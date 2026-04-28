@@ -1,0 +1,68 @@
+/* App specific styles, relying mostly on index.css for global tokens */
+.app-header {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(to right, var(--primary-color), var(--accent-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--text-primary);
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* UI & Layout Utility */
+.flex-gap { display: flex; gap: 0.75rem; }
+.section-divider { border-top: 1px solid var(--border-color); margin-top: 1.5rem; padding-top: 1.5rem; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Printing System */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  header, footer, .btn, .no-print { display: none !important; }
+  body { background: white !important; padding: 0 !important; }
+  .card { border: 1px solid #ccc !important; box-shadow: none !important; break-inside: avoid; color: black !important; }
+  .label-id { color: black !important; }
+}
+
+.print-only { display: none; }
