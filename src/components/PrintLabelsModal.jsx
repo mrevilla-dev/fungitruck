@@ -57,7 +57,7 @@ export default function PrintLabelsModal({ batches, onClose }) {
                       {batch.trazabilidad.fecha_preparacion} <br />
                       {batch.variables_experimentales ? 
                         Object.entries(batch.variables_experimentales).map(([k, v]) => `${k}: ${v}`).join(', ') : 
-                        `Lote: ${batch.id.slice(-4)}`}
+                        (batch.medio_origen_alias ? `Origen: ${batch.medio_origen_alias}` : `Lote: ${batch.id.slice(-4)}`)}
                     </div>
                   </div>
                 </div>
@@ -95,7 +95,7 @@ export default function PrintLabelsModal({ batches, onClose }) {
                         {batch.trazabilidad.fecha_preparacion} <br />
                         {batch.variables_experimentales ? 
                           Object.entries(batch.variables_experimentales)[0]?.join(': ') : 
-                          `ID: ${batch.id.slice(-4)}`}
+                          (batch.medio_origen_alias ? `Org: ${batch.medio_origen_alias}` : `ID: ${batch.id.slice(-4)}`)}
                       </div>
                     </div>
                   </div>
@@ -124,7 +124,7 @@ export default function PrintLabelsModal({ batches, onClose }) {
                   <div className="etiqueta-id">{batch.alias}</div>
                   <div className="etiqueta-nombre">{batch.nombre_receta}</div>
                   <div className="etiqueta-meta">
-                    {batch.trazabilidad.fecha_preparacion} | {batch.id.slice(-4)}
+                    {batch.trazabilidad.fecha_preparacion} | {batch.medio_origen_alias || batch.id.slice(-4)}
                   </div>
                 </div>
               </div>

@@ -4,20 +4,17 @@ import { db, storage } from '../firebase';
 import { doc, getDoc, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { QRCodeSVG } from 'qrcode.react';
-import DestinoSelector from '../components/DestinoSelector';
-import BatchEditModal from '../components/BatchEditModal';
+import { compressImage } from '../utils/imageUtils';
 
 function ScannerPage() {
   const [scanResult, setScanResult] = useState(null);
-  const [batchData, setBatchData] = useState(null);
+  const [recordData, setRecordData] = useState(null);  // batch OR cultivo OR medio
+  const [recordType, setRecordType] = useState(null);  // 'batch' | 'cultivo' | 'medio'
   const [history, setHistory] = useState([]);
   const [statusText, setStatusText] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [showMoveModal, setShowMoveModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [newDestino, setNewDestino] = useState({ id: '', nombre: '' });
 
   useEffect(() => {
     if (!scanResult) {
@@ -26,45 +23,61 @@ function ScannerPage() {
         { fps: 10, qrbox: { width: 250, height: 250 } },
         false
       );
-
       scanner.render(
-        (decodedText) => {
-          setScanResult(decodedText);
-          scanner.clear();
-        },
-        (error) => {}
+        (decodedText) => { setScanResult(decodedText); scanner.clear(); },
+        () => {}
       );
-
-      return () => {
-        scanner.clear().catch(e => console.error(e));
-      };
+      return () => { scanner.clear().catch(() => {}); };
     } else {
-      fetchBatchDetails(scanResult);
+      fetchDetails(scanResult);
     }
   }, [scanResult]);
 
-  const fetchBatchDetails = async (id) => {
+  const fetchDetails = async (id) => {
     setLoading(true);
+    setRecordData(null);
+    setRecordType(null);
+    setHistory([]);
     try {
-      // 1. Get Batch Info
-      const bDoc = await getDoc(doc(db, "batches", id));
-      if (bDoc.exists()) {
-        setBatchData(bDoc.data());
-        
-        // 2. Get Tracking History
-        const hQuery = query(
-          collection(db, "tracking"), 
-          where("batchId", "==", id),
-          orderBy("createdAt", "desc")
-        );
-        const hSnapshot = await getDocs(hQuery);
-        setHistory(hSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      } else {
-        alert("No se encontró información para el lote: " + id);
-        setScanResult(null);
+      // 1. Intentar como Cultivo (CL-YYYYMMDD-XXXX)
+      if (id.startsWith('CL-')) {
+        const qCultivos = query(collection(db, "cultivos"), where("id", "==", id));
+        const snapC = await getDocs(qCultivos);
+        if (!snapC.empty) {
+          setRecordData(snapC.docs[0].data());
+          setRecordType('cultivo');
+          setLoading(false);
+          return;
+        }
       }
+
+      // 2. Intentar como Medio Preparado (ID de Firestore)
+      const medioDoc = await getDoc(doc(db, "medios_preparados", id));
+      if (medioDoc.exists()) {
+        setRecordData({ dbId: id, ...medioDoc.data() });
+        setRecordType('medio');
+        setLoading(false);
+        return;
+      }
+
+      // 3. Intentar como Batch (legacy)
+      const batchDoc = await getDoc(doc(db, "batches", id));
+      if (batchDoc.exists()) {
+        setRecordData(batchDoc.data());
+        setRecordType('batch');
+        const hQuery = query(collection(db, "tracking"), where("batchId", "==", id), orderBy("createdAt", "desc"));
+        const hSnap = await getDocs(hQuery);
+        setHistory(hSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+        return;
+      }
+
+      alert(`No se encontró ningún registro para: ${id}`);
+      setScanResult(null);
     } catch (err) {
-      console.error(err);
+      console.error("Error al buscar:", err);
+      alert("Error al buscar el registro.");
+      setScanResult(null);
     } finally {
       setLoading(false);
     }
@@ -72,10 +85,7 @@ function ScannerPage() {
 
   const handlePhotoCapture = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setPhotoFile(file);
-      setPhotoUrl(URL.createObjectURL(file));
-    }
+    if (file) { setPhotoFile(file); setPhotoUrl(URL.createObjectURL(file)); }
   };
 
   const handleSaveTracking = async () => {
@@ -84,11 +94,25 @@ function ScannerPage() {
     try {
       let uploadedUrl = null;
       if (photoFile) {
-        const fileRef = ref(storage, `tracking/${scanResult}/${Date.now()}-${photoFile.name}`);
-        await uploadBytes(fileRef, photoFile);
-        uploadedUrl = await getDownloadURL(fileRef);
-      }
+        let fileToUpload = photoFile;
+        try {
+          if (photoFile.size > 1024 * 500) {
+            fileToUpload = await compressImage(photoFile);
+          }
+        } catch (compErr) {
+          console.warn("Error en compresión:", compErr);
+        }
 
+        const fileRef = ref(storage, `tracking/${scanResult}/${Date.now()}-${photoFile.name}`);
+        
+        try {
+          await uploadBytes(fileRef, fileToUpload);
+          uploadedUrl = await getDownloadURL(fileRef);
+        } catch (uploadErr) {
+          console.error("Storage Error:", uploadErr);
+          throw new Error(`Fallo la subida: ${uploadErr.code || uploadErr.message}`);
+        }
+      }
       const logEntry = {
         batchId: scanResult,
         status: statusText,
@@ -97,69 +121,33 @@ function ScannerPage() {
         createdAt: new Date().toISOString(),
         serverTimestamp: serverTimestamp()
       };
-
       await addDoc(collection(db, "tracking"), logEntry);
-      
-      // Update local state
       setHistory([logEntry, ...history]);
       setStatusText('');
       setPhotoFile(null);
       setPhotoUrl(null);
-      alert("Seguimiento guardado");
+      alert("✅ Seguimiento guardado");
     } catch (error) {
       console.error(error);
-      alert("Error al guardar");
+      alert(`⚠️ Error al guardar: ${error.message || "Error desconocido"}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMoveBatch = async () => {
-    if (!newDestino.id) return;
+  const handleUpdateCultivoStatus = async (newStatus) => {
+    if (!window.confirm(`¿Marcar este cultivo como "${newStatus}"?`)) return;
     setLoading(true);
     try {
-      // 1. Update Batch Document
-      await updateDoc(doc(db, "batches", scanResult), {
-        destinoId: newDestino.id,
-        destinoNombre: newDestino.nombre
-      });
-
-      // 2. Add Tracking Log
-      await addDoc(collection(db, "tracking"), {
-        batchId: scanResult,
-        status: `📦 Movido a: ${newDestino.nombre}`,
-        type: 'movement',
-        operator: 'Maxi',
-        createdAt: new Date().toISOString(),
-        serverTimestamp: serverTimestamp()
-      });
-
-      setBatchData({ ...batchData, destinoId: newDestino.id, destinoNombre: newDestino.nombre });
-      setShowMoveModal(false);
-      fetchBatchDetails(scanResult); // Refresh
-    } catch (err) {
-      console.error(err);
-      alert("Error al mover");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateStatus = async (newStatus) => {
-    if (!window.confirm(`¿Seguro que querés marcar este lote como ${newStatus}?`)) return;
-    setLoading(true);
-    try {
-      await updateDoc(doc(db, "batches", scanResult), { status: newStatus });
-      await addDoc(collection(db, "tracking"), {
-        batchId: scanResult,
-        status: `⚠️ Estado cambiado a: ${newStatus}`,
-        type: 'status_change',
-        operator: 'Maxi',
-        createdAt: new Date().toISOString(),
-        serverTimestamp: serverTimestamp()
-      });
-      setBatchData({ ...batchData, status: newStatus });
-      fetchBatchDetails(scanResult);
+      const q = query(collection(db, "cultivos"), where("id", "==", scanResult));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        await updateDoc(doc(db, "cultivos", snap.docs[0].id), {
+          status: newStatus,
+          updatedAt: new Date().toISOString()
+        });
+        setRecordData({ ...recordData, status: newStatus });
+      }
     } catch (err) {
       console.error(err);
       alert("Error al actualizar estado");
@@ -168,174 +156,227 @@ function ScannerPage() {
     }
   };
 
-  if (scanResult && batchData) {
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Incubación':     return 'var(--primary-color)';
+      case 'Fructificación': return '#8b5cf6';
+      case 'Cosechado':      return 'var(--accent-color)';
+      case 'Contaminado':    return 'var(--danger-color)';
+      default:               return 'var(--border-color)';
+    }
+  };
+
+  // ── Pantalla de carga ──
+  if (loading && !recordData) {
+    return (
+      <div className="animate-fade-in" style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔍</div>
+        <p style={{ color: 'var(--text-secondary)' }}>Buscando registro...</p>
+      </div>
+    );
+  }
+
+  // ── Vista: Cultivo ──
+  if (recordType === 'cultivo' && recordData) {
+    const statusColor = getStatusColor(recordData.status);
     return (
       <div className="animate-fade-in">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <button className="btn btn-outline no-print" style={{ width: 'auto' }} onClick={() => { setScanResult(null); setBatchData(null); }}>← Volver</button>
-          <div className="label-id" style={{ margin: 0 }}>{scanResult}</div>
-          <button className="btn btn-primary no-print" style={{ width: 'auto', padding: '0.5rem 1rem' }} onClick={() => window.print()}>🖨️ Reimprimir</button>
+          <button className="btn btn-outline no-print" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>{scanResult}</div>
+          <button className="btn btn-primary no-print" style={{ width: 'auto', padding: '0.5rem 1rem' }}
+            onClick={() => window.print()}>🖨️ Imprimir</button>
         </div>
 
-        {/* --- PRINTABLE LABEL (Hidden in UI, visible in print) --- */}
-        <div className="print-only label-card card" style={{ textAlign: 'center', padding: '20px', border: '1px solid black' }}>
-          <div className="label-id" style={{ fontSize: '1.2rem', marginBottom: '10px' }}>{scanResult}</div>
+        {/* Etiqueta de impresión */}
+        <div className="print-only" style={{ textAlign: 'center', padding: '20px', border: '1px solid black' }}>
           <QRCodeSVG value={scanResult} size={150} />
           <div style={{ marginTop: '10px', fontSize: '0.9rem' }}>
-            <strong>{batchData.genero} {batchData.especie}</strong><br/>
-            G{batchData.generacion} | {batchData.substrate}<br/>
-            {new Date(batchData.createdAt).toLocaleDateString()}
+            <strong>{recordData.cepa_especie}</strong><br />
+            {recordData.id} · {recordData.fecha_inoculacion}
           </div>
         </div>
 
-        <div className="card no-print" style={{ borderTop: `6px solid ${
-          batchData.status === 'Contaminado' ? 'var(--danger-color)' : 
-          batchData.status === 'Cosechado' ? 'var(--accent-color)' : 'var(--primary-color)'
-        }` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <div className="card no-print" style={{ borderTop: `6px solid ${statusColor}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
             <div>
-              <h2 style={{ marginBottom: '0.2rem' }}>{batchData.genero} {batchData.especie}</h2>
-              <p style={{ margin: 0 }}>{batchData.cepa || 'Sin cepa'} | <strong style={{ color: 
-                batchData.status === 'Contaminado' ? 'var(--danger-color)' : 
-                batchData.status === 'Cosechado' ? 'var(--accent-color)' : 'inherit'
-              }}>{batchData.status}</strong></p>
+              <h2 style={{ marginBottom: '0.25rem' }}>{recordData.cepa_especie}</h2>
+              <span style={{
+                fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase',
+                color: statusColor, background: `${statusColor}20`,
+                padding: '3px 10px', borderRadius: '99px'
+              }}>{recordData.status}</span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <span className="sala-tipo">G{batchData.generacion}</span>
-              <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>{batchData.esDicarion ? 'Dicarión' : 'Haploide'}</p>
-            </div>
-          </div>
-          
-          <div className="section-divider" style={{ marginTop: '1rem', paddingTop: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label className="form-label">Ubicación Actual</label>
-                <p>📍 {batchData.destinoNombre || 'No definida'} 
-                  {batchData.subUbicacion && <span style={{ color: 'var(--accent-color)', fontWeight: 'bold' }}> - {batchData.subUbicacion}</span>}
-                </p>
-              </div>
-              <div>
-                <label className="form-label">Sustrato</label>
-                <p>🧫 {batchData.substrate}</p>
-              </div>
-            </div>
-            
-            <div className="flex-gap" style={{ marginTop: '1rem' }}>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowMoveModal(true)}>📦 Mover</button>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditModal(true)}>✏️ Editar</button>
-              
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
-                {batchData.status === 'Inoculado' && (
-                  <button className="btn btn-primary" style={{ width: 'auto', padding: '0.5rem' }} onClick={() => handleUpdateStatus('Colonizando')}>🔜</button>
-                )}
-                {batchData.status === 'Colonizando' && (
-                  <button className="btn btn-primary" style={{ width: 'auto', padding: '0.5rem', background: '#f59e0b' }} onClick={() => handleUpdateStatus('Fructificando')}>🍄</button>
-                )}
-                {batchData.status === 'Fructificando' && (
-                  <button className="btn btn-primary" style={{ width: 'auto', padding: '0.5rem', background: 'var(--accent-color)' }} onClick={() => handleUpdateStatus('Cosechado')}>✅</button>
-                )}
-                {batchData.status !== 'Contaminado' && batchData.status !== 'Cosechado' && (
-                  <button className="btn btn-danger" style={{ width: 'auto', padding: '0.5rem' }} onClick={() => handleUpdateStatus('Contaminado')}>☣️</button>
-                )}
-              </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <QRCodeSVG value={scanResult} size={64} />
             </div>
           </div>
 
-          {batchData.parentId && (
-            <div className="section-divider">
-              <label className="form-label">Linaje (Padre)</label>
-              <p style={{ cursor: 'pointer', color: 'var(--primary-color)' }} onClick={() => setScanResult(batchData.parentId)}>
-                🧬 {batchData.parentId}
-              </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div>
+              <label className="form-label">Medio de Origen</label>
+              <p style={{ margin: 0 }}>🧫 {recordData.medio_origen_alias || '—'}</p>
             </div>
-          )}
+            <div>
+              <label className="form-label">Cantidad / Unidades</label>
+              <p style={{ margin: 0 }}>📦 {recordData.cantidad} {recordData.unidad}</p>
+            </div>
+            <div>
+              <label className="form-label">Fecha de Inoculación</label>
+              <p style={{ margin: 0 }}>📅 {recordData.fecha_inoculacion}</p>
+            </div>
+          </div>
+
+          {/* Acciones de estado */}
+          <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+            <label className="form-label">Cambiar Estado del Cultivo</label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {recordData.status !== 'Fructificación' && recordData.status !== 'Cosechado' && recordData.status !== 'Contaminado' && (
+                <button className="btn btn-outline" style={{ width: 'auto', borderColor: '#8b5cf6', color: '#8b5cf6' }}
+                  onClick={() => handleUpdateCultivoStatus('Fructificación')}>🍄 Fructificación</button>
+              )}
+              {recordData.status !== 'Cosechado' && recordData.status !== 'Contaminado' && (
+                <button className="btn btn-outline" style={{ width: 'auto', borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}
+                  onClick={() => handleUpdateCultivoStatus('Cosechado')}>🧺 Cosechado</button>
+              )}
+              {recordData.status !== 'Contaminado' && (
+                <button className="btn btn-danger" style={{ width: 'auto' }}
+                  onClick={() => handleUpdateCultivoStatus('Contaminado')}>☣️ Contaminado</button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* --- NUEVO SEGUIMIENTO --- */}
-        <h3 className="no-print">Nuevo Seguimiento</h3>
+        {/* Seguimiento */}
+        <h3 className="no-print" style={{ marginTop: '1.5rem' }}>Agregar Observación</h3>
         <div className="card no-print">
           <div className="form-group">
-            <label className="form-label">Estado / Evolución</label>
-            <textarea 
-              className="form-control" 
-              rows="2" 
-              placeholder="Ej: Micelio colonizando bien, sin contaminaciones."
+            <label className="form-label">Notas / Observaciones</label>
+            <textarea className="form-control" rows="2"
+              placeholder="Ej: Micelio avanzando bien, sin señales de contaminación."
               value={statusText}
-              onChange={(e) => setStatusText(e.target.value)}
-            />
+              onChange={e => setStatusText(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">Foto de control</label>
+            <label className="form-label">📷 Foto de control</label>
             <input type="file" capture="environment" accept="image/*" className="form-control" onChange={handlePhotoCapture} />
             {photoUrl && <img src={photoUrl} alt="Preview" style={{ width: '100%', borderRadius: '12px', marginTop: '1rem' }} />}
           </div>
-          <button className="btn btn-primary" onClick={handleSaveTracking} disabled={loading || (!statusText && !photoFile)}>
-            {loading ? "Guardando..." : "💾 Guardar Registro"}
+          <button className="btn btn-primary" onClick={handleSaveTracking}
+            disabled={loading || (!statusText && !photoFile)}>
+            {loading ? "Guardando..." : "💾 Guardar Observación"}
           </button>
         </div>
+      </div>
+    );
+  }
 
-        {/* --- HISTORIAL --- */}
-        <div className="no-print">
-          <h3>Historial</h3>
-          {history.length === 0 ? (
-            <p style={{ textAlign: 'center', padding: '2rem' }}>Sin registros previos.</p>
-          ) : (
-            <div className="history-list">
-              {history.map((log, i) => (
-                <div key={i} className="card" style={{ padding: '1rem', marginBottom: '1rem', borderLeft: '4px solid var(--primary-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                    <span>{new Date(log.createdAt).toLocaleString('es-AR')}</span>
-                    <span>{log.operator}</span>
-                  </div>
-                  <p style={{ margin: 0, fontWeight: log.type === 'movement' ? 'bold' : 'normal' }}>{log.status}</p>
-                  {log.imageUrl && <img src={log.imageUrl} alt="Evidencia" style={{ width: '100%', borderRadius: '8px', marginTop: '0.5rem' }} />}
-                </div>
-              ))}
-            </div>
-          )}
+  // ── Vista: Medio Preparado ──
+  if (recordType === 'medio' && recordData) {
+    return (
+      <div className="animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <button className="btn btn-outline" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>
+            {recordData.alias}
+          </div>
         </div>
 
-        {/* --- MOVE MODAL --- */}
-        {showMoveModal && (
-          <div className="modal-overlay no-print">
-            <div className="modal-box">
-              <div className="modal-header">
-                <h3>Mover Lote</h3>
-                <button className="modal-close" onClick={() => setShowMoveModal(false)}>×</button>
-              </div>
-              <p>Seleccioná la nueva sala para el lote <strong>{scanResult}</strong></p>
-              <DestinoSelector 
-                value={newDestino.id} 
-                onChange={(e) => setNewDestino({ id: e.target.value, nombre: e.target.label })} 
-              />
-              <div className="flex-gap" style={{ marginTop: '1.5rem' }}>
-                <button className="btn btn-primary" onClick={handleMoveBatch} disabled={!newDestino.id || loading}>Confirmar Movimiento</button>
-                <button className="btn btn-outline" onClick={() => setShowMoveModal(false)}>Cancelar</button>
-              </div>
+        <div className="card" style={{ borderTop: '6px solid var(--primary-color)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ marginBottom: '0.25rem' }}>{recordData.alias}</h2>
+              <p style={{ margin: 0 }}>{recordData.nombre_receta} · <span className="sala-tipo" style={{ fontSize: '0.7rem' }}>{recordData.tipo}</span></p>
+            </div>
+            <QRCodeSVG value={scanResult} size={64} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div>
+              <label className="form-label">Stock Disponible</label>
+              <p style={{ margin: 0, fontWeight: '700', fontSize: '1.2rem' }}>
+                {recordData.stock_bulk?.cantidad_actual} {recordData.stock_bulk?.unidad}
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Estado</label>
+              <p style={{ margin: 0 }}><span className="sala-tipo">{recordData.estado}</span></p>
+            </div>
+            <div>
+              <label className="form-label">Fecha de Preparación</label>
+              <p style={{ margin: 0 }}>📅 {recordData.trazabilidad?.fecha_preparacion || '—'}</p>
             </div>
           </div>
-        )}
-        {/* --- EDIT MODAL --- */}
-        {showEditModal && (
-          <BatchEditModal 
-            batch={{ id: scanResult, ...batchData }} 
-            onClose={() => setShowEditModal(false)} 
-            onSaved={(updated) => {
-              setBatchData(updated);
-              fetchBatchDetails(scanResult);
-            }} 
-          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista: Batch Legacy ──
+  if (recordType === 'batch' && recordData) {
+    const statusColor = recordData.status === 'Contaminado' ? 'var(--danger-color)'
+                      : recordData.status === 'Cosechado'   ? 'var(--accent-color)'
+                      : 'var(--primary-color)';
+    return (
+      <div className="animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <button className="btn btn-outline no-print" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>{scanResult}</div>
+          <button className="btn btn-primary no-print" style={{ width: 'auto', padding: '0.5rem 1rem' }}
+            onClick={() => window.print()}>🖨️</button>
+        </div>
+
+        <div className="print-only" style={{ textAlign: 'center', padding: '20px', border: '1px solid black' }}>
+          <QRCodeSVG value={scanResult} size={150} />
+          <div style={{ marginTop: '10px', fontSize: '0.9rem' }}>
+            <strong>{recordData.genero} {recordData.especie}</strong><br />
+            G{recordData.generacion} | {recordData.substrate}
+          </div>
+        </div>
+
+        <div className="card no-print" style={{ borderTop: `6px solid ${statusColor}` }}>
+          <h2>{recordData.genero} {recordData.especie}</h2>
+          <p style={{ margin: 0 }}>G{recordData.generacion} · <strong>{recordData.status}</strong></p>
+          <p style={{ margin: '0.5rem 0 0' }}>📍 {recordData.destinoNombre || '—'}</p>
+        </div>
+
+        {history.length > 0 && (
+          <div className="no-print" style={{ marginTop: '1.5rem' }}>
+            <h3>Historial</h3>
+            {history.map((log, i) => (
+              <div key={i} className="card" style={{ padding: '1rem', marginBottom: '0.75rem', borderLeft: '4px solid var(--primary-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  <span>{new Date(log.createdAt).toLocaleString('es-AR')}</span>
+                  <span>{log.operator}</span>
+                </div>
+                <p style={{ margin: 0 }}>{log.status}</p>
+                {log.imageUrl && <img src={log.imageUrl} alt="Evidencia" style={{ width: '100%', borderRadius: '8px', marginTop: '0.5rem' }} />}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     );
   }
 
+  // ── Pantalla principal: Scanner ──
   return (
     <div className="animate-fade-in no-print">
-      <h2>Escanear Lote</h2>
-      <p>Apunta con la cámara al código QR del lote para ver su ficha y trazabilidad.</p>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h2 style={{ marginBottom: '0.25rem' }}>Escanear QR</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          Apuntá la cámara a cualquier etiqueta del laboratorio — cultivos, medios o lotes.
+        </p>
+      </div>
       <div className="card" style={{ padding: '0.5rem', overflow: 'hidden' }}>
         <div id="reader" style={{ width: '100%', border: 'none' }}></div>
+      </div>
+      <div className="card" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.1)' }}>
+        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          💡 Compatible con QRs de: <strong>Cultivos (CL-)</strong>, <strong>Medios Preparados</strong> y lotes heredados.
+        </p>
       </div>
     </div>
   );

@@ -25,11 +25,21 @@
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s;
 }
 
-.nav-link:hover, .nav-link.active {
+.nav-link:hover {
   color: var(--text-primary);
+  background: rgba(255,255,255,0.05);
+}
+
+.nav-link.active {
+  color: var(--text-primary);
+  background: rgba(59, 130, 246, 0.15);
+  font-weight: 600;
 }
 
 .icon-btn {
@@ -54,6 +64,37 @@
 .section-divider { border-top: 1px solid var(--border-color); margin-top: 1.5rem; padding-top: 1.5rem; }
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Icon Button - used across tables */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  opacity: 0.65;
+  transition: opacity 0.15s, transform 0.15s;
+  padding: 0.25rem;
+  border-radius: 6px;
+  line-height: 1;
+}
+.btn-icon:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* Inventory list wrapper */
+.inventory-list { display: flex; flex-direction: column; }
+
+/* Label ID badge */
+.label-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+  background: rgba(59,130,246,0.1);
+  color: var(--primary-color);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
 
 /* Printing System */
 @media print {

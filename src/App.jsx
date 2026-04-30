@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
 import NewBatch from './pages/NewBatch';
 import ScannerPage from './pages/ScannerPage';
 import Maintenance from './pages/Maintenance';
@@ -16,21 +17,20 @@ function App() {
       <PermissionGuard>
         <div className="container">
         <header className="app-header no-print">
-          <div className="brand">FungiTrack</div>
+          <div className="brand">🍄 FungiTrack</div>
           <nav className="nav-links">
-            <Link to="/" className="nav-link">Inicio</Link>
-            <Link to="/new" className="nav-link">Inocular</Link>
-            <Link to="/scan" className="nav-link">Escanear</Link>
-            <Link to="/inventory" className="nav-link">Inventario</Link>
-            <Link to="/salas" className="nav-link">Salas</Link>
-            <Link to="/esporomas" className="nav-link">Ejemplares</Link>
-            <Link to="/maintenance" className="nav-link">Mantenimiento</Link>
+            <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Dashboard</NavLink>
+            <NavLink to="/inventory" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Inventario</NavLink>
+            <NavLink to="/scan" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Escanear</NavLink>
+            <NavLink to="/salas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Salas</NavLink>
+            <NavLink to="/esporomas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Ejemplares</NavLink>
+            <NavLink to="/maintenance" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Mantenimiento</NavLink>
           </nav>
         </header>
 
         <main>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Dashboard />} />
             <Route path="/new" element={<NewBatch />} />
             <Route path="/scan" element={<ScannerPage />} />
             <Route path="/inventory" element={<InventoryPage />} />

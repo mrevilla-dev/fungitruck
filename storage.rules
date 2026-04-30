@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Permitir lectura pública de fotos
+      allow read: if true;
+      
+      // Permitir escritura para archivos de hasta 25MB
+      // Ideal para fotos de alta resolución para posters científicos
+      allow write: if request.resource == null || request.resource.size < 25 * 1024 * 1024;
+    }
+  }
+}

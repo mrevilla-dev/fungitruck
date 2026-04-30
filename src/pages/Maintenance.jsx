@@ -3,6 +3,7 @@ import { db, storage } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import DestinoSelector from '../components/DestinoSelector';
+import { compressImage } from '../utils/imageUtils';
 
 const TIPOS = [
   { value: "Limpieza", label: "🧹 Limpieza y Desinfección" },
@@ -44,9 +45,24 @@ function Maintenance() {
     try {
       let fotoUrl = null;
       if (photo) {
+        let fileToUpload = photo;
+        try {
+          if (photo.size > 1024 * 500) {
+            fileToUpload = await compressImage(photo);
+          }
+        } catch (compErr) {
+          console.warn("Error en compresión:", compErr);
+        }
+
         const fileRef = ref(storage, `mantenimiento/${formData.destinoId}/${Date.now()}-${photo.name}`);
-        await uploadBytes(fileRef, photo);
-        fotoUrl = await getDownloadURL(fileRef);
+        
+        try {
+          await uploadBytes(fileRef, fileToUpload);
+          fotoUrl = await getDownloadURL(fileRef);
+        } catch (uploadErr) {
+          console.error("Storage Error:", uploadErr);
+          throw new Error(`Fallo la subida al Storage: ${uploadErr.code || uploadErr.message}`);
+        }
       }
 
       await addDoc(collection(db, "mantenimiento"), {
@@ -63,7 +79,7 @@ function Maintenance() {
       setSaved(true);
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al guardar. Revisá la consola.");
+      alert(`⚠️ Error al guardar registro: ${error.message || "Error desconocido"}`);
     } finally {
       setLoading(false);
     }

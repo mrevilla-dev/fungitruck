@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import BatchEditModal from '../components/BatchEditModal';
 import RegistroInsumoModal from '../components/RegistroInsumoModal';
 import NuevoMedioModal from '../components/NuevoMedioModal';
 import EditInsumoModal from '../components/EditInsumoModal';
+import PrintLabelsModal from '../components/PrintLabelsModal';
+import CultivosTable from '../components/CultivosTable';
+import NuevoCultivoModal from '../components/NuevoCultivoModal';
 
 // --- Sub-componente: Tabla de Insumos Base ---
 const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
@@ -80,90 +83,7 @@ const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
   );
 };
 
-// --- Sub-componente: Tabla de Cultivos ---
-const CultivosTable = ({ batches, filters, setFilters, salas, onEdit }) => {
-  const filteredBatches = batches.filter(b => {
-    const matchesSearch = b.id.toLowerCase().includes(filters.search.toLowerCase()) || 
-                          `${b.genero} ${b.especie}`.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesStatus = filters.status === 'todas' || b.status === filters.status;
-    const matchesSala = filters.sala === 'todas' || b.destinoId === filters.sala;
-    return matchesSearch && matchesStatus && matchesSala;
-  });
-
-  return (
-    <div className="inventory-list animate-fade-in">
-       <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-          <div>
-            <label className="form-label">Buscar por ID o Especie</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder="Ej: PLO-OST" 
-              value={filters.search}
-              onChange={e => setFilters({...filters, search: e.target.value})}
-            />
-          </div>
-          <div>
-            <label className="form-label">Estado</label>
-            <select className="form-control" value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
-              <option value="todas">Todos los estados</option>
-              <option value="Inoculado">Inoculado</option>
-              <option value="Colonizando">Colonizando</option>
-              <option value="Cosechado">Cosechado</option>
-              <option value="Contaminado">Contaminado</option>
-              <option value="Descartado">Descartado</option>
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Sala</label>
-            <select className="form-control" value={filters.sala} onChange={e => setFilters({...filters, sala: e.target.value})}>
-              <option value="todas">Todas las salas</option>
-              {salas.map(s => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {filteredBatches.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <p style={{ color: 'var(--text-secondary)' }}>No se encontraron cultivos que coincidan con los filtros.</p>
-        </div>
-      ) : (
-        filteredBatches.map(batch => (
-          <div key={batch.id} className="card" style={{ 
-            padding: '1.25rem', 
-            marginBottom: '0.75rem', 
-            display: 'grid', 
-            gridTemplateColumns: '2fr 1fr 1fr 1fr', 
-            alignItems: 'center',
-            borderLeft: `4px solid ${
-              batch.status === 'Contaminado' ? 'var(--danger-color)' : 
-              batch.status === 'Cosechado' ? 'var(--accent-color)' : 
-              batch.status === 'Descartado' ? '#666' : 'var(--primary-color)'
-            }`,
-            transition: 'transform 0.2s'
-          }}>
-            <div>
-              <strong style={{ display: 'block', fontSize: '1.1rem' }}>{batch.genero} {batch.especie}</strong>
-              <span style={{ fontSize: '0.85rem', color: 'var(--primary-color)', fontFamily: 'monospace', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>{batch.id}</span>
-            </div>
-            <div style={{ fontSize: '0.9rem' }}>
-              <span className="sala-tipo" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>G{batch.generacion}</span>
-            </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: '500' }}>{batch.destinoNombre || '---'}</div>
-            <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '1rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase' }}>{batch.status}</span>
-              <button className="btn-icon" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} onClick={() => onEdit(batch)}>✏️</button>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-};
+// --- Sub-componentes eliminados (ahora externos) ---
 
 // --- Componente Principal ---
 function InventoryPage() {
@@ -171,7 +91,7 @@ function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     search: '',
-    status: 'Inoculado',
+    status: 'todas',
     sala: 'todas'
   });
   const [salas, setSalas] = useState([]);
@@ -181,17 +101,55 @@ function InventoryPage() {
   const [activeTab, setActiveTab] = useState('insumos'); 
   const [insumos, setInsumos] = useState([]);
   const [medios, setMedios] = useState([]);
+  const [cultivos, setCultivos] = useState([]);
 
   // Modals State
   const [showRegistroModal, setShowRegistroModal] = useState(false);
   const [showNuevoMedioModal, setShowNuevoMedioModal] = useState(false);
+  const [showNuevoCultivoModal, setShowNuevoCultivoModal] = useState(false);
   const [editingInsumo, setEditingInsumo] = useState(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
+
+  const handleDeleteMedio = async (medio) => {
+    if (!window.confirm(`¿Estás seguro de eliminar el medio ${medio.alias}? Esta acción no devolverá los insumos al stock.`)) return;
+    try {
+      await deleteDoc(doc(db, "medios_preparados", medio.id));
+      alert("✅ Medio eliminado correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar el medio.");
+    }
+  };
+
+  const handlePrintMedio = (medio) => {
+    setSelectedMedioForPrint([medio]);
+    setShowPrintModal(true);
+  };
+
+  const handleDeleteBatch = async (batch) => {
+    if (!window.confirm(`¿Estás seguro de eliminar el cultivo ${batch.id}?`)) return;
+    try {
+      await deleteDoc(doc(db, "batches", batch.id));
+      alert("✅ Cultivo eliminado.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar.");
+    }
+  };
+
+  const handlePrintBatch = (batch) => {
+    // Adapter to match PrintLabelsModal expectations if needed, 
+    // but batches usually have the right structure.
+    setSelectedMedioForPrint([batch]);
+    setShowPrintModal(true);
+  };
 
   useEffect(() => {
-    // Suscripción a Batches (Lotes de Cultivo)
-    const qBatches = query(collection(db, "batches"), orderBy("createdAt", "desc"));
-    const unsubscribeBatches = onSnapshot(qBatches, (snapshot) => {
-      setBatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // Suscripción a Cultivos (Nivel 3)
+    const qCultivos = query(collection(db, "cultivos"), orderBy("createdAt", "desc"));
+    const unsubscribeCultivos = onSnapshot(qCultivos, (snapshot) => {
+      setCultivos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
@@ -214,7 +172,7 @@ function InventoryPage() {
     });
 
     return () => {
-      unsubscribeBatches();
+      unsubscribeCultivos();
       unsubscribeSalas();
       unsubscribeInsumos();
       unsubscribeMedios();
@@ -231,6 +189,11 @@ function InventoryPage() {
         {activeTab === 'insumos' && (
           <button className="btn btn-primary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} onClick={() => setShowRegistroModal(true)}>
             ➕ Registrar Compra
+          </button>
+        )}
+        {activeTab === 'cultivos' && (
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} onClick={() => setShowNuevoCultivoModal(true)}>
+            ➕ Nueva Inoculación
           </button>
         )}
       </header>
@@ -336,7 +299,7 @@ function InventoryPage() {
                     padding: '1.25rem', 
                     marginBottom: '0.75rem', 
                     display: 'grid', 
-                    gridTemplateColumns: '1.5fr 1fr 1fr 1fr', 
+                    gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', 
                     alignItems: 'center',
                     borderLeft: `4px solid var(--primary-color)`
                   }}>
@@ -353,8 +316,12 @@ function InventoryPage() {
                     <div>
                       <strong style={{ fontSize: '1rem' }}>{medio.stock_bulk.cantidad_actual} {medio.stock_bulk.unidad}</strong>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div>
                       <span className="sala-tipo" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>{medio.estado}</span>
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button className="btn-icon" title="Imprimir" onClick={() => handlePrintMedio(medio)}>🖨️</button>
+                      <button className="btn-icon" title="Eliminar" style={{ color: 'var(--danger-color)' }} onClick={() => handleDeleteMedio(medio)}>🗑️</button>
                     </div>
                   </div>
                 ))}
@@ -365,11 +332,11 @@ function InventoryPage() {
 
         {activeTab === 'cultivos' && (
           <CultivosTable 
-            batches={batches} 
+            cultivos={cultivos} 
             filters={filters} 
             setFilters={setFilters} 
-            salas={salas} 
             onEdit={setEditingBatch} 
+            onPrint={handlePrintBatch}
           />
         )}
       </main>
@@ -397,11 +364,25 @@ function InventoryPage() {
         />
       )}
 
+      {showNuevoCultivoModal && (
+        <NuevoCultivoModal 
+          onClose={() => setShowNuevoCultivoModal(false)}
+          onSaved={() => setShowNuevoCultivoModal(false)}
+        />
+      )}
+
       {editingInsumo && (
         <EditInsumoModal 
           insumo={editingInsumo} 
           onClose={() => setEditingInsumo(null)} 
           onSaved={() => setEditingInsumo(null)} 
+        />
+      )}
+
+      {showPrintModal && selectedMedioForPrint && (
+        <PrintLabelsModal 
+          batches={selectedMedioForPrint} 
+          onClose={() => setShowPrintModal(false)} 
         />
       )}
     </div>
