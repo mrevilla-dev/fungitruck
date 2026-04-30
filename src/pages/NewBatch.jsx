@@ -33,7 +33,7 @@ function NewBatch() {
     especie: '',
     cepa: '',
     generacion: 1,
-    esDicarion: true,
+    genetica: 'Diploide',
     esporomaId: '',
     parentId: null,
     manualParentId: '', // New field for manual entry
@@ -92,13 +92,29 @@ function NewBatch() {
           cepa: data.cepa || '',
           generacion: (data.generacion || 1) + 1,
           esporomaId: data.esporomaId || '',
-          esDicarion: data.esDicarion ?? true,
+          genetica: data.genetica || 'Diploide',
           parentId: decodedId,
           origenEsQR: true,
         }));
         setIsHeredado(true);
       } else {
-        alert("No se encontró el lote padre en la base de datos.");
+        // --- CASE 2: Parent is an Esporoma (Specimen) ---
+        const espDoc = await getDoc(doc(db, "esporomas", decodedId));
+        if (espDoc.exists()) {
+          const data = espDoc.data();
+          setFormData(prev => ({
+            ...prev,
+            genero: data.genero || '',
+            especie: data.especie || '',
+            esporomaId: decodedId,
+            genetica: data.genetica === 'Diploide' ? 'Haploide' : data.genetica, // Inoculación desde silvestre suele ser aislamiento
+            parentId: null,
+            origenEsQR: true,
+          }));
+          setIsHeredado(true);
+        } else {
+          alert("❌ No se encontró ningún Lote o Ejemplar con ese QR.");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -130,10 +146,10 @@ function NewBatch() {
           if (selected) {
             newData.genero = selected.genero;
             newData.especie = selected.especie;
-            newData.esDicarion = false; // Esporulación = Aislado Haploide
+            newData.genetica = 'Haploide'; // Aislamiento de esporas = Haploide
           }
         } else {
-          newData.esDicarion = true;
+          newData.genetica = 'Diploide';
         }
       }
       return newData;
@@ -205,7 +221,7 @@ function NewBatch() {
             especie: formData.especie,
             cepa: formData.cepa,
             generacion: formData.generacion,
-            esDicarion: formData.esDicarion,
+            genetica: formData.genetica,
             esporomaId: formData.esporomaId,
             parentId: formData.parentId,
             batchIndex: i + 1,
@@ -256,7 +272,7 @@ function NewBatch() {
               </div>
               <div className="label-details">
                 <p><strong>{formData.genero} {formData.especie}</strong> {formData.cepa && `(${formData.cepa})`}</p>
-                <p><strong>Gen:</strong> G{formData.generacion} | {formData.esDicarion ? 'Dicarión' : 'Haploide'}</p>
+                <p><strong>Gen:</strong> G{formData.generacion} | <strong>{formData.genetica}</strong></p>
                 <p><strong>Medio:</strong> {batch.medio}</p>
                 <p><strong>Dest:</strong> {formData.destinoNombre}</p>
                 <p><strong>Fecha:</strong> {new Date().toLocaleDateString('es-AR')}</p>
@@ -405,11 +421,13 @@ function NewBatch() {
             </div>
           </div>
 
-          <div className="form-group flex-gap">
-            <label className="flex-gap" style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>
-              <input type="checkbox" name="esDicarion" checked={formData.esDicarion} onChange={handleChange} />
-              Es Dicarión (Micelio vegetativo)
-            </label>
+          <div className="form-group">
+            <label className="form-label">Estado Genético / Plustal</label>
+            <select name="genetica" className="form-control" value={formData.genetica} onChange={handleChange} disabled={isHeredado}>
+              <option value="Diploide">Diploide (Dicarión / Silvestre)</option>
+              <option value="Haploide">Haploide (Monocarión / Aislamiento)</option>
+              <option value="Dicarión">Dicarión</option>
+            </select>
           </div>
 
           {/* 3. FECHA Y DESTINO */}

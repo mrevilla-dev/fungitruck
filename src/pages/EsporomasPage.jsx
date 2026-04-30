@@ -16,6 +16,7 @@ export default function EsporomasPage() {
     descripcion: '',
     lugarRecoleccion: '',
     fechaRecoleccion: new Date().toISOString().split('T')[0],
+    genetica: 'Diploide', // Diploide por defecto para esporomas
     operator: 'Maxi'
   });
   const [photo, setPhoto] = useState(null);
@@ -38,6 +39,7 @@ export default function EsporomasPage() {
         descripcion: esp.descripcion,
         lugarRecoleccion: esp.lugarRecoleccion,
         fechaRecoleccion: esp.fechaRecoleccion,
+        genetica: esp.genetica || 'Diploide',
         operator: esp.operator || 'Maxi'
       });
     } else {
@@ -48,6 +50,7 @@ export default function EsporomasPage() {
         descripcion: '',
         lugarRecoleccion: '',
         fechaRecoleccion: new Date().toISOString().split('T')[0],
+        genetica: 'Diploide',
         operator: 'Maxi'
       });
     }
@@ -170,7 +173,7 @@ export default function EsporomasPage() {
               <div style={{ flex: 1 }}>
                 <h3>{esp.genero} {esp.especie}</h3>
                 <p style={{ fontSize: '0.9rem' }}>📍 {esp.lugarRecoleccion}</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>📅 {esp.fechaRecoleccion}</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>📅 {esp.fechaRecoleccion} | 🧬 <strong>{esp.genetica || 'Diploide'}</strong></p>
               </div>
               <div className="print-only" style={{ background: 'white', padding: '5px' }}>
                 <QRCodeSVG value={esp.id} size={80} />
@@ -212,6 +215,19 @@ export default function EsporomasPage() {
                 <label className="form-label">Fecha</label>
                 <input type="date" className="form-control" required value={formData.fechaRecoleccion} onChange={e => setFormData({ ...formData, fechaRecoleccion: e.target.value })} disabled={!!editingEsporoma} />
                 {editingEsporoma && <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>La fecha no se puede editar porque es parte del ID.</p>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Genética / Estado Plustal</label>
+                <select 
+                  className="form-control" 
+                  value={formData.genetica} 
+                  onChange={e => setFormData({ ...formData, genetica: e.target.value })}
+                >
+                  <option value="Diploide">Diploide (Silvestre / Basidioma)</option>
+                  <option value="Haploide">Haploide (Aislamiento de Esporas)</option>
+                  <option value="Dicarión">Dicarión (Cultivado)</option>
+                </select>
               </div>
 
               <div className="form-group">
