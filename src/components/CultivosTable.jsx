@@ -18,7 +18,7 @@ const CultivosTable = ({ cultivos, filters, setFilters, onEdit, onPrint }) => {
 
   const handleUpdateStatus = async (cultivo, newStatus) => {
     try {
-      await updateDoc(doc(db, "cultivos", cultivo.id), {
+      await updateDoc(doc(db, "batches", cultivo.id), {
         status: newStatus,
         updatedAt: new Date().toISOString()
       });
@@ -31,7 +31,7 @@ const CultivosTable = ({ cultivos, filters, setFilters, onEdit, onPrint }) => {
   const handleDelete = async (cultivo) => {
     if (!window.confirm(`¿Estás seguro de eliminar el cultivo ${cultivo.id}?`)) return;
     try {
-      await deleteDoc(doc(db, "cultivos", cultivo.id));
+      await deleteDoc(doc(db, "batches", cultivo.id));
       alert("✅ Cultivo eliminado.");
     } catch (err) {
       console.error(err);
@@ -98,7 +98,7 @@ const CultivosTable = ({ cultivos, filters, setFilters, onEdit, onPrint }) => {
             >
               <div>
                 <strong style={{ display: "block", fontSize: "1.1rem" }}>
-                  {cultivo.cepa_especie}
+                  {cultivo.genero} {cultivo.especie} {cultivo.cepa && `(${cultivo.cepa})`}
                 </strong>
                 <span
                   style={{
@@ -116,13 +116,13 @@ const CultivosTable = ({ cultivos, filters, setFilters, onEdit, onPrint }) => {
               <div style={{ fontSize: "0.9rem" }}>
                 <span
                   className="sala-tipo"
-                  style={{ fontSize: "0.65rem", padding: "2px 8px" }}
+                  style={{ fontSize: "0.65rem", padding: "2px 8px", background: 'rgba(255,255,255,0.05)' }}
                 >
-                  {cultivo.cantidad} Unidades
+                  {cultivo.genetica || 'Diploide'}
                 </span>
               </div>
-              <div style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                {cultivo.medio_origen_alias || "---"}
+              <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                {cultivo.substrate || "---"}
               </div>
               <div
                 style={{
@@ -211,8 +211,9 @@ const CultivosTable = ({ cultivos, filters, setFilters, onEdit, onPrint }) => {
                 </button>
                 <button
                   className="btn-icon"
-                  title="Imprimir"
+                  title="Imprimir QR"
                   onClick={() => onPrint(cultivo)}
+                  style={{ background: 'var(--primary-color)', color: 'white', padding: '6px', borderRadius: '6px', boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)' }}
                 >
                   🖨️
                 </button>
@@ -295,8 +296,8 @@ const CultivosTable = ({ cultivos, filters, setFilters, onEdit, onPrint }) => {
                     });
 
                     const url = driveResult.url;
-                    // 1. Actualizar el documento principal del cultivo
-                    await updateDoc(doc(db, 'cultivos', selectedForPhoto.id), {
+                    // 1. Actualizar el documento principal en batches
+                    await updateDoc(doc(db, 'batches', selectedForPhoto.id), {
                       fotoUrl: url,
                       updatedAt: new Date().toISOString()
                     });
