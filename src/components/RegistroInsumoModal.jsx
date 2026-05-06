@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, doc, runTransaction, serverTimestamp, query, onSnapshot } from 'firebase/firestore';
+import PrintLabelsModal from './PrintLabelsModal';
 
 export default function RegistroInsumoModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -22,8 +23,13 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
     cantidad_compra: 1,
     costo_total: '',
     fecha_ingreso: new Date().toISOString().split('T')[0],
-    fecha_vencimiento: ''
+    fecha_vencimiento: '',
+    estado_apertura: 'Cerrado', // Nuevo pilar 1
+    comentarios_lote: '',      // Nuevo pilar 1
+    lote_interno: ''           // Para ID semántico del lote
   });
+
+  const [successData, setSuccessData] = useState(null); // Para mostrar el botón de QR al finalizar
 
   useEffect(() => {
     const q = query(collection(db, "salas"));
@@ -77,19 +83,33 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
           transaction.update(insumoRef, masterData);
         }
 
-        // 2. Registrar la Entrada
-        const newEntryRef = doc(entradasRef);
-        transaction.set(newEntryRef, {
+        // 2. Registrar el Lote Único (Pilar 1)
+        const loteId = `LOT-${formData.nombre.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
+        const newLoteRef = doc(collection(db, 'insumos_lotes'));
+        
+        const loteData = {
+          id: newLoteRef.id,
+          lote_interno: loteId,
+          insumoId: insumoId,
+          nombre_insumo: formData.nombre,
           proveedor: formData.proveedor,
           fecha_ingreso: formData.fecha_ingreso,
           fecha_vencimiento: formData.fecha_vencimiento || null,
           cantidad_compra: Number(formData.cantidad_compra),
+          unidad_compra: formData.unidad_compra,
           cantidad_base_inicial: cantidadBaseNueva,
           cantidad_base_actual: cantidadBaseNueva,
+          unidad_base: formData.unidad_base,
           costo_total_compra: Number(formData.costo_total),
           costo_unidad_base: costoUnidadBase,
+          estado_apertura: formData.estado_apertura,
+          comentarios_lote: formData.comentarios_lote,
+          ubicacion: formData.ubicacion,
           createdAt: serverTimestamp()
-        });
+        };
+
+        transaction.set(newLoteRef, loteData);
+        setSuccessData(loteData);
       });
 
       onSaved();
@@ -101,11 +121,29 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
     }
   };
 
+  if (successData) {
+    return (
+      <PrintLabelsModal 
+        batches={[{
+          id: successData.lote_interno,
+          nombre_insumo: successData.nombre_insumo,
+          proveedor: successData.proveedor,
+          fecha: successData.fecha_ingreso,
+          tipo: 'LOTE_INSUMO'
+        }]}
+        onClose={() => {
+          onSaved();
+          onClose();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="modal-overlay">
       <div className="modal-box animate-fade-in" style={{ maxWidth: '600px' }}>
         <div className="modal-header">
-          <h3>📦 Registrar Compra / Nuevo Insumo</h3>
+          <h3>📦 Registrar Compra / Nuevo Lote</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
@@ -199,6 +237,16 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
               <div className="form-group">
                 <label className="form-label">Vencimiento (Opc)</label>
                 <input type="date" className="form-control" value={formData.fecha_vencimiento} onChange={e => setFormData({...formData, fecha_vencimiento: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Comentarios / Notas del Lote</label>
+                <textarea 
+                  className="form-control" 
+                  rows="2" 
+                  placeholder="Ej: Lote con empaque ligeramente dañado, bolsa #45"
+                  value={formData.comentarios_lote} 
+                  onChange={e => setFormData({...formData, comentarios_lote: e.target.value})} 
+                />
               </div>
             </div>
           </div>

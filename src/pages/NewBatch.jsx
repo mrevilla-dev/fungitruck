@@ -33,7 +33,9 @@ function NewBatch() {
     especie: '',
     cepa: '',
     generacion: 1,
-    genetica: 'Diploide',
+    ploidia: 'Diploide',
+    tipo_micelio: 'Dicarión',
+    mat: 'N/A',
     esporomaId: '',
     parentId: null,
     manualParentId: '', // New field for manual entry
@@ -92,7 +94,9 @@ function NewBatch() {
           cepa: data.cepa || '',
           generacion: (data.generacion || 1) + 1,
           esporomaId: data.esporomaId || '',
-          genetica: data.genetica || 'Diploide',
+          ploidia: data.ploidia || data.genetica || 'Diploide',
+          tipo_micelio: data.tipo_micelio || 'Dicarión',
+          mat: data.mat || 'N/A',
           parentId: decodedId,
           origenEsQR: true,
         }));
@@ -107,7 +111,9 @@ function NewBatch() {
             genero: data.genero || '',
             especie: data.especie || '',
             esporomaId: decodedId,
-            genetica: data.genetica === 'Diploide' ? 'Haploide' : data.genetica, // Inoculación desde silvestre suele ser aislamiento
+            ploidia: 'Haploide',
+            tipo_micelio: 'Monocarión',
+            mat: 'Desconocido',
             parentId: null,
             origenEsQR: true,
           }));
@@ -221,7 +227,9 @@ function NewBatch() {
             especie: formData.especie,
             cepa: formData.cepa,
             generacion: formData.generacion,
-            genetica: formData.genetica,
+            ploidia: formData.ploidia,
+            tipo_micelio: formData.tipo_micelio,
+            mat: formData.mat,
             esporomaId: formData.esporomaId,
             parentId: formData.parentId,
             batchIndex: i + 1,
@@ -272,7 +280,7 @@ function NewBatch() {
               </div>
               <div className="label-details">
                 <p><strong>{formData.genero} {formData.especie}</strong> {formData.cepa && `(${formData.cepa})`}</p>
-                <p><strong>Gen:</strong> G{formData.generacion} | <strong>{formData.genetica}</strong></p>
+                <p><strong>Gen:</strong> G{formData.generacion} | <strong>{formData.ploidia}</strong> · {formData.tipo_micelio}</p>
                 <p><strong>Medio:</strong> {batch.medio}</p>
                 <p><strong>Dest:</strong> {formData.destinoNombre}</p>
                 <p><strong>Fecha:</strong> {new Date().toLocaleDateString('es-AR')}</p>
@@ -353,7 +361,9 @@ function NewBatch() {
                         especie: data.especie,
                         cepa: data.cepa,
                         generacion: (data.generacion || 1) + 1,
-                        esDicarion: data.esDicarion ?? true
+                        ploidia: data.ploidia || data.genetica || 'Diploide',
+                        tipo_micelio: data.tipo_micelio || 'Dicarión',
+                        mat: data.mat || 'N/A',
                       }));
                       setIsHeredado(true);
                     } else {
@@ -422,12 +432,33 @@ function NewBatch() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Estado Genético / Plustal</label>
-            <select name="genetica" className="form-control" value={formData.genetica} onChange={handleChange} disabled={isHeredado}>
-              <option value="Diploide">Diploide (Dicarión / Silvestre)</option>
-              <option value="Haploide">Haploide (Monocarión / Aislamiento)</option>
-              <option value="Dicarión">Dicarión</option>
-            </select>
+            <label className="form-label" style={{ marginBottom: '0.75rem', display: 'block' }}>🧬 Estado Genético</label>
+            <div className="grid-2" style={{ gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Ploidía</label>
+                <select name="ploidia" className="form-control" value={formData.ploidia} onChange={handleChange} disabled={isHeredado}>
+                  <option value="Diploide">Diploide</option>
+                  <option value="Haploide">Haploide</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Tipo de Micelio</label>
+                <select name="tipo_micelio" className="form-control" value={formData.tipo_micelio} onChange={handleChange} disabled={isHeredado}>
+                  <option value="Dicarión">Dicarión</option>
+                  <option value="Monocarión">Monocarión</option>
+                  <option value="Vegetativo">Vegetativo</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="form-label" style={{ fontSize: '0.75rem' }}>MAT (Tipo de Apareamiento)</label>
+              <select name="mat" className="form-control" value={formData.mat} onChange={handleChange} disabled={isHeredado}>
+                <option value="N/A">N/A</option>
+                <option value="mat-A">mat-A</option>
+                <option value="mat-B">mat-B</option>
+                <option value="Desconocido">Desconocido</option>
+              </select>
+            </div>
           </div>
 
           {/* 3. FECHA Y DESTINO */}

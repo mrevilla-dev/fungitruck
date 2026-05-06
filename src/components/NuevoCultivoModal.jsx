@@ -1,246 +1,241 @@
 import { useState, useEffect } from 'react';
-import { db, storage } from '../firebase';
-import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, orderBy, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import PrintLabelsModal from './PrintLabelsModal';
-import { compressImage } from '../utils/imageUtils';
-import { uploadFileToDrive } from '../services/driveService';
+import { generateBatchId } from '../utils/idGenerator';
 
 export default function NuevoCultivoModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [createdCultivo, setCreatedCultivo] = useState(null);
+  const [createdBatches, setCreatedBatches] = useState([]);
+  
   const [medios, setMedios] = useState([]);
+  const [recipientes, setRecipientes] = useState([]);
   
   const [formData, setFormData] = useState({
     medioId: '',
-    cepa_especie: '',
-    cantidad: 1,
+    recipienteId: '',
+    cantidad_por_unidad: 20, 
+    repeticiones: 1,
+    especie: '',
+    cepa: '',
+    ploidia: 'Diploide',
+    tipo_micelio: 'Dicarión',
+    mat: 'N/A',
+    cepa_madre_id: '',
+    paternal_id: '',
+    maternal_id: '',
+    peso_inoculo: 0,
+    peso_sustrato: 0,
+    observaciones: '',
     fecha_inoculacion: new Date().toISOString().split('T')[0],
   });
-  const [photo, setPhoto] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [ratio, setRatio] = useState(0);
+  const [isFraccionado, setIsFraccionado] = useState(false);
 
   useEffect(() => {
-    // Solo traer medios que tengan stock disponible
-    const q = query(collection(db, "medios_preparados"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allMedios = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Filtrar medios con stock (ya sea bulk o fraccionado, pero usaremos bulk por ahora según el requerimiento general)
-      setMedios(allMedios.filter(m => m.stock_bulk.cantidad_actual > 0));
+    if (formData.peso_inoculo > 0 && formData.peso_sustrato > 0) {
+      setRatio(((formData.peso_inoculo / formData.peso_sustrato) * 100).toFixed(2));
+    } else setRatio(0);
+  }, [formData.peso_inoculo, formData.peso_sustrato]);
+
+  useEffect(() => {
+    const unsubMedios = onSnapshot(collection(db, "medios_preparados"), (snap) => {
+      setMedios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => 
+        (m.estado === 'Bulk' && m.stock_bulk.cantidad_actual > 0) || 
+        (m.estado === 'Fraccionado' && m.stock_fraccionado.cantidad_actual > 0)
+      ));
     });
-    return () => unsubscribe();
+
+    const unsubRecipientes = onSnapshot(query(collection(db, "insumos_base"), where("categoria", "==", "Consumibles y Empaque")), (snap) => {
+      setRecipientes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => { unsubMedios(); unsubRecipientes(); };
   }, []);
+
+  useEffect(() => {
+    if (formData.medioId) {
+      const selectedMedio = medios.find(m => m.id === formData.medioId);
+      if (selectedMedio && selectedMedio.estado === 'Fraccionado') {
+        setIsFraccionado(true);
+        setFormData(prev => ({
+          ...prev,
+          recipienteId: selectedMedio.stock_fraccionado.recipienteId,
+          repeticiones: selectedMedio.stock_fraccionado.cantidad_actual,
+          cantidad_por_unidad: selectedMedio.stock_bulk.cantidad_actual / selectedMedio.stock_fraccionado.cantidad_inicial
+        }));
+      } else {
+        setIsFraccionado(false);
+      }
+    }
+  }, [formData.medioId, medios]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.medioId) return alert("Seleccioná un lote de medio preparado");
-    if (formData.cantidad <= 0) return alert("La cantidad debe ser mayor a 0");
-    
     setLoading(true);
+    const batchesToCreate = [];
 
     try {
       const selectedMedio = medios.find(m => m.id === formData.medioId);
-      let cultivoData = null;
+      const selectedRecipiente = recipientes.find(r => r.id === formData.recipienteId);
 
       await runTransaction(db, async (transaction) => {
         const medioRef = doc(db, 'medios_preparados', formData.medioId);
-        const medioSnap = await transaction.get(medioRef);
-
-        if (!medioSnap.exists()) {
-          throw new Error("El medio seleccionado ya no existe.");
-        }
-
-        const currentStock = medioSnap.data().stock_bulk.cantidad_actual;
-        if (currentStock < formData.cantidad) {
-          throw new Error(`Stock insuficiente. Disponible: ${currentStock} ${medioSnap.data().stock_bulk.unidad}`);
-        }
-
-        // 1. Restar stock del medio
-        transaction.update(medioRef, {
-          'stock_bulk.cantidad_actual': currentStock - Number(formData.cantidad)
-        });
-
-        // 2. Crear el nuevo cultivo
-        const newCultivoRef = doc(collection(db, 'cultivos'));
-        const datePart = formData.fecha_inoculacion.replace(/-/g, '');
-        const id = `CL-${datePart}-${newCultivoRef.id.slice(-4).toUpperCase()}`;
-
-        cultivoData = {
-          id: id,
-          dbId: newCultivoRef.id, // Guardamos el ID de firestore por si las moscas
-          cepa_especie: formData.cepa_especie,
-          cantidad: Number(formData.cantidad),
-          unidad: selectedMedio.stock_bulk.unidad,
-          status: 'Incubación',
-          medio_origen_id: selectedMedio.id,
-          medio_origen_alias: selectedMedio.alias,
-          fecha_inoculacion: formData.fecha_inoculacion,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          // Campos para compatibilidad con PrintLabelsModal
-          alias: id,
-          nombre_receta: formData.cepa_especie,
-          trazabilidad: {
-            fecha_preparacion: formData.fecha_inoculacion
-          }
-        };
-
-        transaction.set(newCultivoRef, cultivoData);
-      });
-
-      // 3. Subir foto si existe
-      if (photo && cultivoData) {
-        setLoading(true); // Aseguramos que siga en loading
-        let fileToUpload = photo;
-        try {
-          // Comprimir solo si es absurdamente pesado (> 10MB)
-          if (photo.size > 1024 * 1024 * 10) {
-            fileToUpload = await compressImage(photo, { maxWidth: 3000, quality: 0.9 });
-          }
-        } catch (e) { console.warn(e); }
-
-        const fileRef = "drive_upload"; // Referencia interna
         
-        try {
-          const driveResult = await uploadFileToDrive(fileToUpload, (progress) => {
-            setUploadProgress(progress);
+        if (isFraccionado) {
+          transaction.update(medioRef, {
+            'stock_fraccionado.cantidad_actual': 0,
+            'stock_bulk.cantidad_actual': 0
           });
-          
-          await updateDoc(doc(db, 'cultivos', cultivoData.dbId), {
-            fotoUrl: driveResult.url
-          });
-          cultivoData.fotoUrl = driveResult.url;
-        } catch (uploadErr) {
-          console.error("Drive Upload Error:", uploadErr);
-          throw new Error(`Error en Google Drive: ${uploadErr.message}`);
-        }
-      }
+        } else {
+          const totalMedio = Number(formData.cantidad_por_unidad) * Number(formData.repeticiones);
+          const recipRef = doc(db, 'insumos_base', formData.recipienteId);
+          const medioSnap = await transaction.get(medioRef);
+          const recipSnap = await transaction.get(recipRef);
 
-      setCreatedCultivo(cultivoData);
+          if (medioSnap.data().stock_bulk.cantidad_actual < totalMedio) throw new Error("Stock de medio insuficiente.");
+          if (recipSnap.data().stock_total_base < formData.repeticiones) throw new Error("Recipientes insuficientes.");
+
+          transaction.update(medioRef, { 'stock_bulk.cantidad_actual': medioSnap.data().stock_bulk.cantidad_actual - totalMedio });
+          transaction.update(recipRef, { stock_total_base: recipSnap.data().stock_total_base - Number(formData.repeticiones) });
+        }
+
+        const batchBaseId = generateBatchId('CL');
+        const timestamp = serverTimestamp();
+
+        for (let i = 1; i <= formData.repeticiones; i++) {
+          const unitId = `${batchBaseId}-${i.toString().padStart(2, '0')}`;
+          const unitData = {
+            id: unitId,
+            batchGroupId: batchBaseId,
+            especie: formData.especie,
+            cepa: formData.cepa,
+            substrate: selectedMedio.nombre_receta,
+            recipiente: selectedRecipiente ? selectedRecipiente.nombre : 'Recipiente Lote',
+            status: 'Incubación',
+            fecha_inoculacion: formData.fecha_inoculacion,
+            observaciones: formData.observaciones,
+            variables_predictivas: { 
+              peso_inoculo: Number(formData.peso_inoculo),
+              peso_sustrato: Number(formData.peso_sustrato),
+              ratio_inoculacion: Number(ratio) 
+            },
+            trazabilidad_genetica: {
+              cepa_madre: formData.cepa_madre_id,
+              paternal: formData.paternal_id,
+              maternal: formData.maternal_id,
+              ploidia: formData.ploidia,
+              tipo_micelio: formData.tipo_micelio,
+              mat: formData.mat
+            },
+            medio_origen_id: selectedMedio.id,
+            createdAt: timestamp,
+            updatedAt: timestamp
+          };
+          transaction.set(doc(db, 'batches', unitId), unitData);
+          batchesToCreate.push(unitData);
+        }
+      });
+      setCreatedBatches(batchesToCreate);
       setSuccess(true);
-    } catch (error) {
-      console.error("Error al crear cultivo:", error);
-      let msg = "Error al procesar la operación";
-      if (error.code === 'storage/unauthorized') msg = "Error de permisos en Storage. Revisá las reglas.";
-      if (error.code === 'storage/quota-exceeded') msg = "Límite de almacenamiento alcanzado en Firebase.";
-      alert(`${msg}: ${error.message}`);
-    } finally {
-      setLoading(false);
-      setUploadProgress(0);
-    }
+    } catch (err) { alert(err.message); } finally { setLoading(false); }
   };
 
-  if (success && createdCultivo) {
-    return (
-      <PrintLabelsModal 
-        batches={[createdCultivo]} 
-        onClose={() => {
-          onSaved();
-          onClose();
-        }} 
-      />
-    );
-  }
+  if (success) return <PrintLabelsModal batches={createdBatches} onClose={() => { onSaved(); onClose(); }} />;
 
   return (
     <div className="modal-overlay">
-      <div className="modal-box animate-fade-in" style={{ maxWidth: '500px' }}>
+      <div className="modal-box animate-fade-in" style={{ maxWidth: '750px' }}>
         <div className="modal-header">
-          <h3>🌱 Nueva Inoculación / Cultivo</h3>
+          <h3>🌱 Nueva Inoculación Trazable</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.25rem' }}>
           
-          <div className="form-group">
-            <label className="form-label">Medio Preparado (Origen)</label>
-            <select 
-              className="form-control" 
-              required 
-              value={formData.medioId} 
-              onChange={e => setFormData({...formData, medioId: e.target.value})}
-            >
-              <option value="">-- Seleccioná un lote --</option>
-              {medios.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.alias} - {m.nombre_receta} (Stock: {m.stock_bulk.cantidad_actual} {m.stock_bulk.unidad})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Cepa / Especie Inoculada</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder="Ej: Pleurotus Ostreatus (Cepa P1)" 
-              required 
-              value={formData.cepa_especie} 
-              onChange={e => setFormData({...formData, cepa_especie: e.target.value})}
-            />
-          </div>
-
-          <div className="grid-2">
+          <div className="section-divider">
+            <h4 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>1. Sustrato y Envase</h4>
             <div className="form-group">
-              <label className="form-label">Cantidad de Unidades</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                required 
-                min="1"
-                value={formData.cantidad} 
-                onChange={e => setFormData({...formData, cantidad: e.target.value})} 
-              />
+              <label className="form-label">Elegir Lote de Medio Preparado</label>
+              <select className="form-control" required value={formData.medioId} onChange={e => setFormData({...formData, medioId: e.target.value})}>
+                <option value="">-- Seleccionar Lote --</option>
+                {medios.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.estado === 'Fraccionado' ? '🧪' : '📦'} {m.alias} - {m.nombre_receta} 
+                    ({m.estado === 'Fraccionado' ? `${m.stock_fraccionado.cantidad_actual} unidades` : `${m.stock_bulk.cantidad_actual}ml`})
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="form-group">
-              <label className="form-label">Fecha de Inoculación</label>
-              <input 
-                type="date" 
-                className="form-control" 
-                value={formData.fecha_inoculacion} 
-                onChange={e => setFormData({...formData, fecha_inoculacion: e.target.value})} 
-              />
-            </div>
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">📷 Foto del Cultivo (Opcional)</label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              capture="environment" 
-              className="form-control" 
-              onChange={e => setPhoto(e.target.files[0])} 
-            />
-            {photo && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                Archivo: {photo.name} ({(photo.size / (1024 * 1024)).toFixed(1)} MB)
-              </p>
-            )}
-          </div>
-
-          {loading && uploadProgress > 0 && (
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.75rem', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.4rem' }}>
-                <span>Subiendo imagen...</span>
-                <span>{Math.round(uploadProgress)}%</span>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Recipiente {isFraccionado && '(Auto)'}</label>
+                <select className="form-control" required disabled={isFraccionado} value={formData.recipienteId} onChange={e => setFormData({...formData, recipienteId: e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u)</option>)}
+                </select>
               </div>
-              <div style={{ width: '100%', height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${uploadProgress}%`, height: '100%', background: 'var(--primary-color)', transition: 'width 0.2s' }}></div>
+              <div className="form-group">
+                <label className="form-label">Unidades {isFraccionado && '(Lote)'}</label>
+                <input type="number" className="form-control" required disabled={isFraccionado} value={formData.repeticiones} onChange={e => setFormData({...formData, repeticiones: e.target.value})} />
               </div>
             </div>
-          )}
-
-          <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            💡 Se descontará la cantidad del stock del medio seleccionado y se creará un nuevo registro de cultivo en estado <strong>Incubación</strong>.
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Procesando...' : '🚀 Iniciar Cultivo'}
-            </button>
+          <div className="section-divider">
+            <h4 style={{ color: 'var(--accent-color)', marginBottom: '1rem' }}>2. Genética y Origen</h4>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Especie</label>
+                <input type="text" className="form-control" required placeholder="Ej: P. Ostreatus" value={formData.especie} onChange={e => setFormData({...formData, especie: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cepa ID</label>
+                <input type="text" className="form-control" placeholder="Ej: PO-2024" value={formData.cepa} onChange={e => setFormData({...formData, cepa: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
+              <label className="form-label">🧬 Trazabilidad Genética (Parentales)</label>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input type="text" className="form-control" placeholder="ID Placa Madre / QR" value={formData.cepa_madre_id} onChange={e => setFormData({...formData, cepa_madre_id: e.target.value})} />
+                <button type="button" className="btn btn-outline" style={{ padding: '0.5rem', width: 'auto' }}>📷 Scan</button>
+              </div>
+              <div className="grid-2">
+                <input type="text" className="form-control" placeholder="ID Paternal" value={formData.paternal_id} onChange={e => setFormData({...formData, paternal_id: e.target.value})} />
+                <input type="text" className="form-control" placeholder="ID Maternal" value={formData.maternal_id} onChange={e => setFormData({...formData, maternal_id: e.target.value})} />
+              </div>
+            </div>
+          </div>
+
+          <div className="section-divider" style={{ background: 'rgba(59, 130, 246, 0.03)', padding: '1rem', borderRadius: '12px' }}>
+            <h4 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>📈 Datos de Inoculación (Ratio)</h4>
+            <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Peso Inóculo (g)</label>
+                <input type="number" className="form-control" value={formData.peso_inoculo} onChange={e => setFormData({...formData, peso_inoculo: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Peso Sustrato (g)</label>
+                <input type="number" className="form-control" value={formData.peso_sustrato} onChange={e => setFormData({...formData, peso_sustrato: e.target.value})} />
+              </div>
+              <div style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--primary-color)', alignSelf: 'center' }}>
+                Ratio: {ratio}%
+              </div>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Observaciones Iniciales</label>
+            <textarea className="form-control" rows="2" placeholder="Vigor del micelio, condiciones de inoculación..." value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{loading ? 'Procesando...' : '🚀 Registrar Lote Trazable'}</button>
           </div>
         </form>
       </div>

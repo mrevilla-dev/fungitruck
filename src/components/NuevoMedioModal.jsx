@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import PrintLabelsModal from './PrintLabelsModal';
 
 export default function NuevoMedioModal({ onClose, onSaved }) {
@@ -8,12 +8,19 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const [success, setSuccess] = useState(false);
   const [createdBatches, setCreatedBatches] = useState([]);
   const [recetas, setRecetas] = useState([]);
+  const [lotesDisponibles, setLotesDisponibles] = useState([]);
+  const [recipientes, setRecipientes] = useState([]);
   const [isExperimental, setIsExperimental] = useState(false);
+  
+  const [selectedLotes, setSelectedLotes] = useState({}); // { insumoId: loteId }
   
   const [formData, setFormData] = useState({
     recetaId: '',
     cantidad_preparada: 1000, 
     fecha_preparacion: new Date().toISOString().split('T')[0],
+    tipo_envasado: 'Bulk', // 'Bulk' o 'Fraccionado'
+    recipienteId: '',
+    cantidad_unidades: 1, // Ej: 10 placas
     
     // Campos Serie Experimental
     repeticiones: 1,
@@ -23,16 +30,42 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   });
 
   useEffect(() => {
+    // Suscripción a Recetas
     const q = query(collection(db, "recetas"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeRecetas = onSnapshot(q, (snapshot) => {
       setRecetas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubscribe();
+
+    // Suscripción a Lotes Abiertos
+    const qLotes = query(
+      collection(db, "insumos_lotes"), 
+      where("estado_apertura", "==", "Abierto"),
+      where("cantidad_base_actual", ">", 0)
+    );
+    const unsubscribeLotes = onSnapshot(qLotes, (snapshot) => {
+      setLotesDisponibles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Suscripción a Recipientes (Consumibles)
+    const qRecip = query(collection(db, "insumos_base"), where("categoria", "==", "Consumibles y Empaque"));
+    const unsubscribeRecip = onSnapshot(qRecip, (snapshot) => {
+      setRecipientes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubscribeRecetas();
+      unsubscribeLotes();
+      unsubscribeRecip();
+    };
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.recetaId) return alert("Seleccioná una receta");
+    if (formData.tipo_envasado === 'Fraccionado' && (!formData.recipienteId || !formData.cantidad_unidades)) {
+      return alert("Si es fraccionado, debés elegir el recipiente y la cantidad.");
+    }
+    
     setLoading(true);
 
     try {
@@ -42,7 +75,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       const batchesData = [];
 
       await runTransaction(db, async (transaction) => {
-        // 1. Verificar Stock de Insumos Base
+        // 1. Verificar Stock de Insumos Base e Ingredientes
         const totalConsumo = {};
         receta.ingredientes.forEach(ing => {
           const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
@@ -53,29 +86,50 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
         const insumosDocs = {};
 
         for (const insumoId in totalConsumo) {
-          insumosRefs[insumoId] = doc(db, 'insumos_base', insumoId);
-          const insumoSnap = await transaction.get(insumosRefs[insumoId]);
+          const selectedLoteId = selectedLotes[insumoId];
+          if (!selectedLoteId) throw new Error(`Debés seleccionar un lote para el insumo: ${insumoId}`);
+
+          insumosRefs[insumoId] = doc(db, 'insumos_lotes', selectedLoteId);
+          const loteSnap = await transaction.get(insumosRefs[insumoId]);
+          if (!loteSnap.exists()) throw new Error(`El lote seleccionado ya no existe.`);
           
-          if (!insumoSnap.exists()) {
-            throw new Error(`Insumo base no encontrado: ${insumoId}`);
+          if (loteSnap.data().cantidad_base_actual < totalConsumo[insumoId]) {
+            throw new Error(`Stock insuficiente en LOTE ${loteSnap.data().lote_interno}.`);
           }
-          
-          const currentStock = insumoSnap.data().stock_total_base;
-          if (currentStock < totalConsumo[insumoId]) {
-            throw new Error(`Stock insuficiente de ${insumoSnap.data().nombre}. Requerido: ${totalConsumo[insumoId].toFixed(1)}${insumoSnap.data().unidad_base}, Disponible: ${currentStock.toFixed(1)}${insumoSnap.data().unidad_base}`);
-          }
-          
-          insumosDocs[insumoId] = insumoSnap.data();
+          insumosDocs[insumoId] = loteSnap.data();
         }
 
-        // 2. Descontar Stock
+        // 2. Verificar Stock de Recipientes (si es fraccionado)
+        let recipRef = null;
+        let recipSnap = null;
+        if (formData.tipo_envasado === 'Fraccionado') {
+          recipRef = doc(db, 'insumos_base', formData.recipienteId);
+          recipSnap = await transaction.get(recipRef);
+          const totalRecipientes = Number(formData.cantidad_unidades) * itemsToCreate;
+          if (recipSnap.data().stock_total_base < totalRecipientes) {
+            throw new Error(`Stock insuficiente de recipientes (${recipSnap.data().nombre}). Necesitás ${totalRecipientes}.`);
+          }
+        }
+
+        // 3. Aplicar Descuentos
         for (const insumoId in totalConsumo) {
           transaction.update(insumosRefs[insumoId], {
-            stock_total_base: insumosDocs[insumoId].stock_total_base - totalConsumo[insumoId]
+            cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
+          });
+          const masterRef = doc(db, 'insumos_base', insumoId);
+          const masterSnap = await transaction.get(masterRef);
+          transaction.update(masterRef, {
+            stock_total_base: masterSnap.data().stock_total_base - totalConsumo[insumoId]
           });
         }
 
-        // 3. Crear Lotes en Medios Preparados
+        if (formData.tipo_envasado === 'Fraccionado') {
+          transaction.update(recipRef, {
+            stock_total_base: recipSnap.data().stock_total_base - (Number(formData.cantidad_unidades) * itemsToCreate)
+          });
+        }
+
+        // 4. Crear Lotes de Medios
         const experimentId = isExperimental ? `EXP-${Date.now()}` : null;
         
         for (let i = 0; i < itemsToCreate; i++) {
@@ -83,7 +137,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           const variableValue = isExperimental ? variableValoresArr[i % variableValoresArr.length] : null;
           const alias = isExperimental 
             ? `${formData.prefix_alias}-P${i + 1}` 
-            : `MP-${formData.recetaId.toUpperCase().slice(0, 4)}-${Date.now().toString().slice(-4)}`;
+            : `MP-${receta.nombre.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
 
           const data = {
             id: newMedioRef.id,
@@ -91,19 +145,23 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             recetaId: receta.id,
             nombre_receta: receta.nombre,
             tipo: receta.categoria,
-            estado: 'Bulk',
+            estado: formData.tipo_envasado, // 'Bulk' o 'Fraccionado'
             stock_bulk: {
               cantidad_inicial: Number(formData.cantidad_preparada),
               cantidad_actual: Number(formData.cantidad_preparada),
               unidad: receta.rendimiento_teorico.unidad
             },
             stock_fraccionado: {
-              cantidad_actual: 0,
-              unidad_final: receta.categoria === 'Agar' ? 'Placas Petri' : 'Bolsas/Frascos'
+              cantidad_inicial: formData.tipo_envasado === 'Fraccionado' ? Number(formData.cantidad_unidades) : 0,
+              cantidad_actual: formData.tipo_envasado === 'Fraccionado' ? Number(formData.cantidad_unidades) : 0,
+              recipienteId: formData.recipienteId,
+              recipienteNombre: formData.tipo_envasado === 'Fraccionado' ? recipientes.find(r => r.id === formData.recipienteId).nombre : null,
+              unidad_final: 'Unidades'
             },
             trazabilidad: {
               insumos_consumidos: receta.ingredientes.map(ing => ({
                 insumoId: ing.insumoId,
+                loteId: selectedLotes[ing.insumoId],
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
               })),
               fecha_preparacion: formData.fecha_preparacion,
@@ -114,177 +172,103 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
 
           if (isExperimental) {
             data.experimentId = experimentId;
-            data.variables_experimentales = {
-              [formData.variable_nombre]: variableValue
-            };
+            data.variables_experimentales = { [formData.variable_nombre]: variableValue };
           }
 
           transaction.set(newMedioRef, data);
           batchesData.push(data);
-        }
-
-        if (isExperimental) {
-          const expRef = doc(db, 'experimentos', experimentId);
-          transaction.set(expRef, {
-            id: experimentId,
-            titulo: `${receta.nombre} - ${formData.prefix_alias}`,
-            factores: [formData.variable_nombre],
-            fecha_inicio: formData.fecha_preparacion,
-            createdAt: serverTimestamp()
-          });
         }
       });
 
       setCreatedBatches(batchesData);
       setSuccess(true);
     } catch (error) {
-      console.error("Error al crear medio:", error);
-      alert(error.message || "Error al procesar la operación");
+      console.error(error);
+      alert(error.message);
     } finally {
       setLoading(false);
     }
   };
 
   if (success) {
-    return (
-      <PrintLabelsModal 
-        batches={createdBatches} 
-        onClose={() => {
-          onSaved();
-          onClose();
-        }} 
-      />
-    );
+    return <PrintLabelsModal batches={createdBatches} onClose={() => { onSaved(); onClose(); }} />;
   }
 
   return (
     <div className="modal-overlay">
-      <div className="modal-box animate-fade-in" style={{ maxWidth: '600px' }}>
+      <div className="modal-box animate-fade-in" style={{ maxWidth: '650px' }}>
         <div className="modal-header">
-          <h3>🧫 Preparar Nuevo Medio / Lote</h3>
+          <h3>🧫 Preparar y Envasar Medio</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.25rem' }}>
           
           <div className="section-divider">
-            <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>Configuración Base</h4>
-            
-            <div className="form-group">
-              <label className="form-label">Seleccionar Receta</label>
-              <select 
-                className="form-control" 
-                required 
-                value={formData.recetaId} 
-                onChange={e => setFormData({...formData, recetaId: e.target.value})}
-              >
-                <option value="">-- Seleccioná una receta --</option>
-                {recetas.map(r => (
-                  <option key={r.id} value={r.id}>{r.nombre} ({r.categoria})</option>
-                ))}
-              </select>
-            </div>
+            <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>1. Receta y Cantidad</h4>
+            <select className="form-control" required value={formData.recetaId} onChange={e => setFormData({...formData, recetaId: e.target.value})}>
+              <option value="">-- Seleccioná Receta --</option>
+              {recetas.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.categoria})</option>)}
+            </select>
 
-            <div className="grid-2">
+            <div className="grid-2" style={{ marginTop: '1rem' }}>
               <div className="form-group">
-                <label className="form-label">Cantidad a Preparar</label>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input 
-                    type="number" 
-                    className="form-control" 
-                    required 
-                    value={formData.cantidad_preparada} 
-                    onChange={e => setFormData({...formData, cantidad_preparada: e.target.value})} 
-                  />
-                  <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                    {recetas.find(r => r.id === formData.recetaId)?.rendimiento_teorico.unidad || 'ml/g'}
-                  </span>
-                </div>
+                <label className="form-label">Volumen Total (ml/g)</label>
+                <input type="number" className="form-control" required value={formData.cantidad_preparada} onChange={e => setFormData({...formData, cantidad_preparada: e.target.value})} />
               </div>
               <div className="form-group">
                 <label className="form-label">Fecha</label>
-                <input 
-                  type="date" 
-                  className="form-control" 
-                  value={formData.fecha_preparacion} 
-                  onChange={e => setFormData({...formData, fecha_preparacion: e.target.value})} 
-                />
+                <input type="date" className="form-control" value={formData.fecha_preparacion} onChange={e => setFormData({...formData, fecha_preparacion: e.target.value})} />
               </div>
             </div>
           </div>
 
-          {/* Toggle Serie Experimental */}
-          <div style={{ 
-            background: 'rgba(59, 130, 246, 0.05)', 
-            padding: '1rem', 
-            borderRadius: '12px',
-            border: `1px solid ${isExperimental ? 'var(--primary-color)' : 'rgba(255,255,255,0.1)'}`
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExperimental ? '1rem' : 0 }}>
-              <div>
-                <strong style={{ display: 'block' }}>Serie Experimental</strong>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Crear múltiples unidades con variables controladas</span>
-              </div>
-              <label className="switch">
-                <input type="checkbox" checked={isExperimental} onChange={() => setIsExperimental(!isExperimental)} />
-                <span className="slider round"></span>
-              </label>
+          <div className="section-divider" style={{ background: 'rgba(59, 130, 246, 0.03)', padding: '1rem', borderRadius: '12px' }}>
+            <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>2. Tipo de Envasado</h4>
+            <div className="grid-2">
+              <button type="button" className={`tipo-btn ${formData.tipo_envasado === 'Bulk' ? 'active' : ''}`} onClick={() => setFormData({...formData, tipo_envasado: 'Bulk'})}>📦 A Granel (Bulk)</button>
+              <button type="button" className={`tipo-btn ${formData.tipo_envasado === 'Fraccionado' ? 'active' : ''}`} onClick={() => setFormData({...formData, tipo_envasado: 'Fraccionado'})}>🧪 Fraccionado</button>
             </div>
 
-            {isExperimental && (
-              <div className="animate-fade-in" style={{ display: 'grid', gap: '1rem', marginTop: '1rem' }}>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Repeticiones (Lotes)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={formData.repeticiones} 
-                      onChange={e => setFormData({...formData, repeticiones: e.target.value})} 
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Alias Prefijo</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ej: EXP1"
-                      value={formData.prefix_alias} 
-                      onChange={e => setFormData({...formData, prefix_alias: e.target.value})} 
-                    />
-                  </div>
+            {formData.tipo_envasado === 'Fraccionado' && (
+              <div className="animate-fade-in" style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Recipiente a usar</label>
+                  <select className="form-control" required value={formData.recipienteId} onChange={e => setFormData({...formData, recipienteId: e.target.value})}>
+                    <option value="">-- Seleccionar Envase --</option>
+                    {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Nombre de Variable (Factor)</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Ej: Tipo de Filtro"
-                    value={formData.variable_nombre} 
-                    onChange={e => setFormData({...formData, variable_nombre: e.target.value})} 
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Valores (separados por coma)</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Filtro A, Filtro B, Control"
-                    value={formData.variable_valores} 
-                    onChange={e => setFormData({...formData, variable_valores: e.target.value})} 
-                  />
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    💡 Se asignarán cíclicamente a los {formData.repeticiones} lotes.
-                  </p>
+                  <label className="form-label">Cantidad de Unidades (Placas/Frascos)</label>
+                  <input type="number" className="form-control" placeholder="Ej: 20" value={formData.cantidad_unidades} onChange={e => setFormData({...formData, cantidad_unidades: e.target.value})} />
                 </div>
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+          {/* Lotes de Insumos */}
+          {formData.recetaId && (
+            <div className="section-divider">
+              <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>🔍 Lotes de Insumos Activos</h4>
+              {recetas.find(r => r.id === formData.recetaId)?.ingredientes.map(ing => (
+                <div key={ing.insumoId} style={{ marginBottom: '0.75rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>{ing.nombre || ing.insumoId}</label>
+                  <select className="form-control form-control-sm" required value={selectedLotes[ing.insumoId] || ''} onChange={e => setSelectedLotes({...selectedLotes, [ing.insumoId]: e.target.value})}>
+                    <option value="">-- Elegir Lote Abierto --</option>
+                    {lotesDisponibles.filter(l => l.insumoId === ing.insumoId).map(l => (
+                      <option key={l.id} value={l.id}>{l.lote_interno} ({l.cantidad_base_actual.toFixed(1)} {l.unidad_base})</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
             <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Preparando...' : 'Registrar Medio'}
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 1 }}>
+              {loading ? 'Procesando...' : '💾 Registrar y Descontar Envases'}
             </button>
           </div>
         </form>

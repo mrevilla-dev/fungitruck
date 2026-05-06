@@ -8,6 +8,7 @@ import SalasPage from './pages/SalasPage';
 import EsporomasPage from './pages/EsporomasPage';
 import InventoryPage from './pages/InventoryPage';
 import AdminResetPage from './pages/AdminResetPage';
+import CrioPage from './pages/CrioPage';
 import PermissionGuard from './components/PermissionGuard';
 import './App.css';
 
@@ -24,6 +25,7 @@ function App() {
             <NavLink to="/scan" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Escanear</NavLink>
             <NavLink to="/salas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Salas</NavLink>
             <NavLink to="/esporomas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Ejemplares</NavLink>
+            <NavLink to="/crio" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>🧠 Crio</NavLink>
             <NavLink to="/maintenance" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Mantenimiento</NavLink>
           </nav>
         </header>
@@ -37,6 +39,7 @@ function App() {
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/salas" element={<SalasPage />} />
             <Route path="/esporomas" element={<EsporomasPage />} />
+            <Route path="/crio" element={<CrioPage />} />
             <Route path="/admin-reset" element={<AdminResetPage />} />
           </Routes>
         </main>

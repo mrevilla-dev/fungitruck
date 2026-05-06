@@ -51,14 +51,25 @@ export default function PrintLabelsModal({ batches, onClose }) {
                     <QRCodeSVG value={batch.id} size={75} level="M" />
                   </div>
                   <div className="etiqueta-info">
-                    <div className="etiqueta-id">{batch.alias}</div>
-                    <div className="etiqueta-nombre">{batch.nombre_receta}</div>
-                    <div className="etiqueta-meta">
-                      {batch.trazabilidad.fecha_preparacion} <br />
-                      {batch.variables_experimentales ? 
-                        Object.entries(batch.variables_experimentales).map(([k, v]) => `${k}: ${v}`).join(', ') : 
-                        (batch.medio_origen_alias ? `Origen: ${batch.medio_origen_alias}` : `Lote: ${batch.id.slice(-4)}`)}
-                    </div>
+                    {batch.tipo === 'LOTE_INSUMO' ? (
+                      <>
+                        <div className="etiqueta-id">{batch.id}</div>
+                        <div className="etiqueta-nombre">{batch.nombre_insumo}</div>
+                        <div className="etiqueta-meta">
+                          Prov: {batch.proveedor} <br />
+                          Ing: {batch.fecha}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="etiqueta-id">{batch.alias || batch.id}</div>
+                        <div className="etiqueta-nombre">{batch.nombre_receta || `${batch.genero} ${batch.especie}`}</div>
+                        <div className="etiqueta-meta">
+                          {batch.trazabilidad?.fecha_preparacion || batch.fecha} <br />
+                          {(batch.ploidia || batch.genetica) ? `${batch.ploidia || batch.genetica}` : (batch.medio_origen_alias ? `Origen: ${batch.medio_origen_alias}` : `Lote: ${batch.id.slice(-4)}`)}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -89,13 +100,11 @@ export default function PrintLabelsModal({ batches, onClose }) {
                       <QRCodeSVG value={batch.id} size={65} level="M" />
                     </div>
                     <div className="etiqueta-info">
-                      <div className="etiqueta-id" style={{ fontSize: '7pt' }}>{batch.alias}</div>
-                      <div className="etiqueta-nombre" style={{ fontSize: '6pt' }}>{batch.nombre_receta}</div>
+                      <div className="etiqueta-id" style={{ fontSize: '7pt' }}>{batch.alias || batch.id}</div>
+                      <div className="etiqueta-nombre" style={{ fontSize: '6pt' }}>{batch.nombre_receta || batch.nombre_insumo || `${batch.genero} ${batch.especie}`}</div>
                       <div className="etiqueta-meta" style={{ fontSize: '5pt' }}>
-                        {batch.trazabilidad.fecha_preparacion} <br />
-                        {batch.variables_experimentales ? 
-                          Object.entries(batch.variables_experimentales)[0]?.join(': ') : 
-                          (batch.medio_origen_alias ? `Org: ${batch.medio_origen_alias}` : `ID: ${batch.id.slice(-4)}`)}
+                        {batch.tipo === 'LOTE_INSUMO' ? `Prov: ${batch.proveedor}` : (batch.trazabilidad?.fecha_preparacion || batch.fecha)} <br />
+                        {(batch.ploidia || batch.genetica) || (batch.medio_origen_alias ? `Org: ${batch.medio_origen_alias}` : `ID: ${batch.id.slice(-4)}`)}
                       </div>
                     </div>
                   </div>
@@ -116,16 +125,27 @@ export default function PrintLabelsModal({ batches, onClose }) {
         {mode === 'thermal' ? (
           <div className="thermal-print-layout">
             {batches.map(batch => (
-              <div key={batch.id} className="etiqueta-lab print-label-area">
-                <div className="etiqueta-qr">
+              <div key={batch.id} className="card print-only-card label-card" style={{ border: '1px solid #eee', padding: '10px' }}>
+                <div className="label-id" style={{ background: '#f8fafc', color: '#1e293b', fontWeight: 'bold' }}>{batch.id}</div>
+                <div className="label-qr">
                   <QRCodeSVG value={batch.id} size={75} />
                 </div>
-                <div className="etiqueta-info">
-                  <div className="etiqueta-id">{batch.alias}</div>
-                  <div className="etiqueta-nombre">{batch.nombre_receta}</div>
-                  <div className="etiqueta-meta">
-                    {batch.trazabilidad.fecha_preparacion} | {batch.medio_origen_alias || batch.id.slice(-4)}
-                  </div>
+                <div className="label-details">
+                  {batch.tipo === 'LOTE_INSUMO' ? (
+                    <>
+                      <p><strong>INSUMO:</strong> {batch.nombre_insumo}</p>
+                      <p><strong>PROVEEDOR:</strong> {batch.proveedor}</p>
+                      <p><strong>FECHA ING:</strong> {batch.fecha}</p>
+                      <p style={{ fontSize: '0.6rem', marginTop: '4px' }}>TRAZABILIDAD FUNGITRACK</p>
+                    </>
+                  ) : (
+                    <>
+                      <p><strong>CEPA:</strong> {batch.especie} {batch.cepa && `(${batch.cepa})`}</p>
+                      <p><strong>LOTE:</strong> {batch.id}</p>
+                      <p><strong>MEDIO:</strong> {batch.substrate || 'Agar'}</p>
+                      <p><strong>FECHA:</strong> {batch.fecha_inoculacion || new Date().toLocaleDateString('es-AR')}</p>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -149,10 +169,10 @@ export default function PrintLabelsModal({ batches, onClose }) {
                       <QRCodeSVG value={batch.id} size={65} />
                     </div>
                     <div className="etiqueta-info">
-                      <div className="etiqueta-id">{batch.alias}</div>
-                      <div className="etiqueta-nombre">{batch.nombre_receta}</div>
+                      <div className="etiqueta-id">{batch.alias || batch.id}</div>
+                      <div className="etiqueta-nombre">{batch.nombre_receta || batch.nombre_insumo || `${batch.genero} ${batch.especie}`}</div>
                       <div className="etiqueta-meta">
-                        {batch.trazabilidad.fecha_preparacion}
+                        {batch.tipo === 'LOTE_INSUMO' ? `Prov: ${batch.proveedor}` : (batch.trazabilidad?.fecha_preparacion || batch.fecha)}
                       </div>
                     </div>
                   </div>

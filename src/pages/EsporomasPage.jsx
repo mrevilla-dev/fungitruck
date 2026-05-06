@@ -16,7 +16,9 @@ export default function EsporomasPage() {
     descripcion: '',
     lugarRecoleccion: '',
     fechaRecoleccion: new Date().toISOString().split('T')[0],
-    genetica: 'Diploide', // Diploide por defecto para esporomas
+    ploidia: 'Diploide',
+    tipo_micelio: 'Dicarión',
+    mat: 'N/A',
     operator: 'Maxi'
   });
   const [photo, setPhoto] = useState(null);
@@ -39,7 +41,9 @@ export default function EsporomasPage() {
         descripcion: esp.descripcion,
         lugarRecoleccion: esp.lugarRecoleccion,
         fechaRecoleccion: esp.fechaRecoleccion,
-        genetica: esp.genetica || 'Diploide',
+        ploidia: esp.ploidia || esp.genetica || 'Diploide',
+        tipo_micelio: esp.tipo_micelio || 'Dicarión',
+        mat: esp.mat || 'N/A',
         operator: esp.operator || 'Maxi'
       });
     } else {
@@ -50,7 +54,9 @@ export default function EsporomasPage() {
         descripcion: '',
         lugarRecoleccion: '',
         fechaRecoleccion: new Date().toISOString().split('T')[0],
-        genetica: 'Diploide',
+        ploidia: 'Diploide',
+        tipo_micelio: 'Dicarión',
+        mat: 'N/A',
         operator: 'Maxi'
       });
     }
@@ -173,7 +179,7 @@ export default function EsporomasPage() {
               <div style={{ flex: 1 }}>
                 <h3>{esp.genero} {esp.especie}</h3>
                 <p style={{ fontSize: '0.9rem' }}>📍 {esp.lugarRecoleccion}</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>📅 {esp.fechaRecoleccion} | 🧬 <strong>{esp.genetica || 'Diploide'}</strong></p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>📅 {esp.fechaRecoleccion} | 🧬 <strong>{esp.ploidia || esp.genetica || 'Diploide'}</strong> · {esp.tipo_micelio || 'Dicarión'}</p>
               </div>
               <div className="print-only" style={{ background: 'white', padding: '5px' }}>
                 <QRCodeSVG value={esp.id} size={80} />
@@ -218,16 +224,33 @@ export default function EsporomasPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Genética / Estado Plustal</label>
-                <select 
-                  className="form-control" 
-                  value={formData.genetica} 
-                  onChange={e => setFormData({ ...formData, genetica: e.target.value })}
-                >
-                  <option value="Diploide">Diploide (Silvestre / Basidioma)</option>
-                  <option value="Haploide">Haploide (Aislamiento de Esporas)</option>
-                  <option value="Dicarión">Dicarión (Cultivado)</option>
-                </select>
+                <label className="form-label">🧬 Estado Genético</label>
+                <div className="grid-2" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.72rem' }}>Ploidía</label>
+                    <select className="form-control" value={formData.ploidia} onChange={e => setFormData({ ...formData, ploidia: e.target.value })}>
+                      <option value="Diploide">Diploide</option>
+                      <option value="Haploide">Haploide</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.72rem' }}>Tipo de Micelio</label>
+                    <select className="form-control" value={formData.tipo_micelio} onChange={e => setFormData({ ...formData, tipo_micelio: e.target.value })}>
+                      <option value="Dicarión">Dicarión</option>
+                      <option value="Monocarión">Monocarión</option>
+                      <option value="Vegetativo">Vegetativo</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.72rem' }}>MAT (Apareamiento)</label>
+                  <select className="form-control" value={formData.mat} onChange={e => setFormData({ ...formData, mat: e.target.value })}>
+                    <option value="N/A">N/A</option>
+                    <option value="mat-A">mat-A</option>
+                    <option value="mat-B">mat-B</option>
+                    <option value="Desconocido">Desconocido</option>
+                  </select>
+                </div>
               </div>
 
               <div className="form-group">

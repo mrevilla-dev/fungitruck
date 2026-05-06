@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import BatchEditModal from '../components/BatchEditModal';
@@ -8,15 +8,16 @@ import EditInsumoModal from '../components/EditInsumoModal';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import CultivosTable from '../components/CultivosTable';
 import NuevoCultivoModal from '../components/NuevoCultivoModal';
+import AuditInsumoModal from '../components/AuditInsumoModal';
+import RecipeFormModal from '../components/RecipeFormModal';
 
 // --- Sub-componente: Tabla de Insumos Base ---
-const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
+const InsumosTable = ({ insumos, lotes, onRegistrarCompra, onEdit, onAudit }) => {
   if (insumos.length === 0) {
     return (
       <div className="card animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</div>
         <h3>No hay insumos cargados</h3>
-        <p>Comenzá registrando tu primera compra de materia prima.</p>
         <button className="btn btn-primary" style={{ width: 'auto', marginTop: '1rem' }} onClick={onRegistrarCompra}>
           Registrar Primer Insumo
         </button>
@@ -26,7 +27,7 @@ const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
 
   return (
     <div className="inventory-list animate-fade-in">
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', padding: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', padding: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
         <span>Insumo / Ubicación</span>
         <span>Stock Actual</span>
         <span>Estado</span>
@@ -38,353 +39,173 @@ const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
         const stockVisible = (insumo.stock_total_base / (insumo.factor_display || 1)).toFixed(1);
         
         return (
-          <div key={insumo.id} className="card" style={{ 
-            padding: '1.25rem', 
-            marginBottom: '0.75rem', 
-            display: 'grid', 
-            gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', 
-            alignItems: 'center',
-            borderLeft: `4px solid ${isLowStock ? 'var(--danger-color)' : 'var(--accent-color)'}`,
-            background: isLowStock ? 'rgba(239, 68, 68, 0.05)' : 'var(--surface-color)',
-            transition: 'transform 0.2s',
-            cursor: 'default'
-          }}>
-            <div>
-              <strong style={{ display: 'block', fontSize: '1.1rem' }}>{insumo.nombre}</strong>
-              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
-                <span className="sala-tipo" style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{insumo.categoria}</span>
-                {insumo.ubicacion && (
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>📍 {insumo.ubicacion}</span>
-                )}
+          <React.Fragment key={insumo.id}>
+            <div className="card" style={{ 
+              padding: '1.25rem', 
+              marginBottom: '0.75rem', 
+              display: 'grid', 
+              gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', 
+              alignItems: 'center',
+              borderLeft: `4px solid ${isLowStock ? 'var(--danger-color)' : 'var(--accent-color)'}`
+            }}>
+              <div>
+                <strong style={{ display: 'block' }}>{insumo.nombre}</strong>
+                <span className="sala-tipo" style={{ fontSize: '0.65rem' }}>{insumo.categoria}</span>
+              </div>
+              <div><strong>{stockVisible} {insumo.unidad_display || insumo.unidad_base}</strong></div>
+              <div>{isLowStock ? '⚠️ BAJO' : '✔️ OK'}</div>
+              <div>${insumo.metadata?.costo_promedio_base?.toFixed(2) || '0.00'}</div>
+              <div style={{ textAlign: 'right' }}>
+                <button className="btn-icon" onClick={() => onEdit(insumo)}>✏️</button>
               </div>
             </div>
-            <div>
-              <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: isLowStock ? 'var(--danger-color)' : 'var(--text-primary)' }}>
-                {stockVisible} {insumo.unidad_display || insumo.unidad_base}
-              </span>
+            
+            {/* Lotes individuales (Pilar 1) */}
+            <div style={{ marginLeft: '2rem', marginBottom: '1.5rem', display: 'grid', gap: '0.5rem' }}>
+              {lotes.filter(l => l.insumoId === insumo.id).map(lote => (
+                <div key={lote.id} className="card" style={{ 
+                  padding: '0.75rem 1rem', 
+                  fontSize: '0.85rem', 
+                  display: 'grid', 
+                  gridTemplateColumns: '1.5fr 1fr 1fr 1fr', 
+                  alignItems: 'center',
+                  background: lote.estado_apertura === 'Contaminado' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.02)',
+                  border: lote.estado_apertura === 'Abierto' ? '1px solid var(--primary-color)' : '1px solid transparent'
+                }}>
+                  <div><strong>{lote.lote_interno}</strong> <span style={{ fontSize: '0.7rem' }}>({lote.proveedor})</span></div>
+                  <div>{lote.cantidad_base_actual.toFixed(1)} {lote.unidad_base}</div>
+                  <div>{lote.estado_apertura}</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <button className="btn btn-outline" style={{ fontSize: '0.65rem', padding: '2px 8px' }} onClick={() => onAudit(lote)}>🔍 Audit</button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              {isLowStock ? (
-                <span style={{ color: 'var(--danger-color)', fontSize: '0.75rem', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '12px' }}>⚠️ CRÍTICO</span>
-              ) : (
-                <span style={{ color: 'var(--accent-color)', fontSize: '0.75rem', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '12px' }}>✔️ OK</span>
-              )}
-            </div>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              ${insumo.metadata?.costo_promedio_base ? (insumo.metadata.costo_promedio_base * (insumo.factor_display || 1)).toFixed(2) : '0.00'} / {insumo.unidad_display}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <button className="btn-icon" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} onClick={() => onEdit(insumo)}>✏️</button>
-            </div>
-          </div>
+          </React.Fragment>
         );
       })}
     </div>
   );
 };
 
-// --- Sub-componentes eliminados (ahora externos) ---
+// --- Sub-componente: Tabla de Recetas (Pilar 4) ---
+const RecetasTable = ({ recetas, onClone, onAdd }) => {
+  if (recetas.length === 0) return <div className="card">No hay recetas. <button onClick={onAdd}>Crear</button></div>;
+  return (
+    <div className="inventory-list animate-fade-in">
+      {recetas.map(r => (
+        <div key={r.id} className="card" style={{ padding: '1rem', marginBottom: '0.5rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 2fr 0.5fr', alignItems: 'center' }}>
+          <div><strong>{r.nombre}</strong></div>
+          <div>{r.rendimiento_teorico?.cantidad} {r.rendimiento_teorico?.unidad}</div>
+          <div style={{ fontSize: '0.8rem' }}>{r.ingredientes?.map(i => i.nombre || i.insumoId).join(', ')}</div>
+          <div style={{ textAlign: 'right' }}>
+            <button className="btn-icon" onClick={() => onClone(r)}>🐑</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
-// --- Componente Principal ---
 function InventoryPage() {
-  const [batches, setBatches] = useState([]);
+  const [activeTab, setActiveTab] = useState('insumos');
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    search: '',
-    status: 'todas',
-    sala: 'todas'
-  });
-  const [salas, setSalas] = useState([]);
-  const [editingBatch, setEditingBatch] = useState(null);
-  
-  // Tabs State
-  const [activeTab, setActiveTab] = useState('insumos'); 
   const [insumos, setInsumos] = useState([]);
+  const [insumosLotes, setInsumosLotes] = useState([]);
   const [medios, setMedios] = useState([]);
   const [cultivos, setCultivos] = useState([]);
+  const [recetas, setRecetas] = useState([]);
+  const [salas, setSalas] = useState([]);
+  const [filters, setFilters] = useState({ search: '', status: 'todas', sala: 'todas' });
 
-  // Modals State
   const [showRegistroModal, setShowRegistroModal] = useState(false);
   const [showNuevoMedioModal, setShowNuevoMedioModal] = useState(false);
   const [showNuevoCultivoModal, setShowNuevoCultivoModal] = useState(false);
-  const [editingInsumo, setEditingInsumo] = useState(null);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  
+  const [editingInsumo, setEditingInsumo] = useState(null);
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [auditingLote, setAuditingLote] = useState(null);
+  const [recipeToClone, setRecipeToClone] = useState(null);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
 
-  const handleDeleteMedio = async (medio) => {
-    if (!window.confirm(`¿Estás seguro de eliminar el medio ${medio.alias}? Esta acción no devolverá los insumos al stock.`)) return;
-    try {
-      await deleteDoc(doc(db, "medios_preparados", medio.id));
-      alert("✅ Medio eliminado correctamente.");
-    } catch (err) {
-      console.error(err);
-      alert("Error al eliminar el medio.");
-    }
-  };
-
-  const handlePrintMedio = (medio) => {
-    setSelectedMedioForPrint([medio]);
-    setShowPrintModal(true);
-  };
-
-  const handleDeleteBatch = async (batch) => {
-    if (!window.confirm(`¿Estás seguro de eliminar el cultivo ${batch.id}?`)) return;
-    try {
-      await deleteDoc(doc(db, "batches", batch.id));
-      alert("✅ Cultivo eliminado.");
-    } catch (err) {
-      console.error(err);
-      alert("Error al eliminar.");
-    }
-  };
-
-  const handlePrintBatch = (batch) => {
-    // Adapter to match PrintLabelsModal expectations if needed, 
-    // but batches usually have the right structure.
-    setSelectedMedioForPrint([batch]);
-    setShowPrintModal(true);
-  };
-
   useEffect(() => {
-    // Suscripción a Cultivos (Nivel 3)
-    const qCultivos = query(collection(db, "cultivos"), orderBy("createdAt", "desc"));
-    const unsubscribeCultivos = onSnapshot(qCultivos, (snapshot) => {
-      setCultivos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), snap => {
+      setCultivos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
-
-    // Suscripción a Salas
-    const qSalas = query(collection(db, "salas"));
-    const unsubscribeSalas = onSnapshot(qSalas, (snapshot) => {
-      setSalas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    // Suscripción a Insumos Base
-    const qInsumos = query(collection(db, "insumos_base"), orderBy("nombre", "asc"));
-    const unsubscribeInsumos = onSnapshot(qInsumos, (snapshot) => {
-      setInsumos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    // Suscripción a Medios Preparados
-    const qMedios = query(collection(db, "medios_preparados"), orderBy("createdAt", "desc"));
-    const unsubscribeMedios = onSnapshot(qMedios, (snapshot) => {
-      setMedios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubInsumos = onSnapshot(query(collection(db, "insumos_base"), orderBy("nombre", "asc")), snap => setInsumos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubLotes = onSnapshot(query(collection(db, "insumos_lotes"), orderBy("createdAt", "desc")), snap => setInsumosLotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubMedios = onSnapshot(query(collection(db, "medios_preparados"), orderBy("createdAt", "desc")), snap => setMedios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubRecetas = onSnapshot(query(collection(db, "recetas"), orderBy("nombre", "asc")), snap => setRecetas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubSalas = onSnapshot(collection(db, "salas"), snap => setSalas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
     return () => {
-      unsubscribeCultivos();
-      unsubscribeSalas();
-      unsubscribeInsumos();
-      unsubscribeMedios();
+      unsubBatches(); unsubInsumos(); unsubLotes(); unsubMedios(); unsubRecetas(); unsubSalas();
     };
   }, []);
 
+  const handlePrintBatch = (batch) => { setSelectedMedioForPrint([batch]); setShowPrintModal(true); };
+
   return (
-    <div className="inventory-page container">
+    <div className="inventory-page container animate-fade-in">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.5px' }}>Inventario Central</h1>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Gestión integral de recursos y trazabilidad</p>
+        <h2>Inventario Central</h2>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          {activeTab === 'insumos' && <button className="btn btn-primary" onClick={() => setShowRegistroModal(true)}>➕ Registrar Compra</button>}
+          {activeTab === 'cultivos' && <button className="btn btn-primary" onClick={() => setShowNuevoCultivoModal(true)}>➕ Nueva Inoculación</button>}
+          {activeTab === 'recetas' && <button className="btn btn-primary" onClick={() => setShowRecipeModal(true)}>➕ Nueva Receta</button>}
         </div>
-        {activeTab === 'insumos' && (
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} onClick={() => setShowRegistroModal(true)}>
-            ➕ Registrar Compra
-          </button>
-        )}
-        {activeTab === 'cultivos' && (
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} onClick={() => setShowNuevoCultivoModal(true)}>
-            ➕ Nueva Inoculación
-          </button>
-        )}
       </header>
 
-      {/* Navegación por Tabs Estilo Premium */}
-      <nav className="tab-container" style={{ 
-        display: 'flex', 
-        gap: '0.5rem', 
-        marginBottom: '2rem', 
-        background: 'rgba(0,0,0,0.2)', 
-        padding: '0.4rem', 
-        borderRadius: '14px',
-        border: '1px solid rgba(255,255,255,0.05)'
-      }}>
-        <button 
-          className={`tab-btn ${activeTab === 'insumos' ? 'active' : ''}`} 
-          style={{ 
-            flex: 1, 
-            padding: '0.8rem', 
-            border: 'none', 
-            borderRadius: '10px', 
-            cursor: 'pointer', 
-            fontWeight: '600',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-            background: activeTab === 'insumos' ? 'var(--primary-color)' : 'transparent', 
-            color: activeTab === 'insumos' ? 'white' : 'var(--text-secondary)',
-            boxShadow: activeTab === 'insumos' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
-          }}
-          onClick={() => setActiveTab('insumos')}
-        >📦 Insumos Base</button>
-        
-        <button 
-          className={`tab-btn ${activeTab === 'medios' ? 'active' : ''}`} 
-          style={{ 
-            flex: 1, 
-            padding: '0.8rem', 
-            border: 'none', 
-            borderRadius: '10px', 
-            cursor: 'pointer', 
-            fontWeight: '600',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-            background: activeTab === 'medios' ? 'var(--primary-color)' : 'transparent', 
-            color: activeTab === 'medios' ? 'white' : 'var(--text-secondary)',
-            boxShadow: activeTab === 'medios' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
-          }}
-          onClick={() => setActiveTab('medios')}
-        >🧫 Medios Prep.</button>
-        
-        <button 
-          className={`tab-btn ${activeTab === 'cultivos' ? 'active' : ''}`} 
-          style={{ 
-            flex: 1, 
-            padding: '0.8rem', 
-            border: 'none', 
-            borderRadius: '10px', 
-            cursor: 'pointer', 
-            fontWeight: '600',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-            background: activeTab === 'cultivos' ? 'var(--primary-color)' : 'transparent', 
-            color: activeTab === 'cultivos' ? 'white' : 'var(--text-secondary)',
-            boxShadow: activeTab === 'cultivos' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
-          }}
-          onClick={() => setActiveTab('cultivos')}
-        >🌱 Cultivos</button>
+      <nav className="tab-container" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', background: 'rgba(0,0,0,0.2)', padding: '0.4rem', borderRadius: '14px' }}>
+        {['insumos', 'medios', 'cultivos', 'recetas'].map(tab => (
+          <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} style={{ flex: 1, padding: '0.8rem', border: 'none', borderRadius: '10px', background: activeTab === tab ? 'var(--primary-color)' : 'transparent', color: activeTab === tab ? 'white' : 'var(--text-secondary)' }} onClick={() => setActiveTab(tab)}>
+            {tab.toUpperCase()}
+          </button>
+        ))}
       </nav>
 
-      {/* Renderizado Condicional de Vistas */}
-      <main className="tab-content">
-        {activeTab === 'insumos' && (
-          <InsumosTable 
-            insumos={insumos} 
-            onRegistrarCompra={() => setShowRegistroModal(true)} 
-            onEdit={setEditingInsumo}
-          />
-        )}
-        
+      <main>
+        {activeTab === 'insumos' && <InsumosTable insumos={insumos} lotes={insumosLotes} onRegistrarCompra={() => setShowRegistroModal(true)} onEdit={setEditingInsumo} onAudit={setAuditingLote} />}
         {activeTab === 'medios' && (
-          <div className="animate-fade-in">
-             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
-              <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setShowNuevoMedioModal(true)}>
-                ➕ Preparar Nuevo Medio
-              </button>
-            </div>
-            
-            {medios.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-                <div style={{ fontSize: '4rem', marginBottom: '1.5rem', filter: 'grayscale(0.5)' }}>🧫</div>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>No hay medios preparados</h3>
-                <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
-                  Comenzá registrando tu primera preparación de agar o grano.
-                </p>
+          <div>
+            <button className="btn btn-primary" onClick={() => setShowNuevoMedioModal(true)}>➕ Preparar Medio</button>
+            {medios.map(m => (
+              <div key={m.id} className="card" style={{ padding: '1rem', marginTop: '0.5rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', alignItems: 'center' }}>
+                <div><strong>{m.alias}</strong></div>
+                <div>{m.nombre_receta}</div>
+                <div>{m.stock_bulk.cantidad_actual} {m.stock_bulk.unidad}</div>
+                <div>{m.estado}</div>
+                <button className="btn-icon" onClick={() => { setSelectedMedioForPrint([m]); setShowPrintModal(true); }}>🖨️</button>
               </div>
-            ) : (
-              <div className="inventory-list">
-                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', padding: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                  <span>ID / Alias</span>
-                  <span>Receta</span>
-                  <span>Stock Bulk</span>
-                  <span>Estado</span>
-                </div>
-                {medios.map(medio => (
-                  <div key={medio.id} className="card" style={{ 
-                    padding: '1.25rem', 
-                    marginBottom: '0.75rem', 
-                    display: 'grid', 
-                    gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', 
-                    alignItems: 'center',
-                    borderLeft: `4px solid var(--primary-color)`
-                  }}>
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '1rem' }}>{medio.alias}</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{medio.id}</span>
-                      {medio.experimentId && (
-                        <span style={{ marginLeft: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary-color)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.65rem' }}>🔬 EXP</span>
-                      )}
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem' }}>{medio.nombre_receta}</span>
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '1rem' }}>{medio.stock_bulk.cantidad_actual} {medio.stock_bulk.unidad}</strong>
-                    </div>
-                    <div>
-                      <span className="sala-tipo" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>{medio.estado}</span>
-                    </div>
-                    <div style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <button className="btn-icon" title="Imprimir" onClick={() => handlePrintMedio(medio)}>🖨️</button>
-                      <button className="btn-icon" title="Eliminar" style={{ color: 'var(--danger-color)' }} onClick={() => handleDeleteMedio(medio)}>🗑️</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         )}
-
-        {activeTab === 'cultivos' && (
-          <CultivosTable 
-            cultivos={cultivos} 
-            filters={filters} 
-            setFilters={setFilters} 
-            onEdit={setEditingBatch} 
-            onPrint={handlePrintBatch}
-          />
-        )}
+        {activeTab === 'cultivos' && <CultivosTable cultivos={cultivos} filters={filters} setFilters={setFilters} onEdit={setEditingBatch} onPrint={handlePrintBatch} />}
+        {activeTab === 'recetas' && <RecetasTable recetas={recetas} onClone={r => { setRecipeToClone(r); setShowRecipeModal(true); }} onAdd={() => setShowRecipeModal(true)} />}
       </main>
 
-      {/* Modales de Interacción */}
-      {showRegistroModal && (
-        <RegistroInsumoModal 
-          onClose={() => setShowRegistroModal(false)}
-          onSaved={() => setShowRegistroModal(false)}
-        />
-      )}
-
+      {showRegistroModal && <RegistroInsumoModal onClose={() => setShowRegistroModal(false)} onSaved={() => setShowRegistroModal(false)} />}
+      {showNuevoMedioModal && <NuevoMedioModal onClose={() => setShowNuevoMedioModal(false)} onSaved={() => setShowNuevoMedioModal(false)} />}
+      {showNuevoCultivoModal && <NuevoCultivoModal onClose={() => setShowNuevoCultivoModal(false)} onSaved={() => setShowNuevoCultivoModal(false)} />}
+      {showRecipeModal && <RecipeFormModal recipeToClone={recipeToClone} onClose={() => { setShowRecipeModal(false); setRecipeToClone(null); }} onSaved={() => { setShowRecipeModal(false); setRecipeToClone(null); }} />}
       {editingBatch && (
         <BatchEditModal 
           batch={editingBatch} 
           onClose={() => setEditingBatch(null)} 
           onSaved={() => setEditingBatch(null)} 
+          onFilterBatch={(groupId) => {
+            setFilters({ ...filters, search: groupId });
+            setActiveTab('cultivos');
+            setEditingBatch(null);
+          }}
         />
       )}
-
-      {showNuevoMedioModal && (
-        <NuevoMedioModal 
-          onClose={() => setShowNuevoMedioModal(false)}
-          onSaved={() => setShowNuevoMedioModal(false)}
-        />
-      )}
-
-      {showNuevoCultivoModal && (
-        <NuevoCultivoModal 
-          onClose={() => setShowNuevoCultivoModal(false)}
-          onSaved={() => setShowNuevoCultivoModal(false)}
-        />
-      )}
-
-      {editingInsumo && (
-        <EditInsumoModal 
-          insumo={editingInsumo} 
-          onClose={() => setEditingInsumo(null)} 
-          onSaved={() => setEditingInsumo(null)} 
-        />
-      )}
-
-      {showPrintModal && selectedMedioForPrint && (
-        <PrintLabelsModal 
-          batches={selectedMedioForPrint} 
-          onClose={() => setShowPrintModal(false)} 
-        />
-      )}
+      {editingInsumo && <EditInsumoModal insumo={editingInsumo} onClose={() => setEditingInsumo(null)} onSaved={() => setEditingInsumo(null)} />}
+      {auditingLote && <AuditInsumoModal lote={auditingLote} onClose={() => setAuditingLote(null)} />}
+      {showPrintModal && selectedMedioForPrint && <PrintLabelsModal batches={selectedMedioForPrint} onClose={() => setShowPrintModal(false)} />}
     </div>
   );
 }

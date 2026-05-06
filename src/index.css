@@ -155,22 +155,25 @@ p {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Permite que empiece desde arriba si es muy largo */
   justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
+  z-index: 2000;
+  padding: 2rem 1rem;
+  overflow-y: auto;
 }
 
 .modal-box {
   background: var(--surface-color);
   width: 100%;
-  max-width: 500px;
+  max-width: 600px;
   border-radius: 20px;
   border: 1px solid var(--border-color);
-  padding: 1.5rem;
+  padding: 2rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  margin-bottom: 2rem;
+  position: relative;
 }
 
 .modal-header {
