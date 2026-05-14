@@ -490,3 +490,41 @@ input:checked + .slider:before {
 }
 
 
+/* Mobile-first UI for Inventory */
+@media (max-width: 500px) {
+  .inventory-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .inventory-list > div:first-child {
+    display: none; /* Hide the table headers grid */
+  }
+  .inventory-list .card {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start !important;
+  }
+  .inventory-list .card > div {
+    width: 100%;
+    text-align: left !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .inventory-list .card > div:last-child {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+  /* Enlarge buttons for glove usage */
+  .btn, .btn-icon, .tab-btn {
+    min-height: 48px;
+    min-width: 48px;
+    font-size: 1.1rem;
+  }
+  .btn-icon {
+    padding: 10px;
+  }
+}
+
