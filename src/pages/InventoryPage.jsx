@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+
 import BatchEditModal from '../components/BatchEditModal';
 import RegistroInsumoModal from '../components/RegistroInsumoModal';
 import NuevoMedioModal from '../components/NuevoMedioModal';
@@ -10,9 +11,45 @@ import CultivosTable from '../components/CultivosTable';
 import NuevoCultivoModal from '../components/NuevoCultivoModal';
 import AuditInsumoModal from '../components/AuditInsumoModal';
 import RecipeFormModal from '../components/RecipeFormModal';
+import EditLoteModal from '../components/EditLoteModal';
+
+
+// --- Mini modal de confirmación (evita window.confirm bloqueado) ---
+const ConfirmModal = ({ message, onConfirm, onCancel }) => (
+  <div className="modal-overlay" style={{ zIndex: 4000 }}>
+    <div className="modal-box animate-fade-in" style={{ maxWidth: '400px', textAlign: 'center' }}>
+      <p style={{ margin: '1rem 0 1.5rem', fontSize: '0.95rem' }}>{message}</p>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <button className="btn btn-outline" onClick={onCancel}>Cancelar</button>
+        <button className="btn btn-danger" onClick={onConfirm}>Sí, eliminar</button>
+      </div>
+    </div>
+  </div>
+);
 
 // --- Sub-componente: Tabla de Insumos Base ---
-const InsumosTable = ({ insumos, lotes, onRegistrarCompra, onEdit, onAudit }) => {
+const InsumosTable = ({ insumos, lotes, salas, onRegistrarCompra, onEdit, onEditLote, onAudit, onPrintBatch, onDeleteLote, onDeleteInsumo }) => {
+  const [expandedInsumos, setExpandedInsumos] = useState([]);
+  const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm }
+
+  const toggleExpand = (id) => {
+    setExpandedInsumos(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const getSortedLotes = (insumoId) => {
+    return lotes
+      .filter(l => l.insumoId === insumoId)
+      .sort((a, b) => {
+        const order = { 'Activo': 0, 'Vencido': 1, 'Agotado': 2, 'Descartado': 3 };
+        const stateA = a.estado_apertura || 'Activo';
+        const stateB = b.estado_apertura || 'Activo';
+        if (order[stateA] !== order[stateB]) return order[stateA] - order[stateB];
+        return b.createdAt?.seconds - a.createdAt?.seconds; // Más nuevos primero dentro del mismo estado
+      });
+  };
+
   if (insumos.length === 0) {
     return (
       <div className="card animate-fade-in" style={{ textAlign: 'center', padding: '4rem' }}>
@@ -26,6 +63,7 @@ const InsumosTable = ({ insumos, lotes, onRegistrarCompra, onEdit, onAudit }) =>
   }
 
   return (
+    <React.Fragment>
     <div className="inventory-list animate-fade-in">
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', padding: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
         <span>Insumo / Ubicación</span>
@@ -49,42 +87,119 @@ const InsumosTable = ({ insumos, lotes, onRegistrarCompra, onEdit, onAudit }) =>
               borderLeft: `4px solid ${isLowStock ? 'var(--danger-color)' : 'var(--accent-color)'}`
             }}>
               <div>
-                <strong style={{ display: 'block' }}>{insumo.nombre}</strong>
-                <span className="sala-tipo" style={{ fontSize: '0.65rem' }}>{insumo.categoria}</span>
+                <strong style={{ display: 'block' }}>{insumo.nombre || <span style={{color: 'var(--danger-color)'}}>[SIN NOMBRE]</span>}</strong>
+                <span className="sala-tipo" style={{ fontSize: '0.65rem', display: 'block', marginTop: '0.25rem' }}>
+                  {insumo.categoria} 
+                </span>
+                
+                {insumo.categoria === 'Equipamiento' && insumo.equipamiento && (() => {
+                  const amort = (Number(insumo.equipamiento.valor_compra) - Number(insumo.equipamiento.valor_residual)) / (Number(insumo.equipamiento.vida_util_anios) * 12);
+                  return (
+                    <div style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 'bold' }}>
+                      💰 Amort: ${amort > 0 ? amort.toFixed(2) : '0'} /mes
+                    </div>
+                  );
+                })()}
+
+                {insumo.categoria === 'Reutilizables' && insumo.reutilizable && (
+                  <div style={{ fontSize: '0.65rem', color: 'var(--primary-color)' }}>
+                    🔄 {insumo.reutilizable.tipo_contenedor} ({insumo.reutilizable.capacidad_ml}ml)
+                  </div>
+                )}
+
+                {insumo.categoria === 'Bioseguridad' && insumo.bioseguridad && (
+                  <div style={{ fontSize: '0.65rem', color: '#10b981' }}>
+                    🛡️ {insumo.bioseguridad.clasificacion} ({insumo.bioseguridad.concentracion_uso})
+                  </div>
+                )}
+
+                {insumo.ubicacion && (
+                  <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.7 }}>
+                    📍 {typeof insumo.ubicacion === 'object' 
+                      ? (salas.find(s => s.id === insumo.ubicacion.salaId)?.nombre || insumo.ubicacion.salaId) + (insumo.ubicacion.detalle ? ` - ${insumo.ubicacion.detalle}` : '')
+                      : insumo.ubicacion}
+                  </span>
+                )}
+                <span style={{ fontSize: '0.6rem', opacity: 0.4 }}>ID: {insumo.id}</span>
               </div>
               <div><strong>{stockVisible} {insumo.unidad_display || insumo.unidad_base}</strong></div>
               <div>{isLowStock ? '⚠️ BAJO' : '✔️ OK'}</div>
               <div>${insumo.metadata?.costo_promedio_base?.toFixed(2) || '0.00'}</div>
-              <div style={{ textAlign: 'right' }}>
-                <button className="btn-icon" onClick={() => onEdit(insumo)}>✏️</button>
+              <div style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                <button className="btn-icon" onClick={() => onEdit(insumo)} title="Editar Maestro">✏️</button>
+                <button className="btn-icon" style={{ color: 'var(--danger-color)' }} onClick={() => setConfirmAction({ message: `¿Eliminar "${insumo.nombre}" y todos sus lotes? Esta acción es irreversible.`, onConfirm: () => { onDeleteInsumo(insumo); setConfirmAction(null); } })} title="Eliminar Insumo Completo">🗑️</button>
+                <button className="btn-icon" onClick={() => toggleExpand(insumo.id)}>
+                  {expandedInsumos.includes(insumo.id) ? '▲' : '▼'}
+                </button>
               </div>
+
             </div>
             
-            {/* Lotes individuales (Pilar 1) */}
-            <div style={{ marginLeft: '2rem', marginBottom: '1.5rem', display: 'grid', gap: '0.5rem' }}>
-              {lotes.filter(l => l.insumoId === insumo.id).map(lote => (
-                <div key={lote.id} className="card" style={{ 
-                  padding: '0.75rem 1rem', 
-                  fontSize: '0.85rem', 
-                  display: 'grid', 
-                  gridTemplateColumns: '1.5fr 1fr 1fr 1fr', 
-                  alignItems: 'center',
-                  background: lote.estado_apertura === 'Contaminado' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.02)',
-                  border: lote.estado_apertura === 'Abierto' ? '1px solid var(--primary-color)' : '1px solid transparent'
-                }}>
-                  <div><strong>{lote.lote_interno}</strong> <span style={{ fontSize: '0.7rem' }}>({lote.proveedor})</span></div>
-                  <div>{lote.cantidad_base_actual.toFixed(1)} {lote.unidad_base}</div>
-                  <div>{lote.estado_apertura}</div>
-                  <div style={{ textAlign: 'right' }}>
-                    <button className="btn btn-outline" style={{ fontSize: '0.65rem', padding: '2px 8px' }} onClick={() => onAudit(lote)}>🔍 Audit</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Lotes individuales (Acordeón) */}
+            {expandedInsumos.includes(insumo.id) && (
+              <div className="animate-fade-in" style={{ marginLeft: '2rem', marginBottom: '1.5rem', display: 'grid', gap: '0.5rem' }}>
+                {getSortedLotes(insumo.id).map(lote => {
+                  const stockVisibleLote = (lote.cantidad_base_actual / (insumo.factor_display || 1)).toFixed(1);
+                  const isDescartado = lote.estado_apertura === 'Descartado';
+                  
+                  return (
+                    <div key={lote.id} className="card" style={{ 
+                      padding: '0.75rem 1rem', 
+                      fontSize: '0.85rem', 
+                      display: 'grid', 
+                      gridTemplateColumns: '1.5fr 1fr 1fr 1fr', 
+                      alignItems: 'center',
+                      opacity: isDescartado ? 0.5 : 1,
+                      background: lote.estado_apertura === 'Contaminado' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.02)',
+                      border: lote.estado_apertura === 'Abierto' ? '1px solid var(--primary-color)' : '1px solid transparent'
+                    }}>
+                      <div>
+                        <strong>{lote.lote_interno}</strong> 
+                        <span style={{ fontSize: '0.7rem' }}> ({lote.proveedor})</span>
+                        {lote.ubicacion && (
+                          <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.7 }}>
+                            📍 {typeof lote.ubicacion === 'object' 
+                              ? (salas.find(s => s.id === lote.ubicacion.salaId)?.nombre || lote.ubicacion.salaId) + (lote.ubicacion.detalle ? ` - ${lote.ubicacion.detalle}` : '')
+                              : lote.ubicacion}
+                          </span>
+                        )}
+                        {isDescartado && <span style={{ color: 'var(--danger-color)', marginLeft: '0.5rem', fontSize: '0.6rem' }}>[DESCARTADO]</span>}
+                      </div>
+                      <div>
+                        <strong>{stockVisibleLote} {insumo.unidad_display}</strong> 
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                          ({lote.cantidad_base_actual.toFixed(0)} {insumo.unidad_base} naturales)
+                        </span>
+
+                      </div>
+                      <div>{lote.estado_apertura || 'Activo'}</div>
+                      <div style={{ textAlign: 'right', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button className="btn-icon" style={{ fontSize: '0.8rem' }} title="Reimprimir Etiqueta" onClick={() => onPrintBatch(lote)}>🖨️</button>
+                        <button className="btn-icon" style={{ fontSize: '0.8rem' }} title="Editar Lote" onClick={() => onEditLote(lote)}>✏️</button>
+                        <button className="btn-icon" style={{ fontSize: '0.8rem' }} title="Auditar" onClick={() => onAudit(lote)}>🔍</button>
+                        <button className="btn-icon" style={{ fontSize: '0.8rem', color: 'var(--danger-color)' }} title="Eliminar/Descartar" onClick={() => setConfirmAction({ message: `¿Eliminar el lote "${lote.lote_interno}"? Esta acción no se puede deshacer.`, onConfirm: () => { onDeleteLote(lote); setConfirmAction(null); } })}>🗑️</button>
+                      </div>
+
+                    </div>
+                  );
+                })}
+                {getSortedLotes(insumo.id).length === 0 && <p style={{ fontSize: '0.8rem', textAlign: 'center', opacity: 0.5 }}>No hay lotes registrados.</p>}
+              </div>
+            )}
+
+
           </React.Fragment>
         );
       })}
     </div>
+    {confirmAction && (
+      <ConfirmModal
+        message={confirmAction.message}
+        onConfirm={confirmAction.onConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
+    )}
+    </React.Fragment>
   );
 };
 
@@ -117,6 +232,7 @@ function InventoryPage() {
   const [recetas, setRecetas] = useState([]);
   const [salas, setSalas] = useState([]);
   const [filters, setFilters] = useState({ search: '', status: 'todas', sala: 'todas' });
+  const [insumoFilters, setInsumoFilters] = useState({ search: '', categoria: 'todas', salaId: 'todas' });
 
   const [showRegistroModal, setShowRegistroModal] = useState(false);
   const [showNuevoMedioModal, setShowNuevoMedioModal] = useState(false);
@@ -125,10 +241,12 @@ function InventoryPage() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   
   const [editingInsumo, setEditingInsumo] = useState(null);
+  const [editingLote, setEditingLote] = useState(null);
   const [editingBatch, setEditingBatch] = useState(null);
   const [auditingLote, setAuditingLote] = useState(null);
   const [recipeToClone, setRecipeToClone] = useState(null);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
+
 
   useEffect(() => {
     const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), snap => {
@@ -148,8 +266,52 @@ function InventoryPage() {
 
   const handlePrintBatch = (batch) => { setSelectedMedioForPrint([batch]); setShowPrintModal(true); };
 
+  const handleDeleteLote = async (lote) => {
+    try {
+      // 1. Buscamos el maestro para restarle el stock
+      const insumoRef = doc(db, "insumos_base", lote.insumoId);
+      const insumoDoc = await getDoc(insumoRef);
+      
+      if (insumoDoc.exists()) {
+        const currentStock = insumoDoc.data().stock_total_base || 0;
+        await updateDoc(insumoRef, {
+          stock_total_base: Math.max(0, currentStock - lote.cantidad_base_actual)
+        });
+      }
+
+      await deleteDoc(doc(db, "insumos_lotes", lote.id));
+      alert("✅ Lote eliminado y stock maestro actualizado.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar lote");
+    }
+  };
+
+  const handleDeleteInsumo = async (insumo) => {
+    try {
+      setLoading(true);
+      // Eliminar maestro
+      await deleteDoc(doc(db, "insumos_base", insumo.id));
+      
+      // Eliminar lotes asociados
+      const asociados = insumosLotes.filter(l => l.insumoId === insumo.id);
+      for (const lote of asociados) {
+        await deleteDoc(doc(db, "insumos_lotes", lote.id));
+      }
+      
+      alert("✅ Insumo y lotes asociados eliminados correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar insumo completo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
     <div className="inventory-page container animate-fade-in">
+
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2>Inventario Central</h2>
         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -167,8 +329,85 @@ function InventoryPage() {
         ))}
       </nav>
 
+      {/* Filtros para Insumos */}
+      {activeTab === 'insumos' && (
+        <div className="filters-bar animate-fade-in" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 2, minWidth: '200px' }}>
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="🔍 Buscar por nombre o ID (ej: 1967)..." 
+              value={insumoFilters.search} 
+              onChange={e => setInsumoFilters({...insumoFilters, search: e.target.value})} 
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '150px' }}>
+            <select 
+              className="form-control" 
+              value={insumoFilters.categoria} 
+              onChange={e => setInsumoFilters({...insumoFilters, categoria: e.target.value})}
+            >
+              <option value="todas">Todas las Categorías</option>
+              <option value="Medios y reactivos">Medios y reactivos</option>
+              <option value="Sustratos y granos">Sustratos y granos</option>
+              <option value="Descartables">Descartables</option>
+              <option value="Reutilizables">Reutilizables</option>
+              <option value="Bioseguridad">Bioseguridad</option>
+              <option value="Equipamiento">Equipamiento</option>
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: '150px' }}>
+            <select 
+              className="form-control" 
+              value={insumoFilters.salaId} 
+              onChange={e => setInsumoFilters({...insumoFilters, salaId: e.target.value})}
+            >
+              <option value="todas">Todas las Salas</option>
+              {salas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
       <main>
-        {activeTab === 'insumos' && <InsumosTable insumos={insumos} lotes={insumosLotes} onRegistrarCompra={() => setShowRegistroModal(true)} onEdit={setEditingInsumo} onAudit={setAuditingLote} />}
+        {activeTab === 'insumos' && (
+          <InsumosTable 
+            insumos={insumos.filter(i => {
+              const matchesSearch = i.nombre?.toLowerCase().includes(insumoFilters.search.toLowerCase()) || 
+                                   i.id?.toLowerCase().includes(insumoFilters.search.toLowerCase());
+              const matchesCat = insumoFilters.categoria === 'todas' || i.categoria === insumoFilters.categoria;
+              
+              // El filtro de sala ahora busca si el maestro O cualquiera de sus lotes está en esa sala
+              const matchesSala = insumoFilters.salaId === 'todas' || 
+                                   i.ubicacion?.salaId === insumoFilters.salaId || 
+                                   insumosLotes.some(l => l.insumoId === i.id && l.ubicacion?.salaId === insumoFilters.salaId);
+              
+              return matchesSearch && matchesCat && matchesSala;
+            })} 
+            lotes={insumosLotes} 
+            salas={salas}
+            onRegistrarCompra={() => setShowRegistroModal(true)} 
+            onEdit={setEditingInsumo} 
+            onEditLote={setEditingLote}
+            onAudit={setAuditingLote} 
+            onPrintBatch={(lote) => {
+
+              // Convertimos el lote al formato que espera PrintLabelsModal
+              setSelectedMedioForPrint([{
+                id: lote.lote_interno,
+                nombre_insumo: lote.nombre_insumo,
+                proveedor: lote.proveedor,
+                fecha: lote.fecha_ingreso,
+                tipo: 'LOTE_INSUMO'
+              }]);
+              setShowPrintModal(true);
+            }}
+            onDeleteLote={handleDeleteLote}
+            onDeleteInsumo={handleDeleteInsumo}
+          />
+
+        )}
+
         {activeTab === 'medios' && (
           <div>
             <button className="btn btn-primary" onClick={() => setShowNuevoMedioModal(true)}>➕ Preparar Medio</button>
@@ -204,8 +443,10 @@ function InventoryPage() {
         />
       )}
       {editingInsumo && <EditInsumoModal insumo={editingInsumo} onClose={() => setEditingInsumo(null)} onSaved={() => setEditingInsumo(null)} />}
+      {editingLote && <EditLoteModal lote={editingLote} onClose={() => setEditingLote(null)} onSaved={() => setEditingLote(null)} />}
       {auditingLote && <AuditInsumoModal lote={auditingLote} onClose={() => setAuditingLote(null)} />}
       {showPrintModal && selectedMedioForPrint && <PrintLabelsModal batches={selectedMedioForPrint} onClose={() => setShowPrintModal(false)} />}
+
     </div>
   );
 }

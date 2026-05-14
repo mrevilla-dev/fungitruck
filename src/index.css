@@ -372,60 +372,121 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
-/* Lab Labels (50x25mm) */
-.etiqueta-lab {
+/* Lab Labels (50x25mm) - Estilo estricto para impresión térmica */
+.thermal-label {
   width: 50mm;
   height: 25mm;
   padding: 2mm;
   background: white;
   color: black;
   display: flex;
-  gap: 3mm;
   align-items: center;
-  border: 1px solid #eee;
+  gap: 2mm;
   box-sizing: border-box;
   overflow: hidden;
+  position: relative;
+  page-break-after: always;
 }
 
-.etiqueta-qr {
-  width: 20mm;
-  height: 20mm;
+.micro-label {
+  width: 12mm;
+  height: 12mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  page-break-after: always;
+}
+
+.thermal-qr {
+  width: 18mm;
+  height: 18mm;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.etiqueta-info {
+.thermal-info {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.thermal-id {
+  font-size: 8pt;
+  font-weight: 900;
+  margin-bottom: 1pt;
+  font-family: monospace;
+}
+
+.thermal-name {
+  font-size: 7pt;
+  font-weight: 700;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Limit to 2 lines to avoid overlapping dates */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   line-height: 1.1;
 }
 
-.etiqueta-id {
-  font-size: 8pt;
-  font-weight: 800;
-  margin-bottom: 1pt;
-}
-
-.etiqueta-nombre {
-  font-size: 7pt;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.etiqueta-meta {
+.thermal-meta {
   font-size: 6pt;
-  color: #444;
-  margin-top: 2pt;
+  color: #333;
+  margin-top: 1pt;
 }
 
 @media print {
-  .print-label-area {
-    display: block;
+  @page {
+    margin: 0;
+    size: auto; /* Permite que el navegador o la clase de abajo sugiera el tamaño */
+  }
+
+  /* Perfil Standard */
+  html.print-standard, html.print-standard body {
     width: 50mm;
     height: 25mm;
-    page-break-after: always;
+  }
+
+  /* Perfil Micro */
+  html.print-micro, html.print-micro body {
+    width: 12mm;
+    height: 12mm;
+  }
+  
+  /* Nota: Algunos navegadores ignoran el size si se cambia dinámicamente, 
+     pero ajustando el width/height del html/body se suele lograr el efecto. */
+
+
+  #root, .modal-overlay, .no-print {
+    display: none !important;
+  }
+
+  #print-root {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+
+  .thermal-label, .micro-label {
+    border: none;
+    box-shadow: none;
+    margin: 0;
   }
 }
+
+

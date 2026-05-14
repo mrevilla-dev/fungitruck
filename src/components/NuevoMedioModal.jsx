@@ -145,7 +145,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             recetaId: receta.id,
             nombre_receta: receta.nombre,
             tipo: receta.categoria,
+            peso_seco_por_unidad_g: receta.peso_seco_por_unidad_g || 0,
+            ph_esperado: receta.ph_esperado || null,
             estado: formData.tipo_envasado, // 'Bulk' o 'Fraccionado'
+
             stock_bulk: {
               cantidad_inicial: Number(formData.cantidad_preparada),
               cantidad_actual: Number(formData.cantidad_preparada),
@@ -167,8 +170,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               fecha_preparacion: formData.fecha_preparacion,
               operador: 'Sistema' 
             },
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
           };
+
 
           if (isExperimental) {
             data.experimentId = experimentId;
@@ -266,7 +271,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>Cancelar</button>
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>Cerrar</button>
             <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 1 }}>
               {loading ? 'Procesando...' : '💾 Registrar y Descontar Envases'}
             </button>

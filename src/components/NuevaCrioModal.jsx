@@ -10,7 +10,12 @@ const defaultForm = {
   concentracion_pct: 10,
   protocolo_descenso: 'gradual',
   temperatura_final: -80,
-  almacenamiento: 'freezer_80',
+  ubicacion: {
+    equipo_id: 'freezer_80',
+    rack: '',
+    caja: '',
+    posicion: ''
+  },
   fecha_congelacion: new Date().toISOString().split('T')[0],
   operador: 'Maxi',
   observaciones: '',
@@ -49,10 +54,14 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
     const { name, value } = e.target;
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
-      // Auto-sync temperatura when almacenamiento changes
-      if (name === 'almacenamiento') {
-        updated.temperatura_final = ALMACENAMIENTO_TEMP[value] ?? prev.temperatura_final;
+      if (name.startsWith('ubicacion.')) {
+        const field = name.split('.')[1];
+        updated.ubicacion = { ...prev.ubicacion, [field]: value };
+        if (field === 'equipo_id') {
+          updated.temperatura_final = ALMACENAMIENTO_TEMP[value] ?? prev.temperatura_final;
+        }
       }
+
       // Auto-fill cepaId from selected batch
       if (name === 'batchOrigenId' && value) {
         const batch = batches.find(b => b.id === value);
@@ -79,7 +88,9 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
         viabilidad_post: null,
         fecha_descongelacion: null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
+
       await setDoc(doc(db, 'criopreservacion', newId), docData);
       alert(`✅ Muestra ${newId} registrada con éxito.`);
       onSaved();
@@ -189,8 +200,8 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
             </h4>
             <div className="grid-2" style={{ gap: '1rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Sistema de Almacenamiento *</label>
-                <select name="almacenamiento" className="form-control" required value={formData.almacenamiento} onChange={handleChange}>
+                <label className="form-label">Equipo de Almacenamiento *</label>
+                <select name="ubicacion.equipo_id" className="form-control" required value={formData.ubicacion.equipo_id} onChange={handleChange}>
                   <option value="freezer_80">🧊 Freezer -80°C</option>
                   <option value="nitrogeno_liquido">⚗️ Nitrógeno Líquido (-196°C)</option>
                   <option value="heladera_4">❄️ Heladera +4°C</option>
@@ -205,6 +216,21 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
                   value={formData.temperatura_final}
                   onChange={handleChange}
                 />
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Rack / Torre</label>
+                <input type="text" name="ubicacion.rack" className="form-control" placeholder="Ej: R2" value={formData.ubicacion.rack} onChange={handleChange} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Caja</label>
+                <input type="text" name="ubicacion.caja" className="form-control" placeholder="Ej: C4" value={formData.ubicacion.caja} onChange={handleChange} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Posición</label>
+                <input type="text" name="ubicacion.posicion" className="form-control" placeholder="Ej: A3" value={formData.ubicacion.posicion} onChange={handleChange} />
               </div>
             </div>
           </div>

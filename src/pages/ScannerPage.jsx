@@ -118,9 +118,10 @@ function ScannerPage() {
         status: statusText,
         imageUrl: uploadedUrl,
         operator: 'Maxi',
-        createdAt: new Date().toISOString(),
-        serverTimestamp: serverTimestamp()
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
+
       await addDoc(collection(db, "tracking"), logEntry);
       setHistory([logEntry, ...history]);
       setStatusText('');
@@ -144,8 +145,10 @@ function ScannerPage() {
       if (!snap.empty) {
         await updateDoc(doc(db, "cultivos", snap.docs[0].id), {
           status: newStatus,
-          updatedAt: new Date().toISOString()
+          updatedAt: serverTimestamp()
         });
+
+
         setRecordData({ ...recordData, status: newStatus });
       }
     } catch (err) {

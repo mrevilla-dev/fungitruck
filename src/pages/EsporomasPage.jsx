@@ -125,18 +125,20 @@ export default function EsporomasPage() {
         ...formData,
         id: esporomaId,
         fotoUrl,
-        updatedAt: new Date().toISOString(),
-        serverTimestamp: serverTimestamp()
+        updatedAt: serverTimestamp()
       };
+
 
       if (editingEsporoma) {
         await updateDoc(doc(db, "esporomas", esporomaId), docData);
       } else {
         await setDoc(doc(db, "esporomas", esporomaId), {
           ...docData,
-          createdAt: new Date().toISOString()
+          createdAt: serverTimestamp()
         });
+
       }
+
 
       setShowModal(false);
       setEditingEsporoma(null);

@@ -11,7 +11,9 @@ export default function RecipeFormModal({ recipeToClone, onClose, onSaved }) {
     procedimiento: recipeToClone?.procedimiento || '',
     parentRecipeId: recipeToClone?.id || null,
     ingredientes: recipeToClone?.ingredientes || [],
-    rendimiento_teorico: recipeToClone?.rendimiento_teorico || { cantidad: 1000, unidad: 'ml' }
+    rendimiento_teorico: recipeToClone?.rendimiento_teorico || { cantidad: 1000, unidad: 'ml' },
+    peso_seco_por_unidad_g: recipeToClone?.peso_seco_por_unidad_g || 0,
+    ph_esperado: recipeToClone?.ph_esperado || ''
   });
 
   useEffect(() => {
@@ -41,6 +43,8 @@ export default function RecipeFormModal({ recipeToClone, onClose, onSaved }) {
       const recipeId = form.nombre.toLowerCase().replace(/\s+/g, '-');
       await setDoc(doc(db, "recetas", recipeId), {
         ...form,
+        peso_seco_por_unidad_g: Number(form.peso_seco_por_unidad_g) || 0,
+        ph_esperado: form.ph_esperado ? Number(form.ph_esperado) : null,
         updatedAt: serverTimestamp(),
         createdAt: recipeToClone ? recipeToClone.createdAt : serverTimestamp()
       });
@@ -68,7 +72,8 @@ export default function RecipeFormModal({ recipeToClone, onClose, onSaved }) {
             <input type="text" className="form-control" required value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
           </div>
 
-          <div className="grid-2">
+          <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+
             <div className="form-group">
               <label className="form-label">Categoría</label>
               <select className="form-control" value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})}>
@@ -82,7 +87,19 @@ export default function RecipeFormModal({ recipeToClone, onClose, onSaved }) {
               <label className="form-label">Rendimiento (ml/g)</label>
               <input type="number" className="form-control" value={form.rendimiento_teorico.cantidad} onChange={e => setForm({...form, rendimiento_teorico: {...form.rendimiento_teorico, cantidad: Number(e.target.value)}})} />
             </div>
+            <div className="form-group">
+              <label className="form-label">Peso Seco / Unidad (g)</label>
+              <input type="number" step="0.1" className="form-control" placeholder="Ref. cosecha" value={form.peso_seco_por_unidad_g} onChange={e => setForm({...form, peso_seco_por_unidad_g: e.target.value})} />
+            </div>
           </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">pH Esperado (Teórico)</label>
+              <input type="number" step="0.01" className="form-control" placeholder="Ej: 5.6" value={form.ph_esperado} onChange={e => setForm({...form, ph_esperado: e.target.value})} />
+            </div>
+          </div>
+
 
           <div className="section-divider" style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
             <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>🧪 Ingredientes</h4>

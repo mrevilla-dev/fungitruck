@@ -240,12 +240,16 @@ function NewBatch() {
             destinoId: formData.destinoId,
             destinoNombre: formData.destinoNombre,
             tipoContenedor: formData.tipoContenedor === 'otro' ? formData.otroContenedorNombre : formData.tipoContenedor,
+            peso_seco_sustrato_g: Number(medio.peso_seco_sustrato_g || 0),
+            peso_seco_es_medido: Boolean(medio.peso_seco_es_medido),
             observaciones: formData.observaciones,
+
             operator: formData.operator,
             fotoUrl,
             fechaInoculacion: formData.fechaInoculacion,
-            createdAt: new Date().toISOString(),
-            serverTimestamp: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+
             status: "Inoculado",
           };
 
@@ -501,9 +505,10 @@ function NewBatch() {
             </label>
             
             {medios.map((medio, index) => (
-              <div key={medio.id} className="flex-gap" style={{ marginBottom: '0.5rem', alignItems: 'center' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                  <select 
+              <div key={medio.id} style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <div className="flex-gap" style={{ alignItems: 'center' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <select 
                     className="form-control" 
                     value={medio.medioPrepId || ''} 
                     onChange={e => {
@@ -511,12 +516,18 @@ function NewBatch() {
                       const val = e.target.value;
                       newMedios[index].medioPrepId = val;
                       if (val && val !== 'custom') {
-                         newMedios[index].nombre = mediosPrepList.find(m => m.id === val)?.nombre_medio || '';
+                         const mp = mediosPrepList.find(m => m.id === val);
+                         newMedios[index].nombre = mp?.nombre_medio || '';
+                         newMedios[index].peso_seco_sustrato_g = mp?.peso_seco_por_unidad_g || 0;
+                         newMedios[index].peso_seco_es_medido = false;
                       } else {
                          newMedios[index].nombre = '';
+                         newMedios[index].peso_seco_sustrato_g = 0;
+                         newMedios[index].peso_seco_es_medido = false;
                       }
                       setMedios(newMedios);
                     }}
+
                   >
                     <option value="">— Elegir Medio de Inventario —</option>
                     {mediosPrepList.map(mp => (
@@ -535,18 +546,41 @@ function NewBatch() {
                       }} />
                   )}
                 </div>
-                <input type="number" className="form-control" title="Cantidad" min="1" max="50" style={{ width: '80px' }}
-                  value={medio.cantidad}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="number" className="form-control" title="Cantidad Lotes" min="1" max="50" style={{ width: '80px' }}
+                    value={medio.cantidad}
+                    onChange={e => {
+                      const newMedios = [...medios];
+                      newMedios[index].cantidad = Number(e.target.value);
+                      setMedios(newMedios);
+                    }}
+                  />
+                  {medios.length > 1 && (
+                    <button type="button" className="btn btn-danger" title="Eliminar" onClick={() => setMedios(medios.filter(m => m.id !== medio.id))}>🗑</button>
+                  )}
+                </div>
+              </div>
+              <div className="flex-gap" style={{ marginTop: '0.25rem', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', alignItems: 'center' }}>
+                <label className="form-label" style={{ margin: 0, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>Peso Seco (g)</label>
+                <input type="number" step="0.1" className="form-control" style={{ width: '100px', fontSize: '0.8rem' }}
+                  value={medio.peso_seco_sustrato_g || ''}
                   onChange={e => {
                     const newMedios = [...medios];
-                    newMedios[index].cantidad = Number(e.target.value);
+                    newMedios[index].peso_seco_sustrato_g = Number(e.target.value);
                     setMedios(newMedios);
                   }}
                 />
-                {medios.length > 1 && (
-                  <button type="button" className="btn btn-danger" title="Eliminar" onClick={() => setMedios(medios.filter(m => m.id !== medio.id))}>🗑</button>
-                )}
+                <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: medio.peso_seco_es_medido ? 'var(--accent-color)' : 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={medio.peso_seco_es_medido || false} onChange={e => {
+                    const newMedios = [...medios];
+                    newMedios[index].peso_seco_es_medido = e.target.checked;
+                    setMedios(newMedios);
+                  }} />
+                  Pesado manualmente
+                </label>
               </div>
+            </div>
+
             ))}
             <datalist id="medios-list">
               {MEDIOS_SUGERIDOS.map(m => <option key={m} value={m} />)}

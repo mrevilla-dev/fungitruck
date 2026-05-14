@@ -56,8 +56,15 @@ export const uploadFileToDrive = async (file, onProgress) => {
             throw new Error(result.error);
           }
 
+          // Construir URL embebible usando el ID del archivo en Drive
+          const fileId = result.id || result.fileId;
+          const imageUrl = fileId 
+            ? `https://lh3.googleusercontent.com/d/${fileId}` 
+            : (result.url || result.webViewLink);
+
           if (onProgress) onProgress(100);
-          resolve(result);
+          resolve({ ...result, imageUrl });
+
         } catch (fetchErr) {
           if (fetchErr.name === 'AbortError') {
             throw new Error("Tiempo de espera agotado. La imagen puede ser muy pesada o el script está lento.");

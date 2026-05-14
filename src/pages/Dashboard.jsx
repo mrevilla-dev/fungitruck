@@ -194,12 +194,26 @@ export default function Dashboard() {
             {insumosAlerts.length === 0 ? (
               <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Stock óptimo</p>
             ) : (
-              insumosAlerts.map(item => (
-                <div key={item.id} style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{item.nombre}</span>
-                  <strong style={{ color: 'var(--danger-color)' }}>Bajo Stock</strong>
-                </div>
-              ))
+              insumosAlerts.map(item => {
+                const f = item.factor_display || 1;
+                const actual = ((item.stock_total_base || 0) / f).toFixed(1);
+                const min = ((item.stock_minimo_base || 0) / f).toFixed(1);
+                const unidad = item.unidad_display || item.unidad_base || 'un';
+                
+                return (
+                  <div key={item.id} style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600' }}>{item.nombre}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        Quedan: <strong style={{ color: 'var(--danger-color)' }}>{actual} {unidad}</strong> (Mín: {min})
+                      </div>
+                    </div>
+                    <Link to="/inventory" className="btn btn-sm" style={{ background: 'var(--danger-color)', color: 'white', padding: '4px 8px', fontSize: '0.7rem' }}>
+                      Reponer
+                    </Link>
+                  </div>
+                );
+              })
             )}
           </div>
         </section>

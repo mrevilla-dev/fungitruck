@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import { useEffect } from 'react';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import NewBatch from './pages/NewBatch';
@@ -9,10 +10,17 @@ import EsporomasPage from './pages/EsporomasPage';
 import InventoryPage from './pages/InventoryPage';
 import AdminResetPage from './pages/AdminResetPage';
 import CrioPage from './pages/CrioPage';
+import CosechasPage from './pages/CosechasPage';
+import { migrateCategoriesIfNeeded } from './utils/migrateCategories';
+
 import PermissionGuard from './components/PermissionGuard';
 import './App.css';
 
 function App() {
+  useEffect(() => {
+    migrateCategoriesIfNeeded();
+  }, []);
+
   return (
     <Router>
       <PermissionGuard>
@@ -26,6 +34,8 @@ function App() {
             <NavLink to="/salas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Salas</NavLink>
             <NavLink to="/esporomas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Ejemplares</NavLink>
             <NavLink to="/crio" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>🧠 Crio</NavLink>
+            <NavLink to="/cosechas" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>🧺 Cosechas</NavLink>
+
             <NavLink to="/maintenance" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Mantenimiento</NavLink>
           </nav>
         </header>
@@ -39,7 +49,9 @@ function App() {
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/salas" element={<SalasPage />} />
             <Route path="/esporomas" element={<EsporomasPage />} />
-            <Route path="/crio" element={<CrioPage />} />
+             <Route path="/crio" element={<CrioPage />} />
+             <Route path="/cosechas" element={<CosechasPage />} />
+
             <Route path="/admin-reset" element={<AdminResetPage />} />
           </Routes>
         </main>

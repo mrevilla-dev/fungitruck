@@ -1,16 +1,31 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+
 
 export default function AuditInsumoModal({ lote, onClose }) {
   const [loading, setLoading] = useState(true);
   const [affectedMedios, setAffectedMedios] = useState([]);
   const [affectedBatches, setAffectedBatches] = useState([]);
   const [loteStatus, setLoteStatus] = useState(lote.estado_apertura || 'Cerrado');
+  const [estadoActual, setEstadoActual] = useState(lote.estado_actual || lote.estado_reutilizable || (insumoMaster?.categoria === 'Equipamiento' ? 'En Servicio' : 'Disponible'));
+  const [fechaMantenimiento, setFechaMantenimiento] = useState(lote.fecha_mantenimiento || '');
+  const [proximoMantenimiento, setProximoMantenimiento] = useState(lote.proximo_mantenimiento || '');
+  const [insumoMaster, setInsumoMaster] = useState(null);
+  const [observaciones, setObservaciones] = useState(lote.observaciones || '');
+  const [isSavingObs, setIsSavingObs] = useState(false);
 
   useEffect(() => {
     fetchImpact();
+    fetchMaster();
   }, [lote.id]);
+
+  const fetchMaster = async () => {
+    try {
+      const docSnap = await getDoc(doc(db, "insumos_base", lote.insumoId));
+      if (docSnap.exists()) setInsumoMaster(docSnap.data());
+    } catch (e) { console.error(e); }
+  };
 
   const fetchImpact = async () => {
     setLoading(true);
@@ -45,12 +60,66 @@ export default function AuditInsumoModal({ lote, onClose }) {
   const handleUpdateStatus = async (newStatus) => {
     try {
       await updateDoc(doc(db, "insumos_lotes", lote.id), {
-        estado_apertura: newStatus
+        estado_apertura: newStatus,
+        updatedAt: serverTimestamp()
       });
+
       setLoteStatus(newStatus);
       alert("✅ Estado del lote actualizado.");
     } catch (err) {
       alert("Error al actualizar estado.");
+    }
+  };
+
+  const handleUpdateReutilizableStatus = async (newStatus) => {
+    try {
+      const isBaja = newStatus === 'Roto / De Baja';
+      const wasBaja = estadoActual === 'Roto / De Baja';
+      
+      await runTransaction(db, async (transaction) => {
+        const loteRef = doc(db, "insumos_lotes", lote.id);
+        const masterRef = doc(db, "insumos_base", lote.insumoId);
+        const masterSnap = await transaction.get(masterRef);
+        
+        transaction.update(loteRef, {
+          estado_actual: newStatus,
+          updatedAt: serverTimestamp()
+        });
+
+        if (isBaja && !wasBaja) {
+          // Descontar del stock total operativo
+          const newStock = Math.max(0, (masterSnap.data().stock_total_base || 0) - (lote.cantidad_base_actual || 1));
+          transaction.update(masterRef, { stock_total_base: newStock });
+        } else if (!isBaja && wasBaja) {
+          // Si por error se vuelve a poner disponible, recuperar stock
+          const newStock = (masterSnap.data().stock_total_base || 0) + (lote.cantidad_base_actual || 1);
+          transaction.update(masterRef, { stock_total_base: newStock });
+        }
+      });
+
+      setEstadoActual(newStatus);
+      alert("✅ Estado reutilizable actualizado.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al actualizar estado.");
+    }
+  };
+
+  const handleSaveObservations = async () => {
+    setIsSavingObs(true);
+    try {
+      await updateDoc(doc(db, "insumos_lotes", lote.id), {
+        observaciones: observaciones,
+        fecha_mantenimiento: fechaMantenimiento,
+        proximo_mantenimiento: proximoMantenimiento,
+        updatedAt: serverTimestamp()
+      });
+      alert("✅ Datos guardados correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar observaciones.");
+    } finally {
+      setIsSavingObs(false);
     }
   };
 
@@ -65,10 +134,20 @@ export default function AuditInsumoModal({ lote, onClose }) {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           
           <div className="card" style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <strong>{lote.nombre_insumo}</strong>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Prov: {lote.proveedor} | Ingreso: {lote.fecha_ingreso}</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                {insumoMaster?.imageUrl && (
+                  <img 
+                    src={insumoMaster.imageUrl} 
+                    alt="Producto" 
+                    style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer' }}
+                    onClick={() => window.open(insumoMaster.imageUrl, '_blank')}
+                  />
+                )}
+                <div>
+                  <strong>{lote.nombre_insumo}</strong>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Prov: {lote.proveedor} | Ingreso: {lote.fecha_ingreso}</p>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button 
@@ -82,15 +161,116 @@ export default function AuditInsumoModal({ lote, onClose }) {
                   onClick={() => handleUpdateStatus('Contaminado')}
                 >⚠️ Contaminado</button>
                 <button 
-                  className={`btn ${loteStatus === 'Cerrado' ? 'btn-outline' : 'btn-outline'}`}
+                  className={`btn ${loteStatus === 'Cerrado' ? 'btn-primary' : 'btn-outline'}`}
                   style={{ fontSize: '0.7rem', padding: '4px 8px' }}
                   onClick={() => handleUpdateStatus('Cerrado')}
                 >Cerrado</button>
+                <button 
+                  className={`btn ${loteStatus === 'Hidratado' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: '0.7rem', padding: '4px 8px', borderColor: '#3b82f6', color: loteStatus === 'Hidratado' ? 'white' : '#3b82f6' }}
+                  onClick={() => handleUpdateStatus('Hidratado')}
+                >💧 Hidratado</button>
               </div>
             </div>
           </div>
 
-          <div className="impact-analysis">
+          {insumoMaster?.categoria === 'Reutilizables' && (
+            <div className="card animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1rem' }}>
+              <h4 style={{ color: 'var(--primary-color)', fontSize: '0.8rem', marginBottom: '1rem' }}>🔄 Ciclo de Vida Reutilizable</h4>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {['Disponible', 'En Uso', 'En Lavado', 'Roto / De Baja'].map(st => (
+                  <button 
+                    key={st}
+                    className={`btn ${estadoActual === st ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ 
+                      flex: 1, 
+                      fontSize: '0.75rem', 
+                      minWidth: '100px',
+                      background: estadoActual === st ? (st === 'Roto / De Baja' ? 'var(--danger-color)' : (st === 'En Uso' ? '#f59e0b' : 'var(--primary-color)')) : 'transparent',
+                      borderColor: st === 'Roto / De Baja' ? 'var(--danger-color)' : (st === 'En Uso' ? '#f59e0b' : 'var(--primary-color)'),
+                      color: estadoActual === st ? 'white' : (st === 'Roto / De Baja' ? 'var(--danger-color)' : (st === 'En Uso' ? '#f59e0b' : 'var(--primary-color)'))
+                    }}
+                    onClick={() => handleUpdateReutilizableStatus(st)}
+                  >{st}</button>
+                ))}
+              </div>
+              
+              {estadoActual === 'Roto / De Baja' && (
+                <div style={{ marginTop: '1rem', color: 'var(--danger-color)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                  ⚠️ Este ítem ha sido descontado del stock operativo. Por favor registre la causa en las notas abajo.
+                </div>
+              )}
+            </div>
+          )}
+
+          {insumoMaster?.categoria === 'Equipamiento' && (
+            <div className="card animate-fade-in" style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '1.25rem', borderRadius: '12px' }}>
+              <h4 style={{ color: 'var(--primary-color)', fontSize: '0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                ⚙️ Gestión de Estado y Mantenimiento
+              </h4>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                {['En Servicio', 'En Reparación', 'Baja'].map(st => (
+                  <button 
+                    key={st}
+                    className={`btn ${estadoActual === st ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ 
+                      flex: 1, 
+                      fontSize: '0.8rem',
+                      background: estadoActual === st ? (st === 'Baja' ? 'var(--danger-color)' : (st === 'En Reparación' ? '#f59e0b' : 'var(--primary-color)')) : 'transparent',
+                      borderColor: st === 'Baja' ? 'var(--danger-color)' : (st === 'En Reparación' ? '#f59e0b' : 'var(--primary-color)'),
+                    }}
+                    onClick={() => handleUpdateReutilizableStatus(st)}
+                  >
+                    {st === 'En Servicio' ? '✅ ' : (st === 'En Reparación' ? '🛠️ ' : '🚫 ')}
+                    {st}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Último Mantenimiento</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={fechaMantenimiento} 
+                    onChange={e => setFechaMantenimiento(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Próximo Mantenimiento</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={proximoMantenimiento} 
+                    onChange={e => setProximoMantenimiento(e.target.value)} 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="observations-section" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+            <h4 style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>📝 Notas de Auditoría</h4>
+            <textarea 
+              className="form-control"
+              style={{ minHeight: '100px', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)' }}
+              placeholder="Escribe aquí cualquier hallazgo o nota sobre este lote..."
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+            />
+            <button 
+              className="btn btn-primary" 
+              style={{ width: 'auto' }}
+              onClick={handleSaveObservations}
+              disabled={isSavingObs}
+            >
+              {isSavingObs ? 'Guardando...' : '💾 Guardar Notas'}
+            </button>
+          </div>
+
+          <div className="impact-analysis" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
             <h4 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>📉 Análisis de Impacto (Efecto Mancha)</h4>
             
             {loading ? (

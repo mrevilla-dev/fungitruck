@@ -40,7 +40,9 @@ export default function CompraInsumoModal({ insumo, onClose, onSaved }) {
           cantidad_base_actual: cantidadBaseNueva,
           costo_total_compra: Number(formData.costo_total),
           costo_unidad_base: costoUnidadBase,
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+
         });
 
         // 2. Actualizar el Maestro

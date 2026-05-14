@@ -6,18 +6,36 @@ export default function InsumoFormModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
-    categoria: 'Químicos/Medios',
+    categoria: 'Medios y reactivos',
     unidad_compra: '',
     unidad_base: '',
     factor_conversion: '',
-    stock_minimo_base: 0
+    stock_minimo_base: 0,
+    // Campos Equipamiento
+    marca_modelo: '',
+    nro_serie: '',
+    propietario: 'facultad', // facultad / emprendimiento / personal
+    fecha_adquisicion: new Date().toISOString().split('T')[0],
+    valor_compra: 0,
+    vida_util_anios: 5,
+    valor_residual: 0,
+    // Campos Reutilizables
+    tipo_contenedor: '',
+    capacidad_ml: 0,
+    // Campos Bioseguridad
+    concentracion_uso: '',
+    clasificacion: 'limpieza', // limpieza / desinfectante
+    // Campos Descartables
+    esterilidad_origen: 'N'
   });
 
   const categories = [
-    'Químicos/Medios',
-    'Granos/Sustratos',
-    'Consumibles y Empaque',
-    'Sanidad'
+    'Medios y reactivos',
+    'Sustratos y granos',
+    'Descartables',
+    'Reutilizables',
+    'Bioseguridad',
+    'Equipamiento'
   ];
 
   const handleSubmit = async (e) => {
@@ -26,16 +44,51 @@ export default function InsumoFormModal({ onClose, onSaved }) {
     try {
       const docData = {
         ...formData,
-        factor_conversion: Number(formData.factor_conversion),
+        factor_conversion: formData.categoria === 'Reutilizables' ? 1 : Number(formData.factor_compra) * Number(formData.factor_display),
         stock_minimo_base: Number(formData.stock_minimo_base),
         stock_total_base: 0,
-        fecha_creacion: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+
         metadata: {
           ultimo_proveedor: '',
           fecha_ultima_compra: null,
           costo_promedio_base: 0
         }
       };
+
+      if (formData.categoria === 'Equipamiento') {
+        docData.equipamiento = {
+          marca_modelo: formData.marca_modelo,
+          nro_serie: formData.nro_serie,
+          propietario: formData.propietario,
+          fecha_adquisicion: formData.fecha_adquisicion,
+          valor_compra: Number(formData.valor_compra),
+          vida_util_anios: Number(formData.vida_util_anios),
+          valor_residual: Number(formData.valor_residual)
+        };
+      }
+
+      if (formData.categoria === 'Reutilizables') {
+        docData.reutilizable = {
+          tipo_contenedor: formData.tipo_contenedor,
+          capacidad_ml: Number(formData.capacidad_ml)
+        };
+      }
+
+      if (formData.categoria === 'Bioseguridad') {
+        docData.bioseguridad = {
+          concentracion_uso: formData.concentracion_uso,
+          clasificacion: formData.clasificacion
+        };
+      }
+
+      if (formData.categoria === 'Descartables') {
+        docData.descartables = {
+          esterilidad_origen: formData.esterilidad_origen
+        };
+      }
+
       await addDoc(collection(db, 'insumos_base'), docData);
       onSaved();
     } catch (error) {
@@ -80,59 +133,132 @@ export default function InsumoFormModal({ onClose, onSaved }) {
             </select>
           </div>
 
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Unidad de Compra</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Ej: Rollo, Saco" 
-                required
-                value={formData.unidad_compra}
-                onChange={e => setFormData({...formData, unidad_compra: e.target.value})}
-              />
+          {formData.categoria !== 'Equipamiento' && (
+            <div className="section-divider" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px dashed rgba(59, 130, 246, 0.3)', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--primary-color)', marginBottom: '0.75rem', fontWeight: '600' }}>
+                💡 CONFIGURACIÓN DE RENDIMIENTO
+              </div>
+              <div className="grid-2" style={{ marginBottom: '0.5rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Unidad Compra (ej. Pack, Rollo)</label>
+                  <input type="text" className="form-control" value={formData.unidad_compra} onChange={e => setFormData({...formData, unidad_compra: e.target.value})} placeholder="Pack" />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Contenido por Unidad</label>
+                  <div className="flex-gap">
+                    <input type="number" className="form-control" value={formData.factor_compra} onChange={e => setFormData({...formData, factor_compra: e.target.value})} placeholder="10" />
+                    <input type="text" className="form-control" style={{ width: '90px' }} placeholder="un" value={formData.unidad_display} onChange={e => setFormData({...formData, unidad_display: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+              <div className="form-group" style={{ margin: '1rem 0 0 0' }}>
+                <label className="form-label">Equivalencia Mínima</label>
+                <div className="flex-gap">
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>1 {formData.unidad_display || 'un'} =</span>
+                  <input type="number" className="form-control" value={formData.factor_display} onChange={e => setFormData({...formData, factor_display: e.target.value})} />
+                  <input type="text" className="form-control" style={{ width: '90px' }} value={formData.unidad_base} onChange={e => setFormData({...formData, unidad_base: e.target.value})} />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: '1rem', borderTop: '1px solid rgba(59, 130, 246, 0.1)', paddingTop: '1rem' }}>
+                <label className="form-label" style={{ color: '#10b981' }}>🔔 Stock Mínimo Alerta ({formData.unidad_base || 'unidades'})</label>
+                <input type="number" className="form-control" value={formData.stock_minimo_base} onChange={e => setFormData({...formData, stock_minimo_base: e.target.value})} placeholder="Ej: 50" />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Unidad Base (Consumo)</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Ej: cm, g, ml" 
-                required
-                value={formData.unidad_base}
-                onChange={e => setFormData({...formData, unidad_base: e.target.value})}
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Factor de Conversión</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                placeholder="Cant. base por unidad compra" 
-                required
-                value={formData.factor_conversion}
-                onChange={e => setFormData({...formData, factor_conversion: e.target.value})}
-              />
-              <small style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                {formData.unidad_compra && formData.unidad_base && formData.factor_conversion && (
-                  `1 ${formData.unidad_compra} = ${formData.factor_conversion} ${formData.unidad_base}`
-                )}
-              </small>
+          {/* Se eliminó el bloque repetido de factor_conversion y stock_minimo_base fuera del condicional */}
+
+          {formData.categoria === 'Equipamiento' && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', marginTop: '1rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>🛠️ Datos de Equipamiento</h4>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Marca / Modelo</label>
+                  <input type="text" className="form-control" value={formData.marca_modelo} onChange={e => setFormData({...formData, marca_modelo: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Nro Serie</label>
+                  <input type="text" className="form-control" value={formData.nro_serie} onChange={e => setFormData({...formData, nro_serie: e.target.value})} />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Fecha de Adquisición</label>
+                  <input type="date" className="form-control" value={formData.fecha_adquisicion} onChange={e => setFormData({...formData, fecha_adquisicion: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Valor de Compra ($)</label>
+                  <input type="number" className="form-control" value={formData.valor_compra} onChange={e => setFormData({...formData, valor_compra: e.target.value})} />
+                </div>
+              </div>
+              <div className="grid-3">
+                <div className="form-group">
+                  <label className="form-label">Vida Útil (Años)</label>
+                  <input type="number" className="form-control" value={formData.vida_util_anios} onChange={e => setFormData({...formData, vida_util_anios: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Valor Residual ($)</label>
+                  <input type="number" className="form-control" value={formData.valor_residual} onChange={e => setFormData({...formData, valor_residual: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Propietario</label>
+                  <select className="form-control" value={formData.propietario} onChange={e => setFormData({...formData, propietario: e.target.value})}>
+                    <option value="facultad">Facultad</option>
+                    <option value="emprendimiento">Emprendimiento</option>
+                    <option value="personal">Personal</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Stock Mínimo ({formData.unidad_base})</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                required
-                value={formData.stock_minimo_base}
-                onChange={e => setFormData({...formData, stock_minimo_base: e.target.value})}
-              />
+          )}
+
+          {formData.categoria === 'Reutilizables' && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '12px', marginTop: '1rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>🔄 Propiedades Reutilizables</h4>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Tipo de Contenedor</label>
+                  <input type="text" className="form-control" placeholder="Ej: Beaker, Frasco, Caja" value={formData.tipo_contenedor} onChange={e => setFormData({...formData, tipo_contenedor: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Capacidad (ml)</label>
+                  <input type="number" className="form-control" value={formData.capacidad_ml} onChange={e => setFormData({...formData, capacidad_ml: e.target.value})} />
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {formData.categoria === 'Bioseguridad' && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '1rem', borderRadius: '12px', marginTop: '1rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: '#10b981' }}>🛡️ Datos de Bioseguridad</h4>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Concentración de Uso</label>
+                  <input type="text" className="form-control" placeholder="Ej: 70%, 10%, 200ppm" value={formData.concentracion_uso} onChange={e => setFormData({...formData, concentracion_uso: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Clasificación</label>
+                  <select className="form-control" value={formData.clasificacion} onChange={e => setFormData({...formData, clasificacion: e.target.value})}>
+                    <option value="limpieza">Limpieza</option>
+                    <option value="desinfectante">Desinfectante</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {formData.categoria === 'Descartables' && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1rem', borderRadius: '12px', marginTop: '1rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: '#f59e0b' }}>📦 Datos de Descartables</h4>
+              <div className="form-group">
+                <label className="form-label">¿Esterilidad de Origen?</label>
+                <select className="form-control" value={formData.esterilidad_origen} onChange={e => setFormData({...formData, esterilidad_origen: e.target.value})}>
+                  <option value="S">Sí</option>
+                  <option value="N">No</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
             <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>Cancelar</button>

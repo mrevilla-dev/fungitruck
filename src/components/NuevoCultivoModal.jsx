@@ -113,6 +113,8 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
             especie: formData.especie,
             cepa: formData.cepa,
             substrate: selectedMedio.nombre_receta,
+            peso_seco_por_unidad_g: selectedMedio.peso_seco_por_unidad_g || 0,
+            ph_esperado: selectedMedio.ph_esperado || null,
             recipiente: selectedRecipiente ? selectedRecipiente.nombre : 'Recipiente Lote',
             status: 'Incubación',
             fecha_inoculacion: formData.fecha_inoculacion,
@@ -234,7 +236,8 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-outline" onClick={onClose}>Cerrar</button>
+
             <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{loading ? 'Procesando...' : '🚀 Registrar Lote Trazable'}</button>
           </div>
         </form>
