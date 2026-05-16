@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function AdminResetPage() {
   const [loading, setLoading] = useState(false);
@@ -75,6 +75,75 @@ export default function AdminResetPage() {
     }
   };
 
+  const handleSeedEnvases = async () => {
+    if (!window.confirm("¿Estás seguro de que querés precargar todos los envases estándar? Esto agregará nuevos items a la colección 'insumos_base'.")) {
+      return;
+    }
+
+    setLoading(true);
+    setStatus("Precargando envases...");
+
+    const envases = [
+      { nombre: "Tubo Eppendorf 0.2 ml (PCR)", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 0.5 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 1.5 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 2.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Criovial 2.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Criovial 5.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      
+      { nombre: "Tubo Falcon 15 ml", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Tubo Falcon 50 ml", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Chica (3 ml / 35mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Mediana (6 ml / 60mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Estándar (9 ml / 90mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Grande (12 ml / 150mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      
+      { nombre: "Frasco de Vidrio 250 ml (Café Aglomerado / Común)", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco tipo Nescafé Grande", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco de Vidrio 1 Litro (Schott Duran)", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco Gotero Ámbar 60 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      
+      { nombre: "Matraz Erlenmeyer 125 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 250 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 500 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 1 Litro", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 2 Litros", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      
+      { nombre: "Probeta Graduada 10 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 50 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 500 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 1 Litro", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 2 Litros", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      
+      { nombre: "Bolsa de Incubación Chica (20 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Mediana (30 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Grande (60 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      
+      { nombre: "Portaobjetos Estándar (75x25mm)", categoria: "Envases", subcategoria: "Microscopía", perfil_impresion: "PERFIL_PORTAOBJETOS" }
+    ];
+
+    try {
+      const insumosRef = collection(db, 'insumos_base');
+      for (const envase of envases) {
+        await addDoc(insumosRef, {
+          ...envase,
+          stock: 0,
+          unidad_medida: 'unidades',
+          alerta_minimo: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+      setStatus("✅ Precarga de Envases completada. Ya están disponibles en Insumos Maestro.");
+      alert("Se agregaron " + envases.length + " envases a la base de datos.");
+    } catch (error) {
+      console.error(error);
+      setStatus(`❌ Error al precargar: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in container" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', paddingTop: '4rem' }}>
       <h1 style={{ color: 'var(--danger-color)' }}>🛠️ Panel de Administración (Peligro)</h1>
@@ -119,6 +188,21 @@ export default function AdminResetPage() {
         </button>
         
         {status && <p style={{ marginTop: '1rem', fontWeight: 'bold' }}>{status}</p>}
+      </div>
+
+      <div className="card" style={{ marginTop: '2rem', borderColor: 'var(--primary-color)', borderWidth: '2px', borderStyle: 'solid' }}>
+        <h3 style={{ color: 'var(--primary-color)' }}>🛠️ Utilidades de Precarga (Seeding)</h3>
+        <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+          Usá estas opciones para popular la base de datos con información estándar para arrancar rápido.
+        </p>
+        <button 
+          className="btn btn-primary" 
+          onClick={handleSeedEnvases} 
+          disabled={loading}
+          style={{ width: '100%', padding: '1rem', fontSize: '1.2rem' }}
+        >
+          {loading ? "Procesando..." : "📦 Precargar Envases Estándar"}
+        </button>
       </div>
     </div>
   );
