@@ -176,7 +176,6 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
                 <input type="number" className="form-control" value={formData.stock_minimo_base} onChange={e => setFormData({...formData, stock_minimo_base: e.target.value})} />
               </div>
             </div>
-            </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(59, 130, 246, 0.1)', padding: '0.5rem', borderRadius: '4px' }}>
               💡 Lógica: 1 {formData.unidad_compra} = {formData.factor_compra} {formData.unidad_display} = {Number(formData.factor_compra) * Number(formData.factor_display)} {formData.unidad_base}
             </p>
