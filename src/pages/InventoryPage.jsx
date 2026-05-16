@@ -54,7 +54,7 @@ const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
                 <span className="sala-tipo" style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{insumo.categoria}</span>
                 {insumo.ubicacion && (
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>📍 {insumo.ubicacion}</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>📍 {typeof insumo.ubicacion === 'object' ? (insumo.ubicacion.detalle || insumo.ubicacion.salaId || 'Ubicación') : insumo.ubicacion}</span>
                 )}
               </div>
             </div>

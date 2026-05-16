@@ -1,0 +1,99 @@
+.label-printer-container {
+  padding: 1rem;
+  background: var(--bg-card, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.label-printer-container h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: var(--text-main, #333);
+  text-align: center;
+  font-weight: 600;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 480px) {
+  .cards-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.print-card {
+  border: 2px solid var(--border-color, #eee);
+  border-radius: 10px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  background: var(--bg-main, #fafafa);
+}
+
+.print-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-color: #a0aec0;
+}
+
+.print-card.selected {
+  border-color: #4CAF50;
+  background-color: #f1f8e9;
+  box-shadow: 0 0 0 1px #4CAF50;
+}
+
+.card-group {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #718096;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+}
+
+.card-desc {
+  font-size: 0.85rem;
+  color: #4a5568;
+}
+
+.print-action-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border-radius: 8px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.print-action-btn:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.print-action-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.print-status {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #666;
+}
