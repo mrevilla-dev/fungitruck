@@ -22,7 +22,11 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
     cantidad_compra: 1,
     costo_total: '',
     fecha_ingreso: new Date().toISOString().split('T')[0],
-    fecha_vencimiento: ''
+    fecha_vencimiento: '',
+    
+    // QC
+    porcentaje_carbono: '',
+    porcentaje_nitrogeno: ''
   });
 
   useEffect(() => {
@@ -63,6 +67,8 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
           factor_conversion: factorTotal,
           stock_minimo_base: Number(formData.stock_minimo_base),
           ubicacion: formData.ubicacion,
+          porcentaje_carbono: formData.porcentaje_carbono ? Number(formData.porcentaje_carbono) : null,
+          porcentaje_nitrogeno: formData.porcentaje_nitrogeno ? Number(formData.porcentaje_nitrogeno) : null,
           stock_total_base: (insumoDoc.exists() ? insumoDoc.data().stock_total_base : 0) + cantidadBaseNueva,
           metadata: {
             ultimo_proveedor: formData.proveedor,
@@ -170,9 +176,20 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
                 <input type="number" className="form-control" value={formData.stock_minimo_base} onChange={e => setFormData({...formData, stock_minimo_base: e.target.value})} />
               </div>
             </div>
+            </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(59, 130, 246, 0.1)', padding: '0.5rem', borderRadius: '4px' }}>
               💡 Lógica: 1 {formData.unidad_compra} = {formData.factor_compra} {formData.unidad_display} = {Number(formData.factor_compra) * Number(formData.factor_display)} {formData.unidad_base}
             </p>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">% Carbono (Opcional)</label>
+                <input type="number" step="0.01" className="form-control" value={formData.porcentaje_carbono} onChange={e => setFormData({...formData, porcentaje_carbono: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">% Nitrógeno (Opcional)</label>
+                <input type="number" step="0.01" className="form-control" value={formData.porcentaje_nitrogeno} onChange={e => setFormData({...formData, porcentaje_nitrogeno: e.target.value})} />
+              </div>
+            </div>
           </div>
 
           <div className="section-divider" style={{ border: 'none', padding: 0, margin: 0 }}>

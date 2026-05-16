@@ -11,7 +11,9 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     stock_minimo_base: insumo.stock_minimo_base || 0,
     ubicacion: insumo.ubicacion || '',
     unidad_display: insumo.unidad_display || '',
-    factor_display: insumo.factor_display || 1
+    factor_display: insumo.factor_display || 1,
+    porcentaje_carbono: insumo.porcentaje_carbono || '',
+    porcentaje_nitrogeno: insumo.porcentaje_nitrogeno || ''
   });
 
   useEffect(() => {
@@ -36,7 +38,9 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
         stock_minimo_base: Number(formData.stock_minimo_base),
         ubicacion: formData.ubicacion,
         unidad_display: formData.unidad_display,
-        factor_display: Number(formData.factor_display)
+        factor_display: Number(formData.factor_display),
+        porcentaje_carbono: formData.porcentaje_carbono ? Number(formData.porcentaje_carbono) : null,
+        porcentaje_nitrogeno: formData.porcentaje_nitrogeno ? Number(formData.porcentaje_nitrogeno) : null
       });
       onSaved();
     } catch (error) {
@@ -111,6 +115,27 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
                 className="form-control" 
                 value={formData.unidad_display} 
                 onChange={e => setFormData({...formData, unidad_display: e.target.value})} 
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">% Carbono (Opcional)</label>
+              <input 
+                type="number" step="0.01" 
+                className="form-control" 
+                value={formData.porcentaje_carbono} 
+                onChange={e => setFormData({...formData, porcentaje_carbono: e.target.value})} 
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">% Nitrógeno (Opcional)</label>
+              <input 
+                type="number" step="0.01" 
+                className="form-control" 
+                value={formData.porcentaje_nitrogeno} 
+                onChange={e => setFormData({...formData, porcentaje_nitrogeno: e.target.value})} 
               />
             </div>
           </div>

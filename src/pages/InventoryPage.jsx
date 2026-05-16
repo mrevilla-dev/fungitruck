@@ -8,6 +8,7 @@ import EditInsumoModal from '../components/EditInsumoModal';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import CultivosTable from '../components/CultivosTable';
 import NuevoCultivoModal from '../components/NuevoCultivoModal';
+import RecetaFormModal from '../components/RecetaFormModal';
 
 // --- Sub-componente: Tabla de Insumos Base ---
 const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
@@ -102,6 +103,7 @@ function InventoryPage() {
   const [insumos, setInsumos] = useState([]);
   const [medios, setMedios] = useState([]);
   const [cultivos, setCultivos] = useState([]);
+  const [recetas, setRecetas] = useState([]);
 
   // Modals State
   const [showRegistroModal, setShowRegistroModal] = useState(false);
@@ -110,6 +112,8 @@ function InventoryPage() {
   const [editingInsumo, setEditingInsumo] = useState(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
+  const [showRecetaModal, setShowRecetaModal] = useState(false);
+  const [editingReceta, setEditingReceta] = useState(null);
 
   const handleDeleteMedio = async (medio) => {
     if (!window.confirm(`¿Estás seguro de eliminar el medio ${medio.alias}? Esta acción no devolverá los insumos al stock.`)) return;
@@ -171,11 +175,18 @@ function InventoryPage() {
       setMedios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Suscripción a Recetas
+    const qRecetas = query(collection(db, "recetas"), orderBy("nombre", "asc"));
+    const unsubscribeRecetas = onSnapshot(qRecetas, (snapshot) => {
+      setRecetas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubscribeCultivos();
       unsubscribeSalas();
       unsubscribeInsumos();
       unsubscribeMedios();
+      unsubscribeRecetas();
     };
   }, []);
 
@@ -194,6 +205,11 @@ function InventoryPage() {
         {activeTab === 'cultivos' && (
           <button className="btn btn-primary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} onClick={() => setShowNuevoCultivoModal(true)}>
             ➕ Nueva Inoculación
+          </button>
+        )}
+        {activeTab === 'recetas' && (
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '0.75rem 1.5rem' }} onClick={() => setShowRecetaModal(true)}>
+            ➕ Nueva Receta
           </button>
         )}
       </header>
@@ -258,6 +274,23 @@ function InventoryPage() {
           }}
           onClick={() => setActiveTab('cultivos')}
         >🌱 Cultivos</button>
+
+        <button 
+          className={`tab-btn ${activeTab === 'recetas' ? 'active' : ''}`} 
+          style={{ 
+            flex: 1, 
+            padding: '0.8rem', 
+            border: 'none', 
+            borderRadius: '10px', 
+            cursor: 'pointer', 
+            fontWeight: '600',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
+            background: activeTab === 'recetas' ? 'var(--primary-color)' : 'transparent', 
+            color: activeTab === 'recetas' ? 'white' : 'var(--text-secondary)',
+            boxShadow: activeTab === 'recetas' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
+          }}
+          onClick={() => setActiveTab('recetas')}
+        >📜 Recetas</button>
       </nav>
 
       {/* Renderizado Condicional de Vistas */}
@@ -339,6 +372,47 @@ function InventoryPage() {
             onPrint={handlePrintBatch}
           />
         )}
+
+        {activeTab === 'recetas' && (
+          <div className="animate-fade-in">
+            {recetas.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '4rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📜</div>
+                <h3>No hay recetas configuradas</h3>
+                <p>Configurá tus fórmulas de agar, grano y sustratos.</p>
+                <button className="btn btn-primary" style={{ width: 'auto', marginTop: '1rem' }} onClick={() => setShowRecetaModal(true)}>
+                  Crear Primera Receta
+                </button>
+              </div>
+            ) : (
+              <div className="inventory-list">
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 0.5fr', padding: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                  <span>Nombre / Categoría</span>
+                  <span>Rendimiento</span>
+                  <span>C/N Teórico</span>
+                  <span></span>
+                </div>
+                {recetas.map(r => (
+                  <div key={r.id} className="card" style={{ padding: '1.25rem', marginBottom: '0.75rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 0.5fr', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ display: 'block' }}>{r.nombre}</strong>
+                      <span className="sala-tipo" style={{ fontSize: '0.65rem' }}>{r.categoria}</span>
+                    </div>
+                    <div>{r.rendimiento_teorico?.cantidad} {r.rendimiento_teorico?.unidad}</div>
+                    <div>
+                      <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--accent-color)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                        {r.relacion_cn_teorica}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <button className="btn-icon" onClick={() => { setEditingReceta(r); setShowRecetaModal(true); }}>✏️</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Modales de Interacción */}
@@ -383,6 +457,14 @@ function InventoryPage() {
         <PrintLabelsModal 
           batches={selectedMedioForPrint} 
           onClose={() => setShowPrintModal(false)} 
+        />
+      )}
+
+      {(showRecetaModal || editingReceta) && (
+        <RecetaFormModal 
+          receta={editingReceta}
+          onClose={() => { setShowRecetaModal(false); setEditingReceta(null); }}
+          onSaved={() => { setShowRecetaModal(false); setEditingReceta(null); }}
         />
       )}
     </div>

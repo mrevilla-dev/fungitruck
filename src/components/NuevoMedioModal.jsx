@@ -19,7 +19,12 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     repeticiones: 1,
     variable_nombre: 'Respiración',
     variable_valores: 'Filtro 3M, Micropore, Sin Filtro',
-    prefix_alias: 'EXP1'
+    prefix_alias: 'EXP1',
+    
+    // Control de Calidad
+    ph_real: '',
+    densidad_real_brix: '',
+    osmolaridad_real_mOsm: ''
   });
 
   useEffect(() => {
@@ -107,7 +112,12 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
               })),
               fecha_preparacion: formData.fecha_preparacion,
-              operador: 'Sistema' 
+              operador: 'Sistema',
+              qc: {
+                ph_real: formData.ph_real ? Number(formData.ph_real) : null,
+                densidad_real_brix: formData.densidad_real_brix ? Number(formData.densidad_real_brix) : null,
+                osmolaridad_real_mOsm: formData.osmolaridad_real_mOsm ? Number(formData.osmolaridad_real_mOsm) : null
+              }
             },
             createdAt: serverTimestamp()
           };
@@ -166,7 +176,6 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.25rem' }}>
-          
           <div className="section-divider">
             <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>Configuración Base</h4>
             
@@ -211,6 +220,46 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Control de Calidad QC */}
+          <div className="section-divider">
+            <h4 style={{ marginBottom: '1rem', color: 'var(--accent-color)' }}>Control de Calidad (QC)</h4>
+            <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+              <div className="form-group">
+                <label className="form-label">pH Real</label>
+                <input 
+                  type="number" step="0.1" 
+                  className="form-control" 
+                  value={formData.ph_real} 
+                  onChange={e => setFormData({...formData, ph_real: e.target.value})} 
+                  placeholder="6.5"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Densidad (°Brix)</label>
+                <input 
+                  type="number" step="0.1" 
+                  className="form-control" 
+                  value={formData.densidad_real_brix} 
+                  onChange={e => setFormData({...formData, densidad_real_brix: e.target.value})} 
+                  placeholder="12.5"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Osmolaridad (mOsm)</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  value={formData.osmolaridad_real_mOsm} 
+                  onChange={e => setFormData({...formData, osmolaridad_real_mOsm: e.target.value})} 
+                  placeholder="300"
+                />
+              </div>
+            </div>
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              💡 Medir preferentemente antes de agregar el agar.
+            </p>
           </div>
 
           {/* Toggle Serie Experimental */}
