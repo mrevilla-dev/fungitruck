@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, setDoc, serverTimestamp, query, onSnapshot } from 'firebase/firestore';
+import { getFallbackCN } from '../utils/cnDatabase';
 
 export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSaved }) {
   const [insumosBase, setInsumosBase] = useState([]);
@@ -34,13 +35,34 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
   const cnData = useMemo(() => {
     let sumC = 0;
     let sumN = 0;
+    let usaEstimacion = false;
     form.ingredientes.forEach(ing => {
       if (ing.insumoId && ing.cantidad) {
         const found = insumosBase.find(i => i.id === ing.insumoId);
-        if (found?.bioquimica) {
-          sumC += (ing.cantidad * (Number(found.bioquimica.porcentaje_carbono) || 0) / 100);
-          sumN += (ing.cantidad * (Number(found.bioquimica.porcentaje_nitrogeno) || 0) / 100);
+        
+        let c = 0;
+        let n = 0;
+        let tieneBioq = false;
+
+        // Intentar leer valor configurado en el Insumo Maestro
+        if (found?.bioquimica && (found.bioquimica.porcentaje_carbono > 0 || found.bioquimica.porcentaje_nitrogeno > 0)) {
+          c = Number(found.bioquimica.porcentaje_carbono) || 0;
+          n = Number(found.bioquimica.porcentaje_nitrogeno) || 0;
+          tieneBioq = true;
         }
+
+        // Si no tiene bioquímica asignada, usar Base de Datos Fallback
+        if (!tieneBioq) {
+          const fallback = getFallbackCN(ing.nombre || found?.nombre);
+          if (fallback) {
+            c = fallback.c;
+            n = fallback.n;
+            usaEstimacion = true;
+          }
+        }
+
+        sumC += (ing.cantidad * c) / 100;
+        sumN += (ing.cantidad * n) / 100;
       }
     });
     let ratio = "N/A";
@@ -49,7 +71,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     } else if (sumC > 0) {
       ratio = "Solo Carbono";
     }
-    return { sumC, sumN, ratio };
+    return { sumC, sumN, ratio, usaEstimacion };
   }, [form.ingredientes, insumosBase]);
 
   const addIngredient = () => {
@@ -211,6 +233,9 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             <div style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '8px', border: '2px solid #8b5cf6', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
               <span style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Relación C/N Teórica</span>
               <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#8b5cf6' }}>{cnData.ratio}</span>
+              {cnData.usaEstimacion && (
+                <div style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.25rem', fontWeight: '600' }}>⚠️ (Contiene Valores Estimados)</div>
+              )}
             </div>
           </div>
 
