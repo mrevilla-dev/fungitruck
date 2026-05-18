@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { db, storage } from '../firebase';
 import { doc, getDoc, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -17,17 +17,33 @@ function ScannerPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let html5QrCode;
     if (!scanResult) {
-      const scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
-      scanner.render(
-        (decodedText) => { setScanResult(decodedText); scanner.clear(); },
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      
+      html5QrCode.start(
+        { facingMode: "environment" }, 
+        config,
+        (decodedText) => { 
+          setScanResult(decodedText); 
+          html5QrCode.stop().catch(err => console.warn("Error stopping scanner", err));
+        },
         () => {}
-      );
-      return () => { scanner.clear().catch(() => {}); };
+      ).catch(err => {
+        console.error("Unable to start scanner", err);
+        // Fallback to any camera if environment fails
+        html5QrCode.start({ facingMode: "user" }, config, (decodedText) => {
+          setScanResult(decodedText);
+          html5QrCode.stop().catch(e => console.warn(e));
+        }, () => {});
+      });
+
+      return () => {
+        if (html5QrCode && html5QrCode.isScanning) {
+          html5QrCode.stop().catch(err => console.warn(err));
+        }
+      };
     } else {
       fetchDetails(scanResult);
     }
@@ -60,7 +76,26 @@ function ScannerPage() {
         return;
       }
 
-      // 3. Intentar como Batch (legacy)
+      // 3. Intentar como Lote de Insumo (insumos_lotes)
+      const qLotes = query(collection(db, "insumos_lotes"), where("lote_interno", "==", id));
+      const snapL = await getDocs(qLotes);
+      if (!snapL.empty) {
+        setRecordData({ id: snapL.docs[0].id, ...snapL.docs[0].data() });
+        setRecordType('insumo_lote');
+        setLoading(false);
+        return;
+      }
+
+      // 4. Intentar como Insumo Base (Maestro)
+      const insumoDoc = await getDoc(doc(db, "insumos_base", id));
+      if (insumoDoc.exists()) {
+        setRecordData({ id: id, ...insumoDoc.data() });
+        setRecordType('insumo_base');
+        setLoading(false);
+        return;
+      }
+
+      // 5. Intentar como Batch (legacy)
       const batchDoc = await getDoc(doc(db, "batches", id));
       if (batchDoc.exists()) {
         setRecordData(batchDoc.data());
@@ -309,6 +344,80 @@ function ScannerPage() {
             <div>
               <label className="form-label">Fecha de Preparación</label>
               <p style={{ margin: 0 }}>📅 {recordData.trazabilidad?.fecha_preparacion || '—'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista: Insumo Base (Maestro) ──
+  if (recordType === 'insumo_base' && recordData) {
+    return (
+      <div className="animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <button className="btn btn-outline" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>
+            ID: {recordData.id}
+          </div>
+        </div>
+
+        <div className="card" style={{ borderTop: '6px solid var(--accent-color)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ marginBottom: '0.25rem' }}>{recordData.nombre}</h2>
+              <span className="sala-tipo" style={{ fontSize: '0.7rem' }}>{recordData.categoria}</span>
+            </div>
+            <QRCodeSVG value={scanResult} size={64} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div>
+              <label className="form-label">Stock Total</label>
+              <p style={{ margin: 0, fontWeight: '700', fontSize: '1.2rem' }}>
+                {(recordData.stock_total_base / (recordData.factor_display || 1)).toFixed(1)} {recordData.unidad_display || recordData.unidad_base}
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Ubicación</label>
+              <p style={{ margin: 0 }}>📍 {recordData.ubicacion?.detalle || 'Principal'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista: Lote de Insumo ──
+  if (recordType === 'insumo_lote' && recordData) {
+    return (
+      <div className="animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <button className="btn btn-outline" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>
+            Lote: {recordData.lote_interno}
+          </div>
+        </div>
+
+        <div className="card" style={{ borderTop: '6px solid var(--primary-color)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ marginBottom: '0.25rem' }}>{recordData.nombre_insumo}</h2>
+              <p style={{ margin: 0 }}>{recordData.proveedor} · {recordData.estado_apertura}</p>
+            </div>
+            <QRCodeSVG value={scanResult} size={64} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div>
+              <label className="form-label">Cantidad Actual</label>
+              <p style={{ margin: 0, fontWeight: '700', fontSize: '1.2rem' }}>
+                {recordData.cantidad_base_actual} (base)
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Fecha Ingreso</label>
+              <p style={{ margin: 0 }}>📅 {recordData.fecha_ingreso}</p>
             </div>
           </div>
         </div>

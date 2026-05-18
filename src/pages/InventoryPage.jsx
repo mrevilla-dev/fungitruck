@@ -126,6 +126,12 @@ const InsumosTable = ({ insumos, lotes, salas, onRegistrarCompra, onEdit, onEdit
               <div>{isLowStock ? '⚠️ BAJO' : '✔️ OK'}</div>
               <div>${insumo.metadata?.costo_promedio_base?.toFixed(2) || '0.00'}</div>
               <div style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                <button className="btn-icon" onClick={() => onPrintBatch({
+                  id: insumo.id,
+                  lote_interno: insumo.id.slice(-4),
+                  nombre_insumo: insumo.nombre,
+                  fecha_ingreso: new Date().toISOString().split('T')[0]
+                })} title="Imprimir Etiqueta General">🖨️</button>
                 <button className="btn-icon" onClick={() => onEdit(insumo)} title="Editar Maestro">✏️</button>
                 <button className="btn-icon" style={{ color: 'var(--danger-color)' }} onClick={() => setConfirmAction({ message: `¿Eliminar "${insumo.nombre}" y todos sus lotes? Esta acción es irreversible.`, onConfirm: () => { onDeleteInsumo(insumo); setConfirmAction(null); } })} title="Eliminar Insumo Completo">🗑️</button>
                 <button className="btn-icon" onClick={() => toggleExpand(insumo.id)}>
@@ -204,20 +210,75 @@ const InsumosTable = ({ insumos, lotes, salas, onRegistrarCompra, onEdit, onEdit
 };
 
 // --- Sub-componente: Tabla de Recetas (Pilar 4) ---
-const RecetasTable = ({ recetas, onClone, onAdd }) => {
-  if (recetas.length === 0) return <div className="card">No hay recetas. <button onClick={onAdd}>Crear</button></div>;
+const RecetasTable = ({ recetas, insumos, onEdit, onDuplicate, onDelete, onArchive, onAdd, searchQuery, categoryFilter, statusFilter, setConfirmAction }) => {
+  const filteredRecetas = recetas.filter(r => {
+    const matchesSearch = r.nombre?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === 'todas' || r.categoria === categoryFilter;
+    const matchesStatus = statusFilter === 'todas' || (r.estado || 'activa') === statusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  const calculateRecipeCost = (ingredients) => {
+    if (!ingredients || ingredients.length === 0) return 0;
+    return ingredients.reduce((acc, ing) => {
+      const insumo = insumos.find(i => i.id === ing.insumoId);
+      const costoUnidad = insumo?.metadata?.costo_promedio_base || 0;
+      return acc + (costoUnidad * (ing.cantidad || 0));
+    }, 0);
+  };
+
+  if (recetas.length === 0) return (
+    <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+      <p>No hay recetas cargadas.</p>
+      <button className="btn btn-primary" style={{ width: 'auto', marginTop: '1rem' }} onClick={onAdd}>Crear Primera Receta</button>
+    </div>
+  );
+
   return (
     <div className="inventory-list animate-fade-in">
-      {recetas.map(r => (
-        <div key={r.id} className="card" style={{ padding: '1rem', marginBottom: '0.5rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 2fr 0.5fr', alignItems: 'center' }}>
-          <div><strong>{r.nombre}</strong></div>
-          <div>{r.rendimiento_teorico?.cantidad} {r.rendimiento_teorico?.unidad}</div>
-          <div style={{ fontSize: '0.8rem' }}>{r.ingredientes?.map(i => i.nombre || i.insumoId).join(', ')}</div>
-          <div style={{ textAlign: 'right' }}>
-            <button className="btn-icon" onClick={() => onClone(r)}>🐑</button>
-          </div>
-        </div>
-      ))}
+      {filteredRecetas.length === 0 ? (
+        <p style={{ textAlign: 'center', opacity: 0.5, padding: '2rem' }}>No se encontraron recetas con estos filtros.</p>
+      ) : (
+        filteredRecetas.map(r => {
+          const totalCost = calculateRecipeCost(r.ingredientes);
+          const isArchived = r.estado === 'archivada';
+          
+          return (
+            <div key={r.id} className="card recipe-grid" style={{ 
+              padding: '1rem', 
+              marginBottom: '0.5rem', 
+              opacity: isArchived ? 0.6 : 1,
+              borderLeft: isArchived ? '4px solid #64748b' : '4px solid var(--primary-color)'
+            }}>
+              <div>
+                <strong>{r.nombre}</strong>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--primary-color)' }}>{r.categoria}</span>
+                {r.descripcion && <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.8, marginTop: '0.2rem', fontStyle: 'italic' }}>{r.descripcion}</span>}
+              </div>
+              <div style={{ fontSize: '0.9rem' }}>{r.rendimiento_teorico?.cantidad} {r.rendimiento_teorico?.unidad}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: 'bold' }}>
+                ${totalCost > 0 ? totalCost.toFixed(2) : '0.00'}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+                {r.ingredientes?.length || 0} ing.
+              </div>
+              <div style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                <button className="btn-icon" onClick={() => onEdit(r)} title="Editar Receta">✏️</button>
+                <button className="btn-icon" onClick={() => onDuplicate(r)} title="Duplicar">🐑</button>
+                {!isArchived ? (
+                  <button className="btn-icon" onClick={() => onArchive(r, 'archivada')} title="Archivar">📦</button>
+                ) : (
+                  <button className="btn-icon" onClick={() => onArchive(r, 'activa')} title="Reactivar">🔓</button>
+                )}
+                <button className="btn-icon" style={{ color: 'var(--danger-color)' }} onClick={() => setConfirmAction({ 
+                  message: `¿ELIMINAR DEFINITIVAMENTE "${r.nombre}"? Esta acción no se puede deshacer.`, 
+                  onConfirm: () => onDelete(r) 
+                })} title="Eliminar Definitivamente">🗑️</button>
+              </div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 };
@@ -233,6 +294,9 @@ function InventoryPage() {
   const [salas, setSalas] = useState([]);
   const [filters, setFilters] = useState({ search: '', status: 'todas', sala: 'todas' });
   const [insumoFilters, setInsumoFilters] = useState({ search: '', categoria: 'todas', salaId: 'todas' });
+  const [recipeSearch, setRecipeSearch] = useState('');
+  const [recipeCategory, setRecipeCategory] = useState('todas');
+  const [recipeStatus, setRecipeStatus] = useState('activa');
 
   const [showRegistroModal, setShowRegistroModal] = useState(false);
   const [showNuevoMedioModal, setShowNuevoMedioModal] = useState(false);
@@ -243,9 +307,11 @@ function InventoryPage() {
   const [editingInsumo, setEditingInsumo] = useState(null);
   const [editingLote, setEditingLote] = useState(null);
   const [editingBatch, setEditingBatch] = useState(null);
+  const [editingRecipe, setEditingRecipe] = useState(null);
   const [auditingLote, setAuditingLote] = useState(null);
   const [recipeToClone, setRecipeToClone] = useState(null);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
 
 
   useEffect(() => {
@@ -308,66 +374,104 @@ function InventoryPage() {
     }
   };
 
+  const handleDeleteRecipe = async (recipe) => {
+    try {
+      await deleteDoc(doc(db, "recetas", recipe.id));
+      alert("✅ Receta eliminada correctamente.");
+      setConfirmAction(null);
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar receta");
+    }
+  };
+
+
+  const handleArchiveRecipe = async (recipe, newStatus) => {
+    try {
+      await updateDoc(doc(db, "recetas", recipe.id), { estado: newStatus });
+    } catch (err) {
+      console.error(err);
+      alert("Error al cambiar estado de la receta");
+    }
+  };
+
 
   return (
     <div className="inventory-page container animate-fade-in">
 
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2>Inventario Central</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          {activeTab === 'insumos' && <button className="btn btn-primary" onClick={() => setShowRegistroModal(true)}>➕ Registrar Compra</button>}
-          {activeTab === 'cultivos' && <button className="btn btn-primary" onClick={() => setShowNuevoCultivoModal(true)}>➕ Nueva Inoculación</button>}
-          {activeTab === 'recetas' && <button className="btn btn-primary" onClick={() => setShowRecipeModal(true)}>➕ Nueva Receta</button>}
-        </div>
-      </header>
+      <div className="sticky-header">
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2>Inventario Central</h2>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            {activeTab === 'insumos' && <button className="btn btn-primary" onClick={() => setShowRegistroModal(true)}>➕ Registrar Compra</button>}
+            {activeTab === 'cultivos' && <button className="btn btn-primary" onClick={() => setShowNuevoCultivoModal(true)}>➕ Nueva Inoculación</button>}
+            {activeTab === 'recetas' && <button className="btn btn-primary" onClick={() => setShowRecipeModal(true)}>➕ Nueva Receta</button>}
+          </div>
+        </header>
 
-      <nav className="tab-container" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', background: 'rgba(0,0,0,0.2)', padding: '0.4rem', borderRadius: '14px' }}>
-        {['insumos', 'medios', 'cultivos', 'recetas'].map(tab => (
-          <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} style={{ flex: 1, padding: '0.8rem', border: 'none', borderRadius: '10px', background: activeTab === tab ? 'var(--primary-color)' : 'transparent', color: activeTab === tab ? 'white' : 'var(--text-secondary)' }} onClick={() => setActiveTab(tab)}>
-            {tab.toUpperCase()}
-          </button>
-        ))}
-      </nav>
+        <nav className="tab-container" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', padding: '0.4rem', borderRadius: '14px' }}>
+          {['insumos', 'medios', 'cultivos', 'recetas'].map(tab => (
+            <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} style={{ flex: 1, padding: '0.8rem', border: 'none', borderRadius: '10px', background: activeTab === tab ? 'var(--primary-color)' : 'transparent', color: activeTab === tab ? 'white' : 'var(--text-secondary)', fontSize: '0.85rem' }} onClick={() => setActiveTab(tab)}>
+              {tab.toUpperCase()}
+            </button>
+          ))}
+        </nav>
 
-      {/* Filtros para Insumos */}
-      {activeTab === 'insumos' && (
-        <div className="filters-bar animate-fade-in" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 2, minWidth: '200px' }}>
+        {/* Filtros para Insumos */}
+        {activeTab === 'insumos' && (
+          <div className="filters-bar animate-fade-in" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 2, minWidth: '200px' }}>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="🔍 Buscar por nombre o ID (ej: 1967)..." 
+                value={insumoFilters.search} 
+                onChange={e => setInsumoFilters({...insumoFilters, search: e.target.value})} 
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: '150px' }}>
+              <select 
+                className="form-control" 
+                value={insumoFilters.categoria} 
+                onChange={e => setInsumoFilters({...insumoFilters, categoria: e.target.value})}
+              >
+                <option value="todas">Todas las Categorías</option>
+                <option value="Medios y reactivos">Medios y reactivos</option>
+                <option value="Sustratos y granos">Sustratos y granos</option>
+                <option value="Descartables">Descartables</option>
+                <option value="Reutilizables">Reutilizables</option>
+                <option value="Bioseguridad">Bioseguridad</option>
+                <option value="Equipamiento">Equipamiento</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Filtros para Recetas */}
+        {activeTab === 'recetas' && (
+          <div className="filters-bar animate-fade-in" style={{ display: 'flex', gap: '1rem' }}>
             <input 
               type="text" 
               className="form-control" 
-              placeholder="🔍 Buscar por nombre o ID (ej: 1967)..." 
-              value={insumoFilters.search} 
-              onChange={e => setInsumoFilters({...insumoFilters, search: e.target.value})} 
+              style={{ flex: 2 }}
+              placeholder="🔍 Buscar receta..." 
+              value={recipeSearch} 
+              onChange={e => setRecipeSearch(e.target.value)} 
             />
-          </div>
-          <div style={{ flex: 1, minWidth: '150px' }}>
-            <select 
-              className="form-control" 
-              value={insumoFilters.categoria} 
-              onChange={e => setInsumoFilters({...insumoFilters, categoria: e.target.value})}
-            >
-              <option value="todas">Todas las Categorías</option>
-              <option value="Medios y reactivos">Medios y reactivos</option>
-              <option value="Sustratos y granos">Sustratos y granos</option>
-              <option value="Descartables">Descartables</option>
-              <option value="Reutilizables">Reutilizables</option>
-              <option value="Bioseguridad">Bioseguridad</option>
-              <option value="Equipamiento">Equipamiento</option>
+            <select className="form-control" style={{ flex: 1 }} value={recipeCategory} onChange={e => setRecipeCategory(e.target.value)}>
+              <option value="todas">Categorías</option>
+              <option value="Agar">Agar</option>
+              <option value="Grano">Grano</option>
+              <option value="Sustrato">Sustrato</option>
+            </select>
+            <select className="form-control" style={{ flex: 1 }} value={recipeStatus} onChange={e => setRecipeStatus(e.target.value)}>
+              <option value="activa">Activas</option>
+              <option value="archivada">Archivadas</option>
+              <option value="todas">Todas</option>
             </select>
           </div>
-          <div style={{ flex: 1, minWidth: '150px' }}>
-            <select 
-              className="form-control" 
-              value={insumoFilters.salaId} 
-              onChange={e => setInsumoFilters({...insumoFilters, salaId: e.target.value})}
-            >
-              <option value="todas">Todas las Salas</option>
-              {salas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-            </select>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <main>
         {activeTab === 'insumos' && (
@@ -391,13 +495,15 @@ function InventoryPage() {
             onEditLote={setEditingLote}
             onAudit={setAuditingLote} 
             onPrintBatch={(lote) => {
-
-              // Convertimos el lote al formato que espera PrintLabelsModal
+              // Mapeo robusto para que PrintLabelsModal siempre tenga los datos necesarios
               setSelectedMedioForPrint([{
-                id: lote.lote_interno,
+                id: lote.lote_interno || lote.id,
+                alias: lote.lote_interno,
+                nombre_receta: lote.nombre_insumo || lote.nombre,
                 nombre_insumo: lote.nombre_insumo,
                 proveedor: lote.proveedor,
-                fecha: lote.fecha_ingreso,
+                fecha: lote.fecha_ingreso || lote.createdAt?.toDate()?.toISOString()?.split('T')[0],
+                trazabilidad: { fecha_preparacion: lote.fecha_ingreso || '' },
                 tipo: 'LOTE_INSUMO'
               }]);
               setShowPrintModal(true);
@@ -423,13 +529,34 @@ function InventoryPage() {
           </div>
         )}
         {activeTab === 'cultivos' && <CultivosTable cultivos={cultivos} filters={filters} setFilters={setFilters} onEdit={setEditingBatch} onPrint={handlePrintBatch} />}
-        {activeTab === 'recetas' && <RecetasTable recetas={recetas} onClone={r => { setRecipeToClone(r); setShowRecipeModal(true); }} onAdd={() => setShowRecipeModal(true)} />}
+        {activeTab === 'recetas' && (
+          <RecetasTable 
+            recetas={recetas} 
+            insumos={insumos}
+            searchQuery={recipeSearch}
+            categoryFilter={recipeCategory}
+            statusFilter={recipeStatus}
+            onEdit={r => { setRecipeToClone(null); setEditingRecipe(r); setShowRecipeModal(true); }}
+            onDuplicate={r => { setEditingRecipe(null); setRecipeToClone(r); setShowRecipeModal(true); }} 
+            onDelete={handleDeleteRecipe}
+            onArchive={handleArchiveRecipe}
+            onAdd={() => { setEditingRecipe(null); setRecipeToClone(null); setShowRecipeModal(true); }} 
+            setConfirmAction={setConfirmAction}
+          />
+        )}
       </main>
 
       {showRegistroModal && <RegistroInsumoModal onClose={() => setShowRegistroModal(false)} onSaved={() => setShowRegistroModal(false)} />}
       {showNuevoMedioModal && <NuevoMedioModal onClose={() => setShowNuevoMedioModal(false)} onSaved={() => setShowNuevoMedioModal(false)} />}
       {showNuevoCultivoModal && <NuevoCultivoModal onClose={() => setShowNuevoCultivoModal(false)} onSaved={() => setShowNuevoCultivoModal(false)} />}
-      {showRecipeModal && <RecipeFormModal recipeToClone={recipeToClone} onClose={() => { setShowRecipeModal(false); setRecipeToClone(null); }} onSaved={() => { setShowRecipeModal(false); setRecipeToClone(null); }} />}
+      {showRecipeModal && (
+        <RecipeFormModal 
+          recipeToClone={recipeToClone || editingRecipe} 
+          isEdit={!!editingRecipe}
+          onClose={() => { setShowRecipeModal(false); setRecipeToClone(null); setEditingRecipe(null); }} 
+          onSaved={() => { setShowRecipeModal(false); setRecipeToClone(null); setEditingRecipe(null); }} 
+        />
+      )}
       {editingBatch && (
         <BatchEditModal 
           batch={editingBatch} 
@@ -446,6 +573,14 @@ function InventoryPage() {
       {editingLote && <EditLoteModal lote={editingLote} onClose={() => setEditingLote(null)} onSaved={() => setEditingLote(null)} />}
       {auditingLote && <AuditInsumoModal lote={auditingLote} onClose={() => setAuditingLote(null)} />}
       {showPrintModal && selectedMedioForPrint && <PrintLabelsModal batches={selectedMedioForPrint} onClose={() => setShowPrintModal(false)} />}
+      
+      {confirmAction && (
+        <ConfirmModal 
+          message={confirmAction.message} 
+          onConfirm={confirmAction.onConfirm} 
+          onCancel={() => setConfirmAction(null)} 
+        />
+      )}
 
     </div>
   );

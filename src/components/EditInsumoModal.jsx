@@ -56,6 +56,33 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     return () => unsubscribe();
   }, []);
 
+  const handleAddSala = async () => {
+    const nombreSala = window.prompt("🏷️ Ingrese el nombre de la NUEVA SALA / UBICACIÓN:");
+    if (!nombreSala || nombreSala.trim() === '') return;
+    
+    try {
+      setLoading(true);
+      const { setDoc } = await import('firebase/firestore');
+      const newSalaRef = doc(collection(db, 'salas'));
+      const salaData = { 
+        nombre: nombreSala.trim(), 
+        tipo: 'Depósito / Almacén', 
+        createdAt: serverTimestamp(),
+        descripcion: 'Creada rápidamente desde edición'
+      };
+      
+      await setDoc(newSalaRef, salaData);
+      
+      setFormData(prev => ({ ...prev, salaId: newSalaRef.id }));
+      alert(`✅ Sala "${nombreSala}" creada y seleccionada.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al crear la sala.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePhotoCapture = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -193,10 +220,19 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Ubicación Predeterminada (Sala)</label>
-              <select className="form-control" value={formData.salaId} onChange={e => setFormData({...formData, salaId: e.target.value})}>
-                <option value="">-- Seleccioná Ubicación --</option>
-                {salas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-              </select>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <select className="form-control" value={formData.salaId} onChange={e => setFormData({...formData, salaId: e.target.value})}>
+                  <option value="">-- Seleccioná Ubicación --</option>
+                  {salas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  style={{ width: 'auto', padding: '0 1rem', fontSize: '1.2rem' }}
+                  onClick={handleAddSala}
+                  title="Añadir nueva sala"
+                >+</button>
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Detalle (Estante/Cajón)</label>

@@ -528,3 +528,36 @@ input:checked + .slider:before {
   }
 }
 
+
+/* Sticky Header */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1.5rem;
+  margin-top: -1rem; /* Offset container padding */
+}
+
+/* Responsive Recipes Table */
+.recipe-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .recipe-grid {
+    grid-template-columns: 2fr 1fr 1.5fr;
+    gap: 0.25rem;
+  }
+  .recipe-grid > :nth-child(3), 
+  .recipe-grid > :nth-child(4) {
+    display: none; /* Hide cost and count on very small screens or reflow */
+  }
+}

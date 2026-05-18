@@ -106,41 +106,45 @@ export default function PrintLabelsModal({ batches, onClose }) {
         </div>
 
         {mode === 'thermal' && (
-          <div style={{ marginBottom: '1rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+          <div style={{ marginBottom: '1.5rem', background: 'rgba(59, 130, 246, 0.1)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--primary-color)' }}>
             <div style={{ marginBottom: '1rem' }}>
-              <label className="form-label">Tamaño Zebra (ZPL):</label>
+              <label className="form-label" style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>📟 Configuración para Zebra Z220:</label>
               <select 
                 className="form-control" 
                 value={zplSize} 
                 onChange={e => setZplSize(e.target.value)}
+                style={{ background: 'var(--surface-color)', marginTop: '0.5rem' }}
               >
-                <option value="large">Grande (10x15 cm) - Bolsas</option>
-                <option value="medium">Mediana (5x5 cm) - Frascos</option>
-                <option value="small">Pequeña (5x2.5 cm) - Tubos</option>
+                <option value="large">📏 Grande (10x15 cm) - Bolsas/Botes</option>
+                <option value="medium">📏 Mediana (5x5 cm) - Frascos</option>
+                <option value="small">📏 Pequeña (5x2.5 cm) - Placas/Tubos</option>
               </select>
             </div>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn btn-primary" onClick={handleDownloadZPL} style={{ flex: 1, backgroundColor: '#10b981' }}>
-                ⬇️ Descargar ZPL
+              <button className="btn btn-primary" onClick={handleDownloadZPL} style={{ flex: 1, backgroundColor: '#10b981', fontWeight: 'bold', fontSize: '1rem' }}>
+                ⬇️ DESCARGAR ARCHIVO .ZPL
               </button>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
               <button 
                 className={`btn ${profile === 'standard' ? 'btn-primary' : 'btn-outline'}`} 
-                style={{ flex: 1, fontSize: '0.8rem' }}
+                style={{ flex: 1, fontSize: '0.75rem' }}
                 onClick={() => setProfile('standard')}
               >
-                📏 PDF Standard
+                📄 PDF Standard
               </button>
               <button 
                 className={`btn ${profile === 'micro' ? 'btn-primary' : 'btn-outline'}`} 
-                style={{ flex: 1, fontSize: '0.8rem' }}
+                style={{ flex: 1, fontSize: '0.75rem' }}
                 onClick={() => setProfile('micro')}
               >
-                🧪 PDF Micro
+                📄 PDF Micro
               </button>
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem', textAlign: 'center' }}>
-              Usa ZPL para Zebra Z220 o PDF para impresión normal.
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.75rem', textAlign: 'center' }}>
+              Usa el botón verde para la Zebra. Los botones grises son para imprimir PDF normal.
             </p>
           </div>
         )}
@@ -182,9 +186,6 @@ export default function PrintLabelsModal({ batches, onClose }) {
                         {formatDate(batch.fecha) || batch.trazabilidad?.fecha_preparacion || batch.fecha_inoculacion} <br />
                         {batch.medio_origen_alias ? `Origen: ${batch.medio_origen_alias}` : `Lote: ${batch.id.slice(-4)}`}
                       </div>
-                    </div>
-                  </div>
-
                     </div>
                   </div>
                 ) : (

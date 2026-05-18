@@ -84,20 +84,30 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
   }, [preselectedInsumo]);
 
   const handleAddSala = async () => {
-    const nombreSala = prompt("Ingrese el nombre de la nueva sala:");
-    if (!nombreSala) return;
+    const nombreSala = window.prompt("🏷️ Ingrese el nombre de la NUEVA SALA / UBICACIÓN:");
+    if (!nombreSala || nombreSala.trim() === '') return;
+    
     try {
+      setLoading(true);
       const newSalaRef = doc(collection(db, 'salas'));
+      const salaData = { 
+        nombre: nombreSala.trim(), 
+        tipo: 'Depósito / Almacén', 
+        createdAt: serverTimestamp(),
+        descripcion: 'Creada rápidamente desde registro'
+      };
+      
       await runTransaction(db, async (transaction) => {
-        transaction.set(newSalaRef, { 
-          nombre: nombreSala, 
-          tipo: 'Depósito', 
-          createdAt: serverTimestamp() 
-        });
+        transaction.set(newSalaRef, salaData);
       });
+      
       setFormData(prev => ({ ...prev, salaId: newSalaRef.id }));
+      alert(`✅ Sala "${nombreSala}" creada y seleccionada.`);
     } catch (err) {
-      alert("Error al crear sala");
+      console.error(err);
+      alert("Error al crear la sala. Intente nuevamente.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -128,8 +138,25 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
     'Equipamiento'
   ];
 
-  const factorTotal = formData.categoria === 'Reutilizables' ? 1 : (Number(formData.factor_compra || 0) * Number(formData.factor_display || 0));
-  const conversionPreview = formData.categoria === 'Reutilizables' ? `1 unidad = 1 unidad` : `1 ${formData.unidad_compra || 'unidad'} = ${formData.factor_compra || 0} ${formData.unidad_display || 'vista'} = ${factorTotal} ${formData.unidad_base || 'base'}`;
+  const safeNumber = (val) => {
+    const n = Number(val);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const factorTotal = formData.categoria === 'Reutilizables' ? 1 : (safeNumber(formData.factor_compra) * safeNumber(formData.factor_display));
+  
+  // Generar preview de forma ultra-segura
+  let conversionPreview = "";
+  try {
+    const uCompra = String(formData.unidad_compra || 'unidad');
+    const uDisplay = String(formData.unidad_display || 'un');
+    const uBase = String(formData.unidad_base || 'un');
+    conversionPreview = formData.categoria === 'Reutilizables' 
+      ? `1 unidad = 1 unidad` 
+      : `1 ${uCompra} = ${safeNumber(formData.factor_compra)} ${uDisplay} = ${factorTotal} ${uBase}`;
+  } catch (e) {
+    conversionPreview = "Error en formato de unidades";
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -403,7 +430,13 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
 
             <div className="form-group">
               <label className="form-label">Unidad de Compra (ej. Rollo, Bolsa)</label>
-              <input type="text" className="form-control" value={formData.unidad_compra} onChange={e => setFormData({...formData, unidad_compra: e.target.value})} />
+              <input 
+                type="text" 
+                className="form-control" 
+                autoComplete="off"
+                value={formData.unidad_compra || ''} 
+                onChange={e => setFormData({...formData, unidad_compra: e.target.value})} 
+              />
             </div>
 
 
@@ -416,24 +449,24 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
                 </div>
                 <div className="grid-2" style={{ marginBottom: '0.5rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Contenido por {formData.unidad_compra || 'Unidad'}</label>
+                    <label className="form-label">Contenido por {String(formData.unidad_compra || 'Unidad')}</label>
                     <div className="flex-gap">
                       <input type="number" className="form-control" value={formData.factor_compra} onChange={e => setFormData({...formData, factor_compra: e.target.value})} placeholder="20" />
-                      <input type="text" className="form-control" style={{ width: '90px' }} placeholder="un" value={formData.unidad_display} onChange={e => setFormData({...formData, unidad_display: e.target.value})} title="Unidad en la que querés ver el stock" />
+                      <input type="text" className="form-control" style={{ width: '90px' }} autoComplete="off" placeholder="un" value={formData.unidad_display || ''} onChange={e => setFormData({...formData, unidad_display: e.target.value})} title="Unidad en la que querés ver el stock" />
                     </div>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Equivalencia a Unidad Mínima</label>
                     <div className="flex-gap">
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>1 {formData.unidad_display || 'un'} =</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>1 {String(formData.unidad_display || 'un')} =</span>
                       <input type="number" className="form-control" value={formData.factor_display} onChange={e => setFormData({...formData, factor_display: e.target.value})} placeholder="1" />
-                      <input type="text" className="form-control" style={{ width: '90px' }} placeholder="un" value={formData.unidad_base} onChange={e => setFormData({...formData, unidad_base: e.target.value})} />
+                      <input type="text" className="form-control" style={{ width: '90px' }} autoComplete="off" placeholder="un" value={formData.unidad_base || ''} onChange={e => setFormData({...formData, unidad_base: e.target.value})} />
                     </div>
                   </div>
                 </div>
                 
                 <div className="form-group" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(59, 130, 246, 0.2)', paddingTop: '1rem' }}>
-                  <label className="form-label" style={{ color: '#10b981', fontWeight: 'bold' }}>🔔 Stock Mínimo para Alerta ({formData.unidad_base || 'unidades'})</label>
+                  <label className="form-label" style={{ color: '#10b981', fontWeight: 'bold' }}>🔔 Stock Mínimo para Alerta ({String(formData.unidad_base || 'unidades')})</label>
                   <input type="number" className="form-control" value={formData.stock_minimo_base} onChange={e => setFormData({...formData, stock_minimo_base: e.target.value})} placeholder="Ej: 50" />
                   <small style={{ fontSize: '0.65rem', opacity: 0.7 }}>Te avisaremos cuando queden menos de esta cantidad de unidades individuales en laboratorio.</small>
                 </div>
@@ -549,10 +582,10 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
                   </select>
                   <button 
                     type="button" 
-                    className="btn btn-outline" 
-                    style={{ width: 'auto', padding: '0 0.75rem' }}
+                    className="btn btn-primary" 
+                    style={{ width: 'auto', padding: '0 1rem', fontSize: '1.2rem' }}
                     onClick={handleAddSala}
-                    title="Añadir nueva sala"
+                    title="Añadir nueva sala inmediatamente"
                   >+</button>
                 </div>
               </div>
@@ -581,7 +614,7 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
 
             <div className="grid-2">
               <div className="form-group">
-                <label className="form-label">Cantidad Comprada ({formData.unidad_compra})</label>
+                <label className="form-label">Cantidad Comprada ({String(formData.unidad_compra || 'u')})</label>
                 <input type="number" className="form-control" required value={formData.cantidad_compra} onChange={e => setFormData({...formData, cantidad_compra: e.target.value})} />
               </div>
               <div className="form-group">
