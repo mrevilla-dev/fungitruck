@@ -21,6 +21,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
   const [formData, setFormData] = useState({
     nombre: insumo.nombre || '',
     categoria: insumo.categoria || 'Medios y reactivos',
+    tipo_uso: insumo.tipo_uso || '',
     stock_minimo_vista: initialStockMinimoVista || 0,
     salaId: typeof insumo.ubicacion === 'object' ? insumo.ubicacion.salaId : (insumo.ubicacion || ''),
     detalleUbicacion: typeof insumo.ubicacion === 'object' ? insumo.ubicacion.detalle : '',
@@ -129,6 +130,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
       const updateData = {
         nombre: formData.nombre,
         categoria: formData.categoria,
+        tipo_uso: formData.tipo_uso || null,
         stock_minimo_base: stockMinimoBase,
         ubicacion: {
           salaId: formData.salaId,
@@ -252,6 +254,18 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
                 value={formData.detalleUbicacion} 
                 onChange={e => setFormData({...formData, detalleUbicacion: e.target.value})} 
               />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tipo de Uso</label>
+              <select 
+                className="form-control" 
+                value={formData.tipo_uso} 
+                onChange={e => setFormData({...formData, tipo_uso: e.target.value})}
+              >
+                <option value="">-- Sin clasificar --</option>
+                <option value="descartable">♻️ Descartable</option>
+                <option value="reutilizable">🔄 Reutilizable</option>
+              </select>
             </div>
             <div className="form-group">
                 <label className="form-label">📷 Foto del Producto (Bolsa/Envase)</label>

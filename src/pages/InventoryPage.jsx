@@ -88,9 +88,21 @@ const InsumosTable = ({ insumos, lotes, salas, onRegistrarCompra, onEdit, onEdit
             }}>
               <div>
                 <strong style={{ display: 'block' }}>{insumo.nombre || <span style={{color: 'var(--danger-color)'}}>[SIN NOMBRE]</span>}</strong>
-                <span className="sala-tipo" style={{ fontSize: '0.65rem', display: 'block', marginTop: '0.25rem' }}>
-                  {insumo.categoria} 
-                </span>
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className="sala-tipo" style={{ fontSize: '0.65rem' }}>{insumo.categoria}</span>
+                  {insumo.tipo_uso && (
+                    <span style={{ 
+                      fontSize: '0.65rem', 
+                      padding: '1px 5px', 
+                      borderRadius: '4px',
+                      background: insumo.tipo_uso === 'descartable' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                      color: insumo.tipo_uso === 'descartable' ? '#ef4444' : '#3b82f6',
+                      fontWeight: 600
+                    }}>
+                      {insumo.tipo_uso === 'descartable' ? '♻️ Descartable' : '🔄 Reutilizable'}
+                    </span>
+                  )}
+                </div>
                 
                 {insumo.categoria === 'Equipamiento' && insumo.equipamiento && (() => {
                   const amort = (Number(insumo.equipamiento.valor_compra) - Number(insumo.equipamiento.valor_residual)) / (Number(insumo.equipamiento.vida_util_anios) * 12);
@@ -293,7 +305,7 @@ function InventoryPage() {
   const [recetas, setRecetas] = useState([]);
   const [salas, setSalas] = useState([]);
   const [filters, setFilters] = useState({ search: '', status: 'todas', sala: 'todas' });
-  const [insumoFilters, setInsumoFilters] = useState({ search: '', categoria: 'todas', salaId: 'todas' });
+  const [insumoFilters, setInsumoFilters] = useState({ search: '', categoria: 'todas', salaId: 'todas', tipoUso: 'todos' });
   const [recipeSearch, setRecipeSearch] = useState('');
   const [recipeCategory, setRecipeCategory] = useState('todas');
   const [recipeStatus, setRecipeStatus] = useState('activa');
@@ -444,6 +456,18 @@ function InventoryPage() {
                 <option value="Equipamiento">Equipamiento</option>
               </select>
             </div>
+            <div style={{ flex: 1, minWidth: '150px' }}>
+              <select 
+                className="form-control" 
+                value={insumoFilters.tipoUso} 
+                onChange={e => setInsumoFilters({...insumoFilters, tipoUso: e.target.value})}
+              >
+                <option value="todos">Todos los Usos</option>
+                <option value="descartable">♻️ Descartable</option>
+                <option value="reutilizable">🔄 Reutilizable</option>
+                <option value="sin_clasificar">Sin clasificar</option>
+              </select>
+            </div>
           </div>
         )}
 
@@ -485,8 +509,11 @@ function InventoryPage() {
               const matchesSala = insumoFilters.salaId === 'todas' || 
                                    i.ubicacion?.salaId === insumoFilters.salaId || 
                                    insumosLotes.some(l => l.insumoId === i.id && l.ubicacion?.salaId === insumoFilters.salaId);
+              const matchesTipo = insumoFilters.tipoUso === 'todos' || 
+                                   (insumoFilters.tipoUso === 'sin_clasificar' && !i.tipo_uso) || 
+                                   i.tipo_uso === insumoFilters.tipoUso;
               
-              return matchesSearch && matchesCat && matchesSala;
+              return matchesSearch && matchesCat && matchesSala && matchesTipo;
             })} 
             lotes={insumosLotes} 
             salas={salas}

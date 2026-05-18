@@ -29,6 +29,7 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
     stock_minimo_base: 0,
     salaId: '',
     detalleUbicacion: '',
+    tipo_uso: '',
     
     // Entrada
     proveedor_nombre: '',
@@ -187,6 +188,7 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
         const masterData = {
           nombre: formData.nombre,
           categoria: formData.categoria,
+          tipo_uso: formData.tipo_uso || null,
           unidad_compra: formData.unidad_compra,
           unidad_display: formData.unidad_display,
           unidad_base: formData.unidad_base,
@@ -396,7 +398,19 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
                   {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
-              {/* Campos de ubicación removidos de aquí para ponerlos abajo o manejarlos condicionalmente */}
+              <div className="form-group">
+                <label className="form-label">Tipo de Uso</label>
+                <select 
+                  className="form-control" 
+                  value={formData.tipo_uso} 
+                  onChange={e => setFormData({...formData, tipo_uso: e.target.value})}
+                >
+                  <option value="">-- Sin clasificar --</option>
+                  <option value="descartable">♻️ Descartable</option>
+                  <option value="reutilizable">🔄 Reutilizable</option>
+                </select>
+              </div>
+            </div>
               <div className="form-group">
                 <label className="form-label">📷 Foto del Producto (Bolsa/Envase)</label>
                 <input 
@@ -426,7 +440,6 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
                   <button type="button" className="btn btn-outline" style={{ flex: 1, fontSize: '0.8rem' }} onClick={() => setShowCamera(true)}>📷 Tomar Foto</button>
                 </div>
               </div>
-            </div>
 
             <div className="form-group">
               <label className="form-label">Unidad de Compra (ej. Rollo, Bolsa)</label>
