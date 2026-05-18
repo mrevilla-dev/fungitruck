@@ -75,6 +75,84 @@ export default function AdminResetPage() {
     }
   };
 
+  const handleSeedEnvases = async () => {
+    if (!window.confirm("¿Estás seguro de que querés precargar todos los envases estándar? Esto agregará nuevos items a la colección 'insumos_base' como 'Descartables'.")) {
+      return;
+    }
+
+    setLoading(true);
+    setStatus("Precargando envases...");
+
+    const envases = [
+      { nombre: "Tubo Eppendorf 0.2 ml (PCR)", categoria: "Descartables", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 0.5 ml", categoria: "Descartables", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 1.5 ml", categoria: "Descartables", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 2.0 ml", categoria: "Descartables", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Criovial 2.0 ml", categoria: "Descartables", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Criovial 5.0 ml", categoria: "Descartables", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      
+      { nombre: "Tubo Falcon 15 ml", categoria: "Descartables", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Tubo Falcon 50 ml", categoria: "Descartables", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Chica (3 ml / 35mm)", categoria: "Descartables", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Mediana (6 ml / 60mm)", categoria: "Descartables", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Estándar (9 ml / 90mm)", categoria: "Descartables", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Grande (12 ml / 150mm)", categoria: "Descartables", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      
+      { nombre: "Frasco de Vidrio 250 ml (Café Aglomerado / Común)", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco tipo Nescafé Grande", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco de Vidrio 1 Litro (Schott Duran)", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco Gotero Ámbar 60 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      
+      { nombre: "Matraz Erlenmeyer 125 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 250 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 500 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 1 Litro", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 2 Litros", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      
+      { nombre: "Probeta Graduada 10 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 50 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 500 ml", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 1 Litro", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 2 Litros", categoria: "Descartables", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      
+      { nombre: "Bolsa de Incubación Chica (20 cm)", categoria: "Descartables", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Mediana (30 cm)", categoria: "Descartables", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Grande (60 cm)", categoria: "Descartables", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      
+      { nombre: "Portaobjetos Estándar (75x25mm)", categoria: "Descartables", subcategoria: "Microscopía", perfil_impresion: "PERFIL_PORTAOBJETOS" }
+    ];
+
+    try {
+      const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+      const insumosRef = collection(db, 'insumos_base');
+      for (const envase of envases) {
+        await addDoc(insumosRef, {
+          ...envase,
+          stock_total_base: 0,
+          unidad_compra: 'unidades',
+          unidad_base: 'unidades',
+          factor_conversion: 1,
+          stock_minimo_base: 0,
+          descartables: { esterilidad_origen: 'N' },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          metadata: {
+            ultimo_proveedor: '',
+            fecha_ultima_compra: null,
+            costo_promedio_base: 0
+          }
+        });
+      }
+      setStatus("✅ Precarga de Envases completada. Ya están disponibles en Insumos Maestro.");
+      alert(`Se agregaron ${envases.length} envases a la base de datos como Descartables.`);
+    } catch (error) {
+      console.error(error);
+      setStatus(`❌ Error al precargar: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in container" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', paddingTop: '4rem' }}>
       <h1 style={{ color: 'var(--danger-color)' }}>🛠️ Panel de Administración (Peligro)</h1>
@@ -120,6 +198,22 @@ export default function AdminResetPage() {
         
         {status && <p style={{ marginTop: '1rem', fontWeight: 'bold' }}>{status}</p>}
       </div>
+
+      <div className="card" style={{ marginTop: '2rem', borderColor: 'var(--primary-color)', borderWidth: '2px', borderStyle: 'solid' }}>
+        <h3 style={{ color: 'var(--primary-color)' }}>🛠️ Utilidades de Precarga (Seeding)</h3>
+        <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+          Usá estas opciones para popular la base de datos con información estándar para arrancar rápido.
+        </p>
+        <button 
+          className="btn btn-primary" 
+          onClick={handleSeedEnvases} 
+          disabled={loading}
+          style={{ width: '100%', padding: '1rem', fontSize: '1.2rem' }}
+        >
+          {loading ? "Procesando..." : "📦 Precargar Envases Estándar"}
+        </button>
+      </div>
     </div>
   );
 }
+

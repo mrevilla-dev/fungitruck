@@ -561,3 +561,43 @@ input:checked + .slider:before {
     display: none; /* Hide cost and count on very small screens or reflow */
   }
 }
+
+/* Premium ZPL Print Modal Styling */
+@media (min-width: 768px) {
+  .print-modal-grid {
+    grid-template-columns: 1.2fr 1fr !important;
+    gap: 1.5rem !important;
+  }
+}
+
+.profile-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.profile-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.profile-card.selected {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Scrollbar styling for selector list */
+.print-modal-grid ::-webkit-scrollbar {
+  width: 6px;
+}
+.print-modal-grid ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+.print-modal-grid ::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+.print-modal-grid ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
