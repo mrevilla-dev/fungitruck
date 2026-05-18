@@ -8,6 +8,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
   const [formData, setFormData] = useState({
     nombre: insumo.nombre || '',
     categoria: insumo.categoria || 'Químicos/Medios',
+    tipo_uso: insumo.tipo_uso || '',
     stock_minimo_base: insumo.stock_minimo_base || 0,
     ubicacion: insumo.ubicacion || '',
     unidad_display: insumo.unidad_display || '',
@@ -24,7 +25,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     return () => unsubscribe();
   }, []);
 
-  const categories = ['Químicos/Medios', 'Granos/Sustratos', 'Consumibles y Empaque', 'Sanidad'];
+  const categories = ['Químicos/Medios', 'Granos/Sustratos', 'Consumibles y Empaque', 'Sanidad', 'Envases'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +36,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
       await updateDoc(insumoRef, {
         nombre: formData.nombre,
         categoria: formData.categoria,
+        tipo_uso: formData.tipo_uso || null,
         stock_minimo_base: Number(formData.stock_minimo_base),
         ubicacion: formData.ubicacion,
         unidad_display: formData.unidad_display,
@@ -99,6 +101,18 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
 
           <div className="grid-2">
             <div className="form-group">
+              <label className="form-label">Tipo de Uso</label>
+              <select 
+                className="form-control" 
+                value={formData.tipo_uso} 
+                onChange={e => setFormData({...formData, tipo_uso: e.target.value})}
+              >
+                <option value="">-- Sin clasificar --</option>
+                <option value="descartable">♻️ Descartable</option>
+                <option value="reutilizable">🔄 Reutilizable</option>
+              </select>
+            </div>
+            <div className="form-group">
               <label className="form-label">Stock Mínimo ({insumo.unidad_base})</label>
               <input 
                 type="number" 
@@ -108,6 +122,9 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
                 onChange={e => setFormData({...formData, stock_minimo_base: e.target.value})} 
               />
             </div>
+          </div>
+
+          <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Unidad Vista</label>
               <input 

@@ -52,8 +52,20 @@ const InsumosTable = ({ insumos, onRegistrarCompra, onEdit }) => {
           }}>
             <div>
               <strong style={{ display: 'block', fontSize: '1.1rem' }}>{insumo.nombre}</strong>
-              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
                 <span className="sala-tipo" style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{insumo.categoria}</span>
+                {insumo.tipo_uso && (
+                  <span style={{ 
+                    fontSize: '0.65rem', 
+                    padding: '2px 6px', 
+                    borderRadius: '4px',
+                    background: insumo.tipo_uso === 'descartable' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: insumo.tipo_uso === 'descartable' ? '#ef4444' : '#3b82f6',
+                    fontWeight: 600
+                  }}>
+                    {insumo.tipo_uso === 'descartable' ? '♻️ Descartable' : '🔄 Reutilizable'}
+                  </span>
+                )}
                 {insumo.ubicacion && (
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>📍 {typeof insumo.ubicacion === 'object' ? (insumo.ubicacion.detalle || insumo.ubicacion.salaId || 'Ubicación') : insumo.ubicacion}</span>
                 )}
@@ -114,6 +126,8 @@ function InventoryPage() {
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
   const [showRecetaModal, setShowRecetaModal] = useState(false);
   const [editingReceta, setEditingReceta] = useState(null);
+  const [filterCategoria, setFilterCategoria] = useState('todas');
+  const [filterTipoUso, setFilterTipoUso] = useState('todos');
 
   const handleDeleteMedio = async (medio) => {
     if (!window.confirm(`¿Estás seguro de eliminar el medio ${medio.alias}? Esta acción no devolverá los insumos al stock.`)) return;
@@ -296,11 +310,61 @@ function InventoryPage() {
       {/* Renderizado Condicional de Vistas */}
       <main className="tab-content">
         {activeTab === 'insumos' && (
-          <InsumosTable 
-            insumos={insumos} 
-            onRegistrarCompra={() => setShowRegistroModal(true)} 
-            onEdit={setEditingInsumo}
-          />
+          <>
+            {/* Filters Bar */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '0.75rem', 
+              marginBottom: '1.5rem', 
+              flexWrap: 'wrap',
+              background: 'rgba(0,0,0,0.15)', 
+              padding: '0.75rem', 
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.05)'
+            }}>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' }}>Categoría</label>
+                <select 
+                  className="form-control" 
+                  value={filterCategoria} 
+                  onChange={e => setFilterCategoria(e.target.value)}
+                  style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+                >
+                  <option value="todas">Todas las categorías</option>
+                  <option value="Químicos/Medios">Químicos/Medios</option>
+                  <option value="Granos/Sustratos">Granos/Sustratos</option>
+                  <option value="Consumibles y Empaque">Consumibles y Empaque</option>
+                  <option value="Sanidad">Sanidad</option>
+                  <option value="Envases">Envases</option>
+                </select>
+              </div>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' }}>Tipo de Uso</label>
+                <select 
+                  className="form-control" 
+                  value={filterTipoUso} 
+                  onChange={e => setFilterTipoUso(e.target.value)}
+                  style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+                >
+                  <option value="todos">Todos</option>
+                  <option value="descartable">♻️ Descartable</option>
+                  <option value="reutilizable">🔄 Reutilizable</option>
+                  <option value="sin_clasificar">Sin clasificar</option>
+                </select>
+              </div>
+            </div>
+            <InsumosTable 
+              insumos={insumos.filter(i => {
+                const catMatch = filterCategoria === 'todas' || i.categoria === filterCategoria;
+                const tipoMatch = filterTipoUso === 'todos' 
+                  || (filterTipoUso === 'sin_clasificar' && !i.tipo_uso) 
+                  || i.tipo_uso === filterTipoUso;
+                return catMatch && tipoMatch;
+              })} 
+              onRegistrarCompra={() => setShowRegistroModal(true)} 
+              onEdit={setEditingInsumo}
+            />
+          </>
         )}
         
         {activeTab === 'medios' && (

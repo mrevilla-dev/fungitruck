@@ -9,6 +9,7 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
     // Maestro
     nombre: '',
     categoria: 'Químicos/Medios',
+    tipo_uso: '', // 'descartable' | 'reutilizable'
     unidad_compra: 'Rollo',
     unidad_display: 'metros',
     unidad_base: 'cm',
@@ -37,7 +38,7 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
     return () => unsubscribe();
   }, []);
 
-  const categories = ['Químicos/Medios', 'Granos/Sustratos', 'Consumibles y Empaque', 'Sanidad'];
+  const categories = ['Químicos/Medios', 'Granos/Sustratos', 'Consumibles y Empaque', 'Sanidad', 'Envases'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -59,6 +60,7 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
         const masterData = {
           nombre: formData.nombre,
           categoria: formData.categoria,
+          tipo_uso: formData.tipo_uso || null,
           unidad_compra: formData.unidad_compra,
           unidad_display: formData.unidad_display,
           unidad_base: formData.unidad_base,
@@ -129,6 +131,18 @@ export default function RegistroInsumoModal({ onClose, onSaved }) {
                   {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Tipo de Uso</label>
+                <select className="form-control" value={formData.tipo_uso} onChange={e => setFormData({...formData, tipo_uso: e.target.value})}>
+                  <option value="">-- Sin clasificar --</option>
+                  <option value="descartable">♻️ Descartable</option>
+                  <option value="reutilizable">🔄 Reutilizable</option>
+                </select>
+              </div>
+              <div></div>
             </div>
 
             <div className="grid-2">

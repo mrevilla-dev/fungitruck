@@ -84,42 +84,42 @@ export default function AdminResetPage() {
     setStatus("Precargando envases...");
 
     const envases = [
-      { nombre: "Tubo Eppendorf 0.2 ml (PCR)", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
-      { nombre: "Tubo Eppendorf 0.5 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
-      { nombre: "Tubo Eppendorf 1.5 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
-      { nombre: "Tubo Eppendorf 2.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
-      { nombre: "Criovial 2.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
-      { nombre: "Criovial 5.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 0.2 ml (PCR)", categoria: "Envases", subcategoria: "Micro-contenedores", tipo_uso: "descartable", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 0.5 ml", categoria: "Envases", subcategoria: "Micro-contenedores", tipo_uso: "descartable", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 1.5 ml", categoria: "Envases", subcategoria: "Micro-contenedores", tipo_uso: "descartable", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Tubo Eppendorf 2.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", tipo_uso: "descartable", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Criovial 2.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", tipo_uso: "descartable", perfil_impresion: "PERFIL_MICRO_TUBOS" },
+      { nombre: "Criovial 5.0 ml", categoria: "Envases", subcategoria: "Micro-contenedores", tipo_uso: "descartable", perfil_impresion: "PERFIL_MICRO_TUBOS" },
       
-      { nombre: "Tubo Falcon 15 ml", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
-      { nombre: "Tubo Falcon 50 ml", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
-      { nombre: "Placa de Petri Chica (3 ml / 35mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
-      { nombre: "Placa de Petri Mediana (6 ml / 60mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
-      { nombre: "Placa de Petri Estándar (9 ml / 90mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
-      { nombre: "Placa de Petri Grande (12 ml / 150mm)", categoria: "Envases", subcategoria: "Tubos y Placas", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Tubo Falcon 15 ml", categoria: "Envases", subcategoria: "Tubos y Placas", tipo_uso: "descartable", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Tubo Falcon 50 ml", categoria: "Envases", subcategoria: "Tubos y Placas", tipo_uso: "descartable", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Chica (3 ml / 35mm)", categoria: "Envases", subcategoria: "Tubos y Placas", tipo_uso: "descartable", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Mediana (6 ml / 60mm)", categoria: "Envases", subcategoria: "Tubos y Placas", tipo_uso: "descartable", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Estándar (9 ml / 90mm)", categoria: "Envases", subcategoria: "Tubos y Placas", tipo_uso: "descartable", perfil_impresion: "PERFIL_SLIM_PETRI" },
+      { nombre: "Placa de Petri Grande (12 ml / 150mm)", categoria: "Envases", subcategoria: "Tubos y Placas", tipo_uso: "descartable", perfil_impresion: "PERFIL_SLIM_PETRI" },
       
-      { nombre: "Frasco de Vidrio 250 ml (Café Aglomerado / Común)", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Frasco tipo Nescafé Grande", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Frasco de Vidrio 1 Litro (Schott Duran)", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Frasco Gotero Ámbar 60 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco de Vidrio 250 ml (Café Aglomerado / Común)", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco tipo Nescafé Grande", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco de Vidrio 1 Litro (Schott Duran)", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Frasco Gotero Ámbar 60 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
       
-      { nombre: "Matraz Erlenmeyer 125 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Matraz Erlenmeyer 250 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Matraz Erlenmeyer 500 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Matraz Erlenmeyer 1 Litro", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Matraz Erlenmeyer 2 Litros", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 125 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 250 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 500 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 1 Litro", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Matraz Erlenmeyer 2 Litros", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
       
-      { nombre: "Probeta Graduada 10 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Probeta Graduada 50 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Probeta Graduada 500 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Probeta Graduada 1 Litro", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
-      { nombre: "Probeta Graduada 2 Litros", categoria: "Envases", subcategoria: "Vidriería y Frascos", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 10 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 50 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 500 ml", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 1 Litro", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
+      { nombre: "Probeta Graduada 2 Litros", categoria: "Envases", subcategoria: "Vidriería y Frascos", tipo_uso: "reutilizable", perfil_impresion: "PERFIL_MEDIO_ESTANDAR" },
       
-      { nombre: "Bolsa de Incubación Chica (20 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
-      { nombre: "Bolsa de Incubación Mediana (30 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
-      { nombre: "Bolsa de Incubación Grande (60 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Chica (20 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", tipo_uso: "descartable", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Mediana (30 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", tipo_uso: "descartable", perfil_impresion: "PERFIL_MAXI_BOLSA" },
+      { nombre: "Bolsa de Incubación Grande (60 cm)", categoria: "Envases", subcategoria: "Bolsas de Cultivo", tipo_uso: "descartable", perfil_impresion: "PERFIL_MAXI_BOLSA" },
       
-      { nombre: "Portaobjetos Estándar (75x25mm)", categoria: "Envases", subcategoria: "Microscopía", perfil_impresion: "PERFIL_PORTAOBJETOS" }
+      { nombre: "Portaobjetos Estándar (75x25mm)", categoria: "Envases", subcategoria: "Microscopía", tipo_uso: "descartable", perfil_impresion: "PERFIL_PORTAOBJETOS" }
     ];
 
     try {
