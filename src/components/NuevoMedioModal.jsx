@@ -13,6 +13,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const [isExperimental, setIsExperimental] = useState(false);
   
   const [selectedLotes, setSelectedLotes] = useState({}); // { insumoId: loteId }
+  const [checkedMaterials, setCheckedMaterials] = useState({});
+  
   
   const [formData, setFormData] = useState({
     recetaId: '',
@@ -199,6 +201,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     return <PrintLabelsModal batches={createdBatches} onClose={() => { onSaved(); onClose(); }} />;
   }
 
+  const currentReceta = recetas.find(r => r.id === formData.recetaId);
+  const reqMaterials = currentReceta?.materiales_requeridos || [];
+  const allChecked = reqMaterials.length === 0 || reqMaterials.every((mat, idx) => checkedMaterials[idx]);
+
   return (
     <div className="modal-overlay">
       <div className="modal-box animate-fade-in" style={{ maxWidth: '650px' }}>
@@ -211,7 +217,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           
           <div className="section-divider">
             <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>1. Receta y Cantidad</h4>
-            <select className="form-control" required value={formData.recetaId} onChange={e => setFormData({...formData, recetaId: e.target.value})}>
+            <select className="form-control" required value={formData.recetaId} onChange={e => { setFormData({...formData, recetaId: e.target.value}); setCheckedMaterials({}); }}>
               <option value="">-- Seleccioná Receta --</option>
               {recetas.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.categoria})</option>)}
             </select>
@@ -252,8 +258,28 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             )}
           </div>
 
+          {currentReceta && reqMaterials.length > 0 && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+              <h4 style={{ marginBottom: '1rem', color: '#f59e0b', fontSize: '1.1rem' }}>🧹 Paso 0: Alistamiento de Materiales</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Buscá y asegurate de tener LIMPIOS y listos estos materiales antes de pesar.</p>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {reqMaterials.map((mat, idx) => (
+                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', border: checkedMaterials[idx] ? '1px solid #10b981' : '1px solid transparent', transition: 'all 0.2s' }}>
+                    <input 
+                      type="checkbox" 
+                      style={{ transform: 'scale(1.5)', accentColor: '#10b981' }} 
+                      checked={!!checkedMaterials[idx]}
+                      onChange={(e) => setCheckedMaterials({...checkedMaterials, [idx]: e.target.checked})}
+                    />
+                    <span style={{ fontSize: '1rem', fontWeight: 'bold', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>{mat.cantidad}x {mat.nombre || mat.insumoId}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Lotes de Insumos */}
-          {formData.recetaId && (
+          {formData.recetaId && allChecked && (
             <div className="section-divider">
               <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>🔍 Lotes de Insumos Activos</h4>
               {recetas.find(r => r.id === formData.recetaId)?.ingredientes.map(ing => (
@@ -272,7 +298,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
 
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>Cerrar</button>
-            <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 1 }}>
+            <button type="submit" className="btn btn-primary" disabled={loading || (formData.recetaId && !allChecked)} style={{ flex: 1, opacity: (!formData.recetaId || !allChecked) ? 0.5 : 1 }}>
               {loading ? 'Procesando...' : '💾 Registrar y Descontar Envases'}
             </button>
           </div>

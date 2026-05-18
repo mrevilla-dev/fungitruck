@@ -45,7 +45,10 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     concentracion_uso: insumo.bioseguridad?.concentracion_uso || '',
     clasificacion: insumo.bioseguridad?.clasificacion || 'limpieza',
     // Campos Descartables
-    esterilidad_origen: insumo.descartables?.esterilidad_origen || 'N'
+    esterilidad_origen: insumo.descartables?.esterilidad_origen || 'N',
+    // Propiedades Bioquímicas
+    porcentaje_carbono: insumo.bioquimica?.porcentaje_carbono || '',
+    porcentaje_nitrogeno: insumo.bioquimica?.porcentaje_nitrogeno || ''
   });
 
   useEffect(() => {
@@ -171,6 +174,13 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
       if (formData.categoria === 'Descartables') {
         updateData.descartables = {
           esterilidad_origen: formData.esterilidad_origen
+        };
+      }
+
+      if (['Medios y reactivos', 'Sustratos y granos', 'Adjuntos'].includes(formData.categoria)) {
+        updateData.bioquimica = {
+          porcentaje_carbono: formData.porcentaje_carbono ? Number(formData.porcentaje_carbono) : 0,
+          porcentaje_nitrogeno: formData.porcentaje_nitrogeno ? Number(formData.porcentaje_nitrogeno) : 0
         };
       }
 
@@ -303,6 +313,22 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
               </div>
               <div style={{ textAlign: 'center', padding: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary-color)', marginTop: '1rem' }}>
                 ✨ {conversionPreview}
+              </div>
+            </div>
+          )}
+
+          {['Medios y reactivos', 'Sustratos y granos', 'Adjuntos'].includes(formData.categoria) && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(139, 92, 246, 0.05)', padding: '1rem', borderRadius: '12px', marginTop: '1rem', marginBottom: '0.5rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: '#8b5cf6' }}>🔬 Propiedades Bioquímicas (Opcional)</h4>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">% Carbono (C)</label>
+                  <input type="number" step="0.01" min="0" max="100" className="form-control" placeholder="Ej: 40.0" value={formData.porcentaje_carbono} onChange={e => setFormData({...formData, porcentaje_carbono: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">% Nitrógeno (N)</label>
+                  <input type="number" step="0.01" min="0" max="100" className="form-control" placeholder="Ej: 2.0" value={formData.porcentaje_nitrogeno} onChange={e => setFormData({...formData, porcentaje_nitrogeno: e.target.value})} />
+                </div>
               </div>
             </div>
           )}
