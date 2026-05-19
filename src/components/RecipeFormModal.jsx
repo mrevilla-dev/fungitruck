@@ -22,7 +22,8 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     tiempo_autoclave_min: recipeToClone?.tiempo_autoclave_min || '',
     temperatura_autoclave_c: recipeToClone?.temperatura_autoclave_c || '121',
     descripcion: recipeToClone?.descripcion || '',
-    materiales_requeridos: recipeToClone?.materiales_requeridos || []
+    materiales_requeridos: recipeToClone?.materiales_requeridos || [],
+    equipamiento_requerido: recipeToClone?.equipamiento_requerido || recipeToClone?.equipamientoRequerido || []
   });
 
   useEffect(() => {
@@ -105,6 +106,107 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     const newMat = [...form.materiales_requeridos];
     newMat.splice(index, 1);
     setForm({ ...form, materiales_requeridos: newMat });
+  };
+
+  const addEquipment = () => {
+    setForm({
+      ...form,
+      equipamiento_requerido: [...form.equipamiento_requerido, { insumoId: '', cantidad: 1 }]
+    });
+  };
+
+  const removeEquipment = (index) => {
+    const newEquip = [...form.equipamiento_requerido];
+    newEquip.splice(index, 1);
+    setForm({ ...form, equipamiento_requerido: newEquip });
+  };
+
+  const handleCreateMaterialOnTheFly = async (index) => {
+    const nombre = window.prompt("🔬 Ingrese el nombre del NUEVO MATERIAL (ej. Probeta 500ml, Matraz Erlenmeyer 1L):");
+    if (!nombre || nombre.trim() === '') return;
+    
+    try {
+      setLoading(true);
+      const id = nombre.trim().toLowerCase().replace(/\s+/g, '-');
+      const docRef = doc(db, 'insumos_base', id);
+      
+      const newInsumo = {
+        nombre: nombre.trim(),
+        categoria: 'Reutilizables',
+        tipo_uso: 'reutilizable',
+        unidad_compra: 'un',
+        unidad_display: 'un',
+        unidad_base: 'un',
+        factor_compra: 1,
+        factor_display: 1,
+        factor_conversion: 1,
+        stock_total_base: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        descripcion: 'Creado al vuelo desde receta'
+      };
+      
+      await setDoc(docRef, newInsumo);
+      
+      const newMat = [...form.materiales_requeridos];
+      newMat[index] = { ...newMat[index], insumoId: id, nombre: nombre.trim() };
+      setForm(prev => ({ ...prev, materiales_requeridos: newMat }));
+      
+      alert(`✅ Material "${nombre}" creado y seleccionado automáticamente.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al crear el material.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateEquipmentOnTheFly = async (index) => {
+    const nombre = window.prompt("⚙️ Ingrese el nombre del NUEVO EQUIPAMIENTO (ej. Autoclave 20L, pH-metro Digital):");
+    if (!nombre || nombre.trim() === '') return;
+    
+    try {
+      setLoading(true);
+      const id = nombre.trim().toLowerCase().replace(/\s+/g, '-');
+      const docRef = doc(db, 'insumos_base', id);
+      
+      const newInsumo = {
+        nombre: nombre.trim(),
+        categoria: 'Equipamiento',
+        unidad_compra: 'un',
+        unidad_display: 'un',
+        unidad_base: 'un',
+        factor_compra: 1,
+        factor_display: 1,
+        factor_conversion: 1,
+        stock_total_base: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        descripcion: 'Creado al vuelo desde receta',
+        equipamiento: {
+          marca_modelo: 'Genérico',
+          nro_serie: 'S/N',
+          propietario: 'facultad',
+          fecha_adquisicion: new Date().toISOString().split('T')[0],
+          valor_compra: 0,
+          vida_util_anios: 5,
+          valor_residual: 0
+        }
+      };
+      
+      await setDoc(docRef, newInsumo);
+      
+      const newEquip = [...form.equipamiento_requerido];
+      newEquip[index] = { ...newEquip[index], insumoId: id, nombre: nombre.trim() };
+      setForm(prev => ({ ...prev, equipamiento_requerido: newEquip }));
+      
+      alert(`✅ Equipamiento "${nombre}" creado y seleccionado automáticamente.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al crear el equipamiento.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddInsumo = async () => {
@@ -347,29 +449,79 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             </button>
           </div>
 
-          <div className="section-divider" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-            <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: '#f59e0b' }}>🛠️ Materiales e Instrumental Requerido</h4>
-            <p style={{ fontSize: '0.75rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Seleccioná qué envases o equipamiento se debe tener limpio y listo antes de empezar.</p>
+          {/* RECUADRO 2: VIDRIERÍA E INSTRUMENTAL */}
+          <div className="section-divider" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+            <h4 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>🧪 Vidriería e Instrumental</h4>
+            <p style={{ fontSize: '0.78rem', marginBottom: '1.25rem', color: 'var(--text-secondary)' }}>Seleccioná qué envases, beakers o instrumental de vidrio se requiere tener limpio y listo.</p>
+            
             {form.materiales_requeridos.map((mat, idx) => (
-              <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', padding: '0.75rem', borderRadius: '8px', marginBottom: '0.75rem', position: 'relative', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <button type="button" onClick={() => removeMaterial(idx)} style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'var(--danger-color)', color: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}>✕</button>
-                <div style={{ paddingRight: '2.5rem' }}>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Material / Envase</label>
-                  <select 
-                    className="form-control" 
-                    style={{ marginBottom: '0.5rem' }}
-                    value={mat.insumoId} 
-                    onChange={e => {
-                      const newMat = [...form.materiales_requeridos];
-                      const selected = insumosBase.find(i => i.id === e.target.value);
-                      newMat[idx] = { ...newMat[idx], insumoId: e.target.value, nombre: selected?.nombre };
-                      setForm({ ...form, materiales_requeridos: newMat });
+              <div key={idx} style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '0.75rem', 
+                background: 'rgba(255,255,255,0.05)', 
+                padding: '1rem', 
+                borderRadius: '10px', 
+                marginBottom: '0.75rem', 
+                border: '1px solid rgba(255,255,255,0.1)',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Material / Envase</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <select 
+                        className="form-control" 
+                        value={mat.insumoId} 
+                        onChange={e => {
+                          const newMat = [...form.materiales_requeridos];
+                          const selected = insumosBase.find(i => i.id === e.target.value);
+                          newMat[idx] = { ...newMat[idx], insumoId: e.target.value, nombre: selected?.nombre };
+                          setForm({ ...form, materiales_requeridos: newMat });
+                        }}
+                        style={{ flex: 1, height: '48px', fontSize: '1rem' }}
+                      >
+                        <option value="">-- Seleccionar --</option>
+                        {insumosBase.filter(i => ['Descartables', 'Reutilizables', 'Envases'].includes(i.categoria)).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+                      </select>
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={() => handleCreateMaterialOnTheFly(idx)}
+                        style={{ height: '48px', width: '52px', fontSize: '1.3rem', fontWeight: 'bold' }}
+                        title="Crear nuevo material en caliente"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    type="button" 
+                    onClick={() => removeMaterial(idx)} 
+                    style={{ 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      width: '48px', 
+                      height: '48px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      cursor: 'pointer',
+                      alignSelf: 'flex-end',
+                      fontSize: '1.2rem',
+                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
                     }}
+                    title="Eliminar material"
                   >
-                    <option value="">-- Seleccionar --</option>
-                    {insumosBase.filter(i => ['Descartables', 'Reutilizables', 'Equipamiento'].includes(i.categoria)).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-                  </select>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Cantidad de Unidades</label>
+                    🗑️
+                  </button>
+                </div>
+                
+                <div style={{ width: '100%' }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cantidad Requerida</label>
                   <input 
                     type="number" 
                     className="form-control" 
@@ -379,12 +531,107 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                       newMat[idx].cantidad = Number(e.target.value);
                       setForm({ ...form, materiales_requeridos: newMat });
                     }}
+                    style={{ height: '48px', fontSize: '1.1rem' }}
                   />
                 </div>
               </div>
             ))}
-            <button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem', fontSize: '0.9rem', fontWeight: 'bold' }} onClick={addMaterial}>
+            
+            <button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem', fontSize: '0.9rem', fontWeight: 'bold', height: '48px' }} onClick={addMaterial}>
               ➕ Añadir Material
+            </button>
+          </div>
+
+          {/* RECUADRO 3: EQUIPAMIENTO REQUERIDO */}
+          <div className="section-divider" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+            <h4 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>⚙️ Equipamiento Requerido</h4>
+            <p style={{ fontSize: '0.78rem', marginBottom: '1.25rem', color: 'var(--text-secondary)' }}>Seleccioná los equipos de laboratorio (ej. pH-metro, agitador, autoclave) que se deben utilizar.</p>
+            
+            {form.equipamiento_requerido.map((equip, idx) => (
+              <div key={idx} style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '0.75rem', 
+                background: 'rgba(255,255,255,0.05)', 
+                padding: '1rem', 
+                borderRadius: '10px', 
+                marginBottom: '0.75rem', 
+                border: '1px solid rgba(255,255,255,0.1)',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Equipo</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <select 
+                        className="form-control" 
+                        value={equip.insumoId} 
+                        onChange={e => {
+                          const newEquip = [...form.equipamiento_requerido];
+                          const selected = insumosBase.find(i => i.id === e.target.value);
+                          newEquip[idx] = { ...newEquip[idx], insumoId: e.target.value, nombre: selected?.nombre };
+                          setForm({ ...form, equipamiento_requerido: newEquip });
+                        }}
+                        style={{ flex: 1, height: '48px', fontSize: '1rem' }}
+                      >
+                        <option value="">-- Seleccionar --</option>
+                        {insumosBase.filter(i => i.categoria === 'Equipamiento').map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+                      </select>
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={() => handleCreateEquipmentOnTheFly(idx)}
+                        style={{ height: '48px', width: '52px', fontSize: '1.3rem', fontWeight: 'bold' }}
+                        title="Crear nuevo equipamiento en caliente"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    type="button" 
+                    onClick={() => removeEquipment(idx)} 
+                    style={{ 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      width: '48px', 
+                      height: '48px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      cursor: 'pointer',
+                      alignSelf: 'flex-end',
+                      fontSize: '1.2rem',
+                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                    }}
+                    title="Eliminar equipo"
+                  >
+                    🗑️
+                  </button>
+                </div>
+                
+                <div style={{ width: '100%' }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cantidad Requerida</label>
+                  <input 
+                    type="number" 
+                    className="form-control" 
+                    value={equip.cantidad} 
+                    onChange={e => {
+                      const newEquip = [...form.equipamiento_requerido];
+                      newEquip[idx].cantidad = Number(e.target.value);
+                      setForm({ ...form, equipamiento_requerido: newEquip });
+                    }}
+                    style={{ height: '48px', fontSize: '1.1rem' }}
+                  />
+                </div>
+              </div>
+            ))}
+            
+            <button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem', fontSize: '0.9rem', fontWeight: 'bold', height: '48px' }} onClick={addEquipment}>
+              ➕ Añadir Equipo
             </button>
           </div>
 
