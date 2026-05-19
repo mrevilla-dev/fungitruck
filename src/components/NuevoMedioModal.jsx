@@ -150,6 +150,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             peso_seco_por_unidad_g: receta.peso_seco_por_unidad_g || 0,
             ph_esperado: receta.ph_esperado || null,
             estado: formData.tipo_envasado, // 'Bulk' o 'Fraccionado'
+            fecha_vencimiento: (() => {
+              if (receta.tiempo_max_heladera_dias && formData.fecha_preparacion) {
+                const prepDate = new Date(formData.fecha_preparacion + 'T12:00:00');
+                prepDate.setDate(prepDate.getDate() + Number(receta.tiempo_max_heladera_dias));
+                return prepDate.toISOString().split('T')[0];
+              }
+              return null;
+            })(),
 
             stock_bulk: {
               cantidad_inicial: Number(formData.cantidad_preparada),

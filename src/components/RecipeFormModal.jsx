@@ -33,6 +33,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     protocolo_url: recipeToClone?.protocolo_url || '',
     tiempo_autoclave_min: recipeToClone?.tiempo_autoclave_min || '',
     temperatura_autoclave_c: recipeToClone?.temperatura_autoclave_c || '121',
+    tiempo_max_heladera_dias: recipeToClone?.tiempo_max_heladera_dias || '',
     descripcion: recipeToClone?.descripcion || '',
     materiales_requeridos: recipeToClone?.materiales_requeridos || [],
     equipamiento_requerido: recipeToClone?.equipamiento_requerido || recipeToClone?.equipamientoRequerido || []
@@ -279,6 +280,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
         protocolo_url: form.protocolo_url || null,
         tiempo_autoclave_min: form.tiempo_autoclave_min ? Number(form.tiempo_autoclave_min) : null,
         temperatura_autoclave_c: form.temperatura_autoclave_c ? Number(form.temperatura_autoclave_c) : null,
+        tiempo_max_heladera_dias: form.tiempo_max_heladera_dias ? Number(form.tiempo_max_heladera_dias) : null,
         updatedAt: serverTimestamp(),
         createdAt: (isEdit && recipeToClone) ? recipeToClone.createdAt : serverTimestamp()
       });
@@ -384,14 +386,18 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             <input type="url" className="form-control" placeholder="https://..." value={form.protocolo_url} onChange={e => setForm({...form, protocolo_url: e.target.value})} />
           </div>
 
-          <div className="grid-2" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+          <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr 1fr', background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
             <div className="form-group">
-              <label className="form-label">🔥 Tiempo Autoclave (min)</label>
+              <label className="form-label">🔥 Autoclave (min)</label>
               <input type="number" className="form-control" placeholder="Ej: 20" value={form.tiempo_autoclave_min} onChange={e => setForm({...form, tiempo_autoclave_min: e.target.value})} />
             </div>
             <div className="form-group">
-              <label className="form-label">🌡️ Temperatura (°C)</label>
+              <label className="form-label">🌡️ Temp. (°C)</label>
               <input type="number" className="form-control" placeholder="Ej: 121" value={form.temperatura_autoclave_c} onChange={e => setForm({...form, temperatura_autoclave_c: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" title="Tiempo máximo de stock en heladera antes de vencer (en días)">❄️ Heladera (días)</label>
+              <input type="number" className="form-control" placeholder="Ej: 45" value={form.tiempo_max_heladera_dias} onChange={e => setForm({...form, tiempo_max_heladera_dias: e.target.value})} />
             </div>
           </div>
 

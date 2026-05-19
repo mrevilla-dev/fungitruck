@@ -265,6 +265,11 @@ const RecetasTable = ({ recetas, insumos, onEdit, onDuplicate, onDelete, onArchi
               <div>
                 <strong>{r.nombre}</strong>
                 <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--primary-color)' }}>{r.categoria}</span>
+                {r.tiempo_max_heladera_dias && (
+                  <span style={{ display: 'inline-block', fontSize: '0.68rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', marginTop: '0.25rem', fontWeight: 'bold' }}>
+                    ❄️ Heladera: {r.tiempo_max_heladera_dias} días
+                  </span>
+                )}
                 {r.descripcion && <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.8, marginTop: '0.2rem', fontStyle: 'italic' }}>{r.descripcion}</span>}
               </div>
               <div style={{ fontSize: '0.9rem' }}>{r.rendimiento_teorico?.cantidad} {r.rendimiento_teorico?.unidad}</div>
