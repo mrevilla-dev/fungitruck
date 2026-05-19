@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, setDoc, serverTimestamp, query, onSnapshot } from 'firebase/firestore';
 import { getFallbackCN } from '../utils/cnDatabase';
+import SearchableSelect from './SearchableSelect';
 
 export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSaved }) {
   const [insumosBase, setInsumosBase] = useState([]);
@@ -403,20 +404,28 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                 <div style={{ paddingRight: '2rem' }}>
                   <label className="form-label" style={{ fontSize: '0.75rem' }}>Insumo Maestro</label>
                   <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <select 
-                      className="form-control" 
-                      value={ing.insumoId} 
-                      onChange={e => {
+                    <SearchableSelect 
+                      options={insumosBase.filter(i => ['Medios y reactivos', 'Sustratos y granos', 'Adjuntos'].includes(i.categoria))}
+                      value={ing.insumoId}
+                      onChange={id => {
                         const newIng = [...form.ingredientes];
-                        const selected = insumosBase.find(i => i.id === e.target.value);
-                        newIng[idx] = { ...newIng[idx], insumoId: e.target.value, nombre: selected?.nombre };
+                        const selected = insumosBase.find(i => i.id === id);
+                        newIng[idx] = { ...newIng[idx], insumoId: id, nombre: selected?.nombre };
                         setForm({ ...form, ingredientes: newIng });
                       }}
+                      placeholder="-- Buscar insumo --"
+                      onCreateNew={handleAddInsumo}
+                      createNewText="➕ Crear nuevo insumo"
+                    />
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      style={{ height: '48px', width: '48px', fontSize: '1.3rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                      onClick={handleAddInsumo} 
+                      title="Añadir Insumo"
                     >
-                      <option value="">-- Seleccionar --</option>
-                      {insumosBase.filter(i => ['Medios y reactivos', 'Sustratos y granos', 'Adjuntos'].includes(i.categoria)).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-                    </select>
-                    <button type="button" className="btn btn-primary" style={{ padding: '0 0.75rem' }} onClick={handleAddInsumo} title="Añadir Insumo">+</button>
+                      +
+                    </button>
                   </div>
                   <div className="grid-2">
                     <div>
@@ -476,25 +485,24 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                   <div style={{ flex: 1 }}>
                     <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Material / Envase</label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select 
-                        className="form-control" 
-                        value={mat.insumoId} 
-                        onChange={e => {
+                      <SearchableSelect 
+                        options={insumosBase.filter(i => ['Descartables', 'Reutilizables', 'Envases'].includes(i.categoria))}
+                        value={mat.insumoId}
+                        onChange={id => {
                           const newMat = [...form.materiales_requeridos];
-                          const selected = insumosBase.find(i => i.id === e.target.value);
-                          newMat[idx] = { ...newMat[idx], insumoId: e.target.value, nombre: selected?.nombre };
+                          const selected = insumosBase.find(i => i.id === id);
+                          newMat[idx] = { ...newMat[idx], insumoId: id, nombre: selected?.nombre };
                           setForm({ ...form, materiales_requeridos: newMat });
                         }}
-                        style={{ flex: 1, height: '48px', fontSize: '1rem' }}
-                      >
-                        <option value="">-- Seleccionar --</option>
-                        {insumosBase.filter(i => ['Descartables', 'Reutilizables', 'Envases'].includes(i.categoria)).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-                      </select>
+                        placeholder="-- Buscar material --"
+                        onCreateNew={() => handleCreateMaterialOnTheFly(idx)}
+                        createNewText="➕ Crear nuevo material"
+                      />
                       <button 
                         type="button" 
                         className="btn btn-primary" 
                         onClick={() => handleCreateMaterialOnTheFly(idx)}
-                        style={{ height: '48px', width: '52px', fontSize: '1.3rem', fontWeight: 'bold' }}
+                        style={{ height: '48px', width: '48px', fontSize: '1.3rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         title="Crear nuevo material en caliente"
                       >
                         +
@@ -569,25 +577,24 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                   <div style={{ flex: 1 }}>
                     <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Equipo</label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select 
-                        className="form-control" 
-                        value={equip.insumoId} 
-                        onChange={e => {
+                      <SearchableSelect 
+                        options={insumosBase.filter(i => i.categoria === 'Equipamiento')}
+                        value={equip.insumoId}
+                        onChange={id => {
                           const newEquip = [...form.equipamiento_requerido];
-                          const selected = insumosBase.find(i => i.id === e.target.value);
-                          newEquip[idx] = { ...newEquip[idx], insumoId: e.target.value, nombre: selected?.nombre };
+                          const selected = insumosBase.find(i => i.id === id);
+                          newEquip[idx] = { ...newEquip[idx], insumoId: id, nombre: selected?.nombre };
                           setForm({ ...form, equipamiento_requerido: newEquip });
                         }}
-                        style={{ flex: 1, height: '48px', fontSize: '1rem' }}
-                      >
-                        <option value="">-- Seleccionar --</option>
-                        {insumosBase.filter(i => i.categoria === 'Equipamiento').map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-                      </select>
+                        placeholder="-- Buscar equipo --"
+                        onCreateNew={() => handleCreateEquipmentOnTheFly(idx)}
+                        createNewText="➕ Crear nuevo equipamiento"
+                      />
                       <button 
                         type="button" 
                         className="btn btn-primary" 
                         onClick={() => handleCreateEquipmentOnTheFly(idx)}
-                        style={{ height: '48px', width: '52px', fontSize: '1.3rem', fontWeight: 'bold' }}
+                        style={{ height: '48px', width: '48px', fontSize: '1.3rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         title="Crear nuevo equipamiento en caliente"
                       >
                         +
