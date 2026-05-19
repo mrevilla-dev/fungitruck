@@ -30,7 +30,9 @@ export const CN_DATABASE = [
   { nombre: "Cascara arroz", c: 40, n: 0.5, h: 10.0 },
   { nombre: "Celulosa", c: 44, n: 0.0, h: 5.0 },
   { nombre: "CMC", c: 40, n: 0.0, h: 5.0 },
-  { nombre: "Agar", c: 0, n: 0.0, h: 10.0 } // Neutral base
+  { nombre: "Agar", c: 0, n: 0.0, h: 10.0 }, // Neutral base
+  { nombre: "Agua", c: 0, n: 0.0, h: 100.0 },
+  { nombre: "Agua destilada", c: 0, n: 0.0, h: 100.0 }
 ];
 
 /**

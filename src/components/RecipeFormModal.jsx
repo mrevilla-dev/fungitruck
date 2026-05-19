@@ -68,6 +68,12 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
           }
         }
 
+        // Si el nombre contiene "agua" o "h2o", forzar 100% de humedad (0% de peso seco aportado)
+        const lowerName = (ing.nombre || found?.nombre || '').toLowerCase();
+        if (lowerName.includes('agua') || lowerName.includes('h2o')) {
+          h = 100.0;
+        }
+
         sumC += (ing.cantidad * c) / 100;
         sumN += (ing.cantidad * n) / 100;
         sumDryWeight += ing.cantidad * (1 - h / 100);
