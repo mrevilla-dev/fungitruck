@@ -35,6 +35,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
   const cnData = useMemo(() => {
     let sumC = 0;
     let sumN = 0;
+    let sumDryWeight = 0;
     let usaEstimacion = false;
     form.ingredientes.forEach(ing => {
       if (ing.insumoId && ing.cantidad) {
@@ -42,13 +43,17 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
         
         let c = 0;
         let n = 0;
+        let h = 0;
         let tieneBioq = false;
 
         // Intentar leer valor configurado en el Insumo Maestro
-        if (found?.bioquimica && (found.bioquimica.porcentaje_carbono > 0 || found.bioquimica.porcentaje_nitrogeno > 0)) {
-          c = Number(found.bioquimica.porcentaje_carbono) || 0;
-          n = Number(found.bioquimica.porcentaje_nitrogeno) || 0;
-          tieneBioq = true;
+        if (found?.bioquimica) {
+          if (found.bioquimica.porcentaje_carbono > 0 || found.bioquimica.porcentaje_nitrogeno > 0 || found.bioquimica.porcentaje_humedad > 0) {
+            c = Number(found.bioquimica.porcentaje_carbono) || 0;
+            n = Number(found.bioquimica.porcentaje_nitrogeno) || 0;
+            h = Number(found.bioquimica.porcentaje_humedad) || 0;
+            tieneBioq = true;
+          }
         }
 
         // Si no tiene bioquímica asignada, usar Base de Datos Fallback
@@ -57,12 +62,14 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
           if (fallback) {
             c = fallback.c;
             n = fallback.n;
+            h = fallback.h || 0;
             usaEstimacion = true;
           }
         }
 
         sumC += (ing.cantidad * c) / 100;
         sumN += (ing.cantidad * n) / 100;
+        sumDryWeight += ing.cantidad * (1 - h / 100);
       }
     });
     let ratio = "N/A";
@@ -71,7 +78,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     } else if (sumC > 0) {
       ratio = "Solo Carbono";
     }
-    return { sumC, sumN, ratio, usaEstimacion };
+    return { sumC, sumN, ratio, sumDryWeight, usaEstimacion };
   }, [form.ingredientes, insumosBase]);
 
   const addIngredient = () => {
@@ -200,6 +207,19 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             <div className="form-group">
               <label className="form-label" title="Peso del material seco antes de hidratar (referencia para EB)">Peso Seco / Unidad (g)</label>
               <input type="number" step="0.1" className="form-control" placeholder="Ej: 500" value={form.peso_seco_por_unidad_g} onChange={e => setForm({...form, peso_seco_por_unidad_g: e.target.value})} />
+              {cnData.sumDryWeight > 0 && (
+                <div style={{ fontSize: '0.72rem', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-secondary)' }}>
+                  <span>Teórico: <strong>{cnData.sumDryWeight.toFixed(1)} g</strong></span>
+                  <button 
+                    type="button" 
+                    className="btn-link" 
+                    style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: 0, fontSize: '0.72rem', fontWeight: 'bold' }}
+                    onClick={() => setForm(prev => ({ ...prev, peso_seco_por_unidad_g: cnData.sumDryWeight.toFixed(1) }))}
+                  >
+                    ⚡ Aplicar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

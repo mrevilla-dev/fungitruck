@@ -49,7 +49,8 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     esterilidad_origen: insumo.descartables?.esterilidad_origen || 'N',
     // Propiedades Bioquímicas
     porcentaje_carbono: insumo.bioquimica?.porcentaje_carbono || '',
-    porcentaje_nitrogeno: insumo.bioquimica?.porcentaje_nitrogeno || ''
+    porcentaje_nitrogeno: insumo.bioquimica?.porcentaje_nitrogeno || '',
+    porcentaje_humedad: insumo.bioquimica?.porcentaje_humedad || ''
   });
 
   useEffect(() => {
@@ -182,7 +183,8 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
       if (['Medios y reactivos', 'Sustratos y granos', 'Adjuntos'].includes(formData.categoria)) {
         updateData.bioquimica = {
           porcentaje_carbono: formData.porcentaje_carbono ? Number(formData.porcentaje_carbono) : 0,
-          porcentaje_nitrogeno: formData.porcentaje_nitrogeno ? Number(formData.porcentaje_nitrogeno) : 0
+          porcentaje_nitrogeno: formData.porcentaje_nitrogeno ? Number(formData.porcentaje_nitrogeno) : 0,
+          porcentaje_humedad: formData.porcentaje_humedad ? Number(formData.porcentaje_humedad) : 0
         };
       }
 
@@ -334,7 +336,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
           {['Medios y reactivos', 'Sustratos y granos', 'Adjuntos'].includes(formData.categoria) && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(139, 92, 246, 0.05)', padding: '1rem', borderRadius: '12px', marginTop: '1rem', marginBottom: '0.5rem' }}>
               <h4 style={{ marginBottom: '1rem', color: '#8b5cf6' }}>🔬 Propiedades Bioquímicas (Opcional)</h4>
-              <div className="grid-2">
+              <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                 <div className="form-group">
                   <label className="form-label">% Carbono (C)</label>
                   <input type="number" step="0.01" min="0" max="100" className="form-control" placeholder="Ej: 40.0" value={formData.porcentaje_carbono} onChange={e => setFormData({...formData, porcentaje_carbono: e.target.value})} />
@@ -342,6 +344,10 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
                 <div className="form-group">
                   <label className="form-label">% Nitrógeno (N)</label>
                   <input type="number" step="0.01" min="0" max="100" className="form-control" placeholder="Ej: 2.0" value={formData.porcentaje_nitrogeno} onChange={e => setFormData({...formData, porcentaje_nitrogeno: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">% Humedad Teórica</label>
+                  <input type="number" step="0.1" min="0" max="100" className="form-control" placeholder="Ej: 10.0" value={formData.porcentaje_humedad} onChange={e => setFormData({...formData, porcentaje_humedad: e.target.value})} />
                 </div>
               </div>
             </div>
