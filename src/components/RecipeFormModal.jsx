@@ -34,6 +34,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     tiempo_autoclave_min: recipeToClone?.tiempo_autoclave_min || '',
     temperatura_autoclave_c: recipeToClone?.temperatura_autoclave_c || '121',
     tiempo_max_heladera_dias: recipeToClone?.tiempo_max_heladera_dias || '',
+    tiempo_estimado_confeccion: recipeToClone?.tiempo_estimado_confeccion || '',
     descripcion: recipeToClone?.descripcion || '',
     materiales_requeridos: recipeToClone?.materiales_requeridos || [],
     equipamiento_requerido: recipeToClone?.equipamiento_requerido || recipeToClone?.equipamientoRequerido || []
@@ -281,6 +282,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
         tiempo_autoclave_min: form.tiempo_autoclave_min ? Number(form.tiempo_autoclave_min) : null,
         temperatura_autoclave_c: form.temperatura_autoclave_c ? Number(form.temperatura_autoclave_c) : null,
         tiempo_max_heladera_dias: form.tiempo_max_heladera_dias ? Number(form.tiempo_max_heladera_dias) : null,
+        tiempo_estimado_confeccion: form.tiempo_estimado_confeccion || null,
         updatedAt: serverTimestamp(),
         createdAt: (isEdit && recipeToClone) ? recipeToClone.createdAt : serverTimestamp()
       });
@@ -401,15 +403,27 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">📝 Características / Descripción corta</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder="Ej: Agar base sin levadura para adaptación de cepas..." 
-              value={form.descripcion} 
-              onChange={e => setForm({...form, descripcion: e.target.value})}
-            />
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">⏱️ Tiempo Estimado de Confección</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Ej: 60 a 75 minutos" 
+                value={form.tiempo_estimado_confeccion} 
+                onChange={e => setForm({...form, tiempo_estimado_confeccion: e.target.value})}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">📝 Características / Descripción corta</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Ej: Agar base sin levadura para adaptación de cepas..." 
+                value={form.descripcion} 
+                onChange={e => setForm({...form, descripcion: e.target.value})}
+              />
+            </div>
           </div>
 
 
