@@ -444,8 +444,165 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   }
 
   const currentReceta = recetas.find(r => r.id === formData.recetaId);
-  const reqMaterials = currentReceta?.materiales_requeridos || [];
-  const allChecked = reqMaterials.length === 0 || reqMaterials.every((mat, idx) => checkedMaterials[idx]);
+
+  // --- Dynamic materials checklist and capacity calculation ---
+  const baseVol = currentReceta?.rendimiento_teorico?.cantidad || 1000;
+  const targetVol = formData.cantidad_preparada || 1000;
+
+  const scaleMaterial = (mat) => {
+    const factor = targetVol / baseVol;
+    if (!mat.nombre) {
+      return {
+        ...mat,
+        cantidad: Math.ceil(mat.cantidad * factor),
+        displayNombre: mat.insumoId
+      };
+    }
+
+    const name = mat.nombre.toLowerCase();
+    
+    // Extract capacity/volume (e.g. 1L, 500ml, 1 Litro, 2 Litros)
+    const volMatch = mat.nombre.match(/(\d+)\s*(L|ml|litro|litros)/i);
+    if (!volMatch) {
+      const isEquip = name.includes("balanza") || name.includes("espátula") || name.includes("agitador") || name.includes("placa") || name.includes("autoclave") || name.includes("termómetro") || name.includes("phmetro");
+      const newQty = isEquip ? mat.cantidad : Math.ceil(mat.cantidad * factor);
+      return {
+        ...mat,
+        cantidad: newQty,
+        displayNombre: mat.nombre
+      };
+    }
+
+    const numVal = parseInt(volMatch[1], 10);
+    const unit = volMatch[2].toLowerCase();
+    const baseCapacityMl = (unit.startsWith('l') || unit.includes('litro')) ? numVal * 1000 : numVal;
+    
+    const baseTotalCapMl = baseCapacityMl * mat.cantidad;
+    const targetTotalCapMl = baseTotalCapMl * factor;
+
+    const formatVolume = (valMl) => {
+      if (valMl >= 1000) {
+        const L = valMl / 1000;
+        return `${L} ${L === 1 ? 'Litro' : 'Litros'}`;
+      }
+      return `${valMl}ml`;
+    };
+
+    if (name.includes("matraz") || name.includes("beaker") || name.includes("vaso de precipitado")) {
+      const prefix = mat.nombre.split(/de \d+/i)[0].trim();
+      const suggestedCapMl = targetTotalCapMl;
+      const suggestedCapStr = suggestedCapMl >= 1000 ? `${suggestedCapMl/1000}L` : `${suggestedCapMl}ml`;
+      const origCapStr = baseCapacityMl >= 1000 ? `${baseCapacityMl/1000}L` : `${baseCapacityMl}ml`;
+      const origQtyScaled = Math.ceil(targetTotalCapMl / baseCapacityMl);
+
+      const pluralPrefix = prefix.toLowerCase().endsWith('z') 
+        ? prefix.slice(0, -1) + 'ces' 
+        : (prefix.toLowerCase().includes('vaso') ? prefix.replace(/vaso/i, 'vasos') : prefix + 's');
+
+      return {
+        ...mat,
+        cantidad: 1,
+        displayNombre: `${prefix} de ${suggestedCapStr} (o ${origQtyScaled}x ${pluralPrefix} de ${origCapStr})`
+      };
+    }
+    
+    if (name.includes("probeta")) {
+      const prefix = mat.nombre.split(/de \d+/i)[0].trim();
+      const suggestedCapMl = targetTotalCapMl;
+      const suggestedCapStr = suggestedCapMl >= 1000 ? `${suggestedCapMl/1000}L` : `${suggestedCapMl}ml`;
+      
+      return {
+        ...mat,
+        cantidad: 1,
+        displayNombre: `${prefix} de ${suggestedCapStr} (o envases equivalentes para enrasar)`
+      };
+    }
+
+    if (name.includes("frasco") || name.includes("botella") || name.includes("tubo") || name.includes("placa")) {
+      const origQtyScaled = Math.ceil(targetTotalCapMl / baseCapacityMl);
+      const origCapStr = baseCapacityMl >= 1000 ? `${baseCapacityMl/1000}L` : `${baseCapacityMl}ml`;
+      
+      let altCapMl = baseCapacityMl * 2;
+      if (altCapMl > 1000) altCapMl = 1000;
+      const altQty = Math.ceil(targetTotalCapMl / altCapMl);
+      const altCapStr = formatVolume(altCapMl);
+
+      const singularName = name.includes("frasco") ? "frasco" : name.includes("botella") ? "botella" : name.includes("tubo") ? "tubo" : "placa";
+      const pluralName = singularName + (singularName === "botella" || singularName === "placa" ? "s" : "s");
+
+      let displayNombre = mat.nombre;
+      if (baseCapacityMl !== altCapMl && targetTotalCapMl >= altCapMl) {
+        displayNombre = `${origQtyScaled}x ${pluralName} de ${origCapStr} (o ${altQty}x ${pluralName} de ${altCapStr})`;
+      } else {
+        displayNombre = `${origQtyScaled}x ${pluralName} de ${origCapStr}`;
+      }
+
+      return {
+        ...mat,
+        cantidad: 1,
+        displayNombre: displayNombre
+      };
+    }
+
+    return {
+      ...mat,
+      cantidad: Math.ceil(mat.cantidad * factor),
+      displayNombre: mat.nombre
+    };
+  };
+
+  const dynamicMaterials = (currentReceta?.materiales_requeridos || []).map(scaleMaterial);
+  const allChecked = dynamicMaterials.length === 0 || dynamicMaterials.every((mat, idx) => checkedMaterials[idx]);
+
+  // Check autoclave/plate capacity limit
+  const checkEquipmentCapacityExceeded = () => {
+    if (!currentReceta) return false;
+    const eqList = currentReceta.equipamiento_requerido || currentReceta.equipamientoRequerido || [];
+    const prepVol = targetVol;
+
+    for (const eq of eqList) {
+      if (!eq.nombre) continue;
+      const name = eq.nombre.toLowerCase();
+
+      if (name.includes('autoclave')) {
+        let limit = 10000; // default 10L
+        if (name.includes('chico') || name.includes('chica') || name.includes('pequeño') || name.includes('pequeña') || name.includes('mini')) {
+          limit = 1500; // 1.5L limit
+        }
+        const match = eq.nombre.match(/(\d+)\s*(L|ml|litro|litros)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          const unit = match[2].toLowerCase();
+          limit = (unit.startsWith('l') || unit.includes('litro')) ? num * 1000 : num;
+        }
+        if (prepVol > limit) return true;
+      }
+
+      if (name.includes('placa') || name.includes('calefactora') || name.includes('agitador')) {
+        let limit = 2000; // default 2L
+        if (name.includes('chico') || name.includes('chica') || name.includes('pequeño') || name.includes('pequeña') || name.includes('mini') || name.includes('1l') || name.includes('500ml')) {
+          limit = 1000; // 1L limit
+        }
+        const match = eq.nombre.match(/(\d+)\s*(L|ml|litro|litros)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          const unit = match[2].toLowerCase();
+          limit = (unit.startsWith('l') || unit.includes('litro')) ? num * 1000 : num;
+        }
+        if (prepVol > limit) return true;
+      }
+    }
+    return false;
+  };
+
+  const showCapacityWarning = checkEquipmentCapacityExceeded();
+
+  const formatMaterialLabel = (mat) => {
+    if (/^\d/.test(mat.displayNombre) || mat.displayNombre.includes('(')) {
+      return mat.displayNombre;
+    }
+    return `${mat.cantidad}x ${mat.displayNombre}`;
+  };
 
   return (
     <div className="modal-overlay">
@@ -522,12 +679,34 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* PASO 0: ALISTAMIENTO DE MATERIALES */}
-          {currentReceta && reqMaterials.length > 0 && (
+          {currentReceta && dynamicMaterials.length > 0 && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
               <h4 style={{ marginBottom: '0.75rem', color: '#f59e0b', fontSize: '1.05rem' }}>🧹 Paso 0: Alistamiento de Materiales</h4>
+              
+              {showCapacityWarning && (
+                <div 
+                  className="animate-fade-in" 
+                  style={{ 
+                    background: 'rgba(245, 158, 11, 0.1)', 
+                    borderLeft: '4px solid #f59e0b', 
+                    padding: '1rem', 
+                    borderRadius: '8px', 
+                    marginBottom: '1.25rem', 
+                    display: 'flex', 
+                    alignItems: 'start', 
+                    gap: '0.75rem' 
+                  }}
+                >
+                  <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                    <strong>Atención:</strong> El volumen seleccionado puede requerir procesar el lote en tandas separadas o utilizar un equipo de mayor capacidad.
+                  </div>
+                </div>
+              )}
+
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Asegurate de que estos materiales estén esterilizados y en la mesa de trabajo:</p>
               <div style={{ display: 'grid', gap: '0.75rem' }}>
-                {reqMaterials.map((mat, idx) => (
+                {dynamicMaterials.map((mat, idx) => (
                   <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', border: checkedMaterials[idx] ? '2px solid #10b981' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
                     <input 
                       type="checkbox" 
@@ -535,7 +714,9 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                       checked={!!checkedMaterials[idx]}
                       onChange={(e) => setCheckedMaterials({...checkedMaterials, [idx]: e.target.checked})}
                     />
-                    <span style={{ fontSize: '1.05rem', fontWeight: '600', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>{mat.cantidad}x {mat.nombre || mat.insumoId}</span>
+                    <span style={{ fontSize: '1.05rem', fontWeight: '600', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>
+                      {formatMaterialLabel(mat)}
+                    </span>
                   </label>
                 ))}
               </div>
