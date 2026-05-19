@@ -4,6 +4,17 @@ import { collection, doc, setDoc, serverTimestamp, query, onSnapshot } from 'fir
 import { getFallbackCN } from '../utils/cnDatabase';
 import SearchableSelect from './SearchableSelect';
 
+const cleanFirestoreId = (str) => {
+  return (str || '')
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove accents/diacritics
+    .replace(/[^a-z0-9]/g, '-')     // Replace any non-alphanumeric character with hyphen
+    .replace(/-+/g, '-')             // Remove double/multiple hyphens
+    .replace(/^-|-$/g, '');          // Remove leading and trailing hyphens
+};
+
 export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSaved }) {
   const [insumosBase, setInsumosBase] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +145,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     
     try {
       setLoading(true);
-      const id = nombre.trim().toLowerCase().replace(/\s+/g, '-');
+      const id = cleanFirestoreId(nombre);
       const docRef = doc(db, 'insumos_base', id);
       
       const newInsumo = {
@@ -174,7 +185,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     
     try {
       setLoading(true);
-      const id = nombre.trim().toLowerCase().replace(/\s+/g, '-');
+      const id = cleanFirestoreId(nombre);
       const docRef = doc(db, 'insumos_base', id);
       
       const newInsumo = {
@@ -222,7 +233,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     
     try {
       setLoading(true);
-      const insumoId = nombreInsumo.trim().toLowerCase().replace(/\s+/g, '-');
+      const insumoId = cleanFirestoreId(nombreInsumo);
       const insumoRef = doc(db, 'insumos_base', insumoId);
       
       const insumoData = { 
@@ -254,7 +265,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     e.preventDefault();
     setLoading(true);
     try {
-      const recipeId = form.nombre.toLowerCase().replace(/\s+/g, '-');
+      const recipeId = cleanFirestoreId(form.nombre);
       
       // Si estamos editando y el nombre cambió, deberíamos considerar si eliminar el anterior.
       // Pero por ahora seguiremos la lógica de setDoc que sobreescribe si el ID coincide.
