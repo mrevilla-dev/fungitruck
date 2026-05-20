@@ -65,8 +65,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       setLotesDisponibles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Suscripción a Recipientes (Consumibles y Empaque)
-    const qRecip = query(collection(db, "insumos_base"), where("categoria", "==", "Consumibles y Empaque"));
+    // Suscripción a Recipientes (Descartables + Reutilizables)
+    const qRecip = query(collection(db, "insumos_base"), where("categoria", "in", ["Descartables", "Reutilizables"]));
     const unsubscribeRecip = onSnapshot(qRecip, (snapshot) => {
       setRecipientes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -286,7 +286,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       await runTransaction(db, async (transaction) => {
         // 1. Verificar Stock de Insumos Base e Ingredientes
         const totalConsumo = {};
-        receta.ingredientes.forEach(ing => {
+        const ingredientesValidos = receta.ingredientes || [];
+        ingredientesValidos.forEach(ing => {
           const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
           totalConsumo[ing.insumoId] = (totalConsumo[ing.insumoId] || 0) + (ing.cantidad * factor);
         });
@@ -405,7 +406,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               }))
             })),
             trazabilidad: {
-              insumos_consumidos: receta.ingredientes.map(ing => ({
+              insumos_consumidos: ingredientesValidos.map(ing => ({
                 insumoId: ing.insumoId,
                 loteId: selectedLotes[ing.insumoId],
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
@@ -659,7 +660,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
               <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.85rem', fontSize: '1rem' }}>⚖️ Cantidades Calculadas (Regla de Tres)</h4>
               <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                {currentReceta.ingredientes.map(ing => {
+                {(currentReceta.ingredientes || []).map(ing => {
                   const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
                   const scaledQty = ing.cantidad * factor;
                   return (
@@ -732,7 +733,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               {activeScannerForInsumo && (
                 <div style={{ background: 'rgba(15, 23, 42, 0.95)', border: '2px solid var(--primary-color)', padding: '1.25rem', borderRadius: '16px', marginBottom: '1.5rem', textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h5 style={{ margin: 0 }}>Cámara activa para: <strong>{recetas.find(r => r.id === formData.recetaId)?.ingredientes.find(i => i.insumoId === activeScannerForInsumo)?.nombre || activeScannerForInsumo}</strong></h5>
+                    <h5 style={{ margin: 0 }}>Cámara activa para: <strong>{(recetas.find(r => r.id === formData.recetaId)?.ingredientes || []).find(i => i.insumoId === activeScannerForInsumo)?.nombre || activeScannerForInsumo}</strong></h5>
                     <button type="button" className="btn btn-danger" style={{ width: 'auto', minHeight: 'auto', padding: '0.4rem 1rem' }} onClick={() => setActiveScannerForInsumo(null)}>✕ Cerrar</button>
                   </div>
                   <div id="modal-scanner-reader" style={{ width: '100%', maxWidth: '350px', height: '240px', margin: '0 auto', background: '#000', borderRadius: '12px', overflow: 'hidden' }}></div>
@@ -756,7 +757,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {recetas.find(r => r.id === formData.recetaId)?.ingredientes.map(ing => (
+                {(recetas.find(r => r.id === formData.recetaId)?.ingredientes || []).map(ing => (
                   <div key={ing.insumoId} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <label className="form-label" style={{ fontSize: '0.9rem', marginBottom: 0, fontWeight: '600' }}>{ing.nombre || ing.insumoId}</label>
