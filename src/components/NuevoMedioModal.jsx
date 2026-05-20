@@ -15,6 +15,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   
   const [selectedLotes, setSelectedLotes] = useState({}); // { insumoId: loteId }
   const [checkedMaterials, setCheckedMaterials] = useState({});
+  const [checkedEquipments, setCheckedEquipments] = useState({});
   
   const [formData, setFormData] = useState({
     recetaId: '',
@@ -184,7 +185,9 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     if (!volumen || volumen <= 0) return alert("Ingresá un volumen válido");
     if (!cantidad || cantidad <= 0) return alert("Ingresá una cantidad válida");
 
-    const selectedRecip = recipientes.find(r => r.id === recipienteId);
+    const selectedRecip = recipienteId === 'generico' 
+      ? { nombre: 'Envase de Laboratorio (Genérico)' }
+      : recipientes.find(r => r.id === recipienteId);
     const newEnvases = [];
     const baseCount = envasesList.length + 1;
     
@@ -209,7 +212,9 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     if (!cantidad || cantidad <= 0) return alert("Ingresá una cantidad válida");
     if (!volumen_unidad || volumen_unidad <= 0) return alert("Ingresá un volumen de unidad válido");
 
-    const selectedRecip = recipientes.find(r => r.id === recipienteId);
+    const selectedRecip = recipienteId === 'generico'
+      ? { nombre: 'Envase Secundario (Genérico)' }
+      : recipientes.find(r => r.id === recipienteId);
     const totalSubVol = Number(cantidad) * Number(volumen_unidad);
 
     setEnvasesList(prev => prev.map(env => {
@@ -266,11 +271,38 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       return alert("Debés registrar al menos un envase de stock principal.");
     }
     
+    const receta = recetas.find(r => r.id === formData.recetaId);
+    const itemsToCreate = isExperimental ? Number(formData.repeticiones) : 1;
+
+    // --- Validación y Advertencia de Stock antes de guardar ---
+    const totalConsumoCheck = {};
+    const ingredientesValidosCheck = receta.ingredientes || [];
+    ingredientesValidosCheck.forEach(ing => {
+      const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
+      totalConsumoCheck[ing.insumoId] = (totalConsumoCheck[ing.insumoId] || 0) + (ing.cantidad * factor);
+    });
+
+    let warningMessages = [];
+    for (const insumoId in totalConsumoCheck) {
+      const selectedLoteId = selectedLotes[insumoId];
+      if (!selectedLoteId) {
+        warningMessages.push(`- Insumo ${ingredientesValidosCheck.find(i=>i.insumoId===insumoId)?.nombre || insumoId} sin lote seleccionado.`);
+      } else {
+        const lote = lotesDisponibles.find(l => l.id === selectedLoteId);
+        if (lote && lote.cantidad_base_actual < totalConsumoCheck[insumoId]) {
+          warningMessages.push(`- Stock insuficiente en Lote ${lote.lote_interno} (quedará negativo).`);
+        }
+      }
+    }
+
+    if (warningMessages.length > 0) {
+      const proceed = window.confirm("⚠️ Advertencia:\n\n" + warningMessages.join("\n") + "\n\n¿Querés guardar el medio de todos modos?");
+      if (!proceed) return;
+    }
+
     setLoading(true);
 
     try {
-      const receta = recetas.find(r => r.id === formData.recetaId);
-      const itemsToCreate = isExperimental ? Number(formData.repeticiones) : 1;
       const variableValoresArr = formData.variable_valores.split(',').map(v => v.trim());
       const batchesData = [];
 
@@ -551,7 +583,27 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   };
 
   const dynamicMaterials = (currentReceta?.materiales_requeridos || []).map(scaleMaterial);
-  const allChecked = dynamicMaterials.length === 0 || dynamicMaterials.every((mat, idx) => checkedMaterials[idx]);
+  const dynamicEquipments = (currentReceta?.equipamiento_requerido || currentReceta?.equipamientoRequerido || []).map(scaleMaterial);
+
+  const toggleAllMaterials = () => {
+    if (dynamicMaterials.length > 0 && dynamicMaterials.every((_, idx) => checkedMaterials[idx])) {
+      setCheckedMaterials({});
+    } else {
+      const all = {};
+      dynamicMaterials.forEach((_, idx) => { all[idx] = true; });
+      setCheckedMaterials(all);
+    }
+  };
+
+  const toggleAllEquipments = () => {
+    if (dynamicEquipments.length > 0 && dynamicEquipments.every((_, idx) => checkedEquipments[idx])) {
+      setCheckedEquipments({});
+    } else {
+      const all = {};
+      dynamicEquipments.forEach((_, idx) => { all[idx] = true; });
+      setCheckedEquipments(all);
+    }
+  };
 
   // Check autoclave/plate capacity limit
   const checkEquipmentCapacityExceeded = () => {
@@ -617,7 +669,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           <div className="section-divider">
             <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.1rem' }}>1. Receta y Volumen General</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <select className="form-control" style={{ height: '48px', fontSize: '1.05rem' }} required value={formData.recetaId} onChange={e => { setFormData({...formData, recetaId: e.target.value}); setCheckedMaterials({}); setSelectedLotes({}); }}>
+              <select className="form-control" style={{ height: '48px', fontSize: '1.05rem' }} required value={formData.recetaId} onChange={e => { setFormData({...formData, recetaId: e.target.value}); setCheckedMaterials({}); setCheckedEquipments({}); setSelectedLotes({}); }}>
                 <option value="">-- Seleccioná Receta --</option>
                 {recetas.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.categoria})</option>)}
               </select>
@@ -677,10 +729,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             </div>
           )}
 
-          {/* PASO 0: ALISTAMIENTO DE MATERIALES */}
-          {currentReceta && dynamicMaterials.length > 0 && (
+          {/* PASO 0: ALISTAMIENTO DE MATERIALES Y EQUIPOS */}
+          {currentReceta && (dynamicMaterials.length > 0 || dynamicEquipments.length > 0) && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-              <h4 style={{ marginBottom: '0.75rem', color: '#f59e0b', fontSize: '1.05rem' }}>🧹 Paso 0: Alistamiento de Materiales</h4>
+              <h4 style={{ marginBottom: '0.75rem', color: '#f59e0b', fontSize: '1.05rem' }}>🧹 Paso 0: Alistamiento</h4>
               
               {showCapacityWarning && (
                 <div 
@@ -703,21 +755,60 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 </div>
               )}
 
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Asegurate de que estos materiales estén esterilizados y en la mesa de trabajo:</p>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                {dynamicMaterials.map((mat, idx) => (
-                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', border: checkedMaterials[idx] ? '2px solid #10b981' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ transform: 'scale(1.6)', accentColor: '#10b981' }} 
-                      checked={!!checkedMaterials[idx]}
-                      onChange={(e) => setCheckedMaterials({...checkedMaterials, [idx]: e.target.checked})}
-                    />
-                    <span style={{ fontSize: '1.05rem', fontWeight: '600', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>
-                      {formatMaterialLabel(mat)}
-                    </span>
-                  </label>
-                ))}
+              <div className="grid-2" style={{ gap: '1.5rem' }}>
+                {/* MATERIALES */}
+                {dynamicMaterials.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Materiales y Vidriería</h5>
+                      <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', height: '32px', minHeight: '32px', padding: '0 0.5rem' }} onClick={toggleAllMaterials}>
+                        {dynamicMaterials.every((_, idx) => checkedMaterials[idx]) ? 'Desmarcar todo' : 'Marcar todo'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {dynamicMaterials.map((mat, idx) => (
+                        <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px', cursor: 'pointer', border: checkedMaterials[idx] ? '2px solid #10b981' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
+                          <input 
+                            type="checkbox" 
+                            style={{ transform: 'scale(1.4)', accentColor: '#10b981' }} 
+                            checked={!!checkedMaterials[idx]}
+                            onChange={(e) => setCheckedMaterials({...checkedMaterials, [idx]: e.target.checked})}
+                          />
+                          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>
+                            {formatMaterialLabel(mat)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* EQUIPOS */}
+                {dynamicEquipments.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Equipamiento</h5>
+                      <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', height: '32px', minHeight: '32px', padding: '0 0.5rem' }} onClick={toggleAllEquipments}>
+                        {dynamicEquipments.every((_, idx) => checkedEquipments[idx]) ? 'Desmarcar todo' : 'Marcar todo'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {dynamicEquipments.map((eq, idx) => (
+                        <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px', cursor: 'pointer', border: checkedEquipments[idx] ? '2px solid #3b82f6' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
+                          <input 
+                            type="checkbox" 
+                            style={{ transform: 'scale(1.4)', accentColor: '#3b82f6' }} 
+                            checked={!!checkedEquipments[idx]}
+                            onChange={(e) => setCheckedEquipments({...checkedEquipments, [idx]: e.target.checked})}
+                          />
+                          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: checkedEquipments[idx] ? '#3b82f6' : 'var(--text-primary)' }}>
+                            {formatMaterialLabel(eq)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -821,6 +912,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                       onChange={e => setAddEnvaseForm({...addEnvaseForm, recipienteId: e.target.value})}
                     >
                       <option value="">-- Seleccionar Envase --</option>
+                      <option value="generico">Otro / Genérico (No descuenta stock)</option>
                       {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
                     </select>
                   </div>
@@ -914,6 +1006,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                               onChange={e => setSubFracForm({...subFracForm, recipienteId: e.target.value})}
                             >
                               <option value="">-- Seleccionar Envase Secundario --</option>
+                              <option value="generico">Otro / Genérico (No descuenta stock)</option>
                               {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
                             </select>
                           </div>
