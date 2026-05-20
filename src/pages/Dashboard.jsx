@@ -208,7 +208,7 @@ export default function Dashboard() {
                         Quedan: <strong style={{ color: 'var(--danger-color)' }}>{actual} {unidad}</strong> (Mín: {min})
                       </div>
                     </div>
-                    <Link to="/inventory" className="btn btn-sm" style={{ background: 'var(--danger-color)', color: 'white', padding: '4px 8px', fontSize: '0.7rem' }}>
+                    <Link to="/inventory" state={{ action: 'reponer', insumoId: item.id }} className="btn btn-sm" style={{ background: 'var(--danger-color)', color: 'white', padding: '4px 8px', fontSize: '0.7rem' }}>
                       Reponer
                     </Link>
                   </div>

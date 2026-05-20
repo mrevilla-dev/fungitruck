@@ -29,7 +29,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     ph_observado: '',
     densidad_observada: '',
     osmolaridad_observada: '',
-    peso_seco_muestra_g: '',
+    peso_muestra_humeda_g: '',
     operario: '',
 
     // Campos Serie Experimental
@@ -458,7 +458,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               ph_observado: formData.ph_observado ? Number(formData.ph_observado) : null,
               densidad_observada: formData.densidad_observada ? Number(formData.densidad_observada) : null,
               osmolaridad_observada: formData.osmolaridad_observada ? Number(formData.osmolaridad_observada) : null,
-              peso_seco_muestra_g: formData.peso_seco_muestra_g ? Number(formData.peso_seco_muestra_g) : null,
+              peso_muestra_humeda_g: formData.peso_muestra_humeda_g ? Number(formData.peso_muestra_humeda_g) : null,
             },
             observaciones: formData.observaciones || '',
             createdAt: serverTimestamp(),
@@ -1149,8 +1149,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                   <input type="number" step="1" className="form-control" placeholder="Ej: 300" value={formData.osmolaridad_observada} onChange={e => setFormData({...formData, osmolaridad_observada: e.target.value})} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Muestra Peso Seco (g)</label>
-                  <input type="number" step="0.01" className="form-control" placeholder="Peso muestra..." value={formData.peso_seco_muestra_g} onChange={e => setFormData({...formData, peso_seco_muestra_g: e.target.value})} />
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Peso Muestra Húmeda (g)</label>
+                  <input type="number" step="0.01" className="form-control" placeholder="Peso húmedo..." value={formData.peso_muestra_humeda_g} onChange={e => setFormData({...formData, peso_muestra_humeda_g: e.target.value})} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
                   <label className="form-label" style={{ fontSize: '0.8rem' }}>Operario / Responsable</label>
