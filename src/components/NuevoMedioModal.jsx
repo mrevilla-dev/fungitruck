@@ -15,6 +15,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   
   const [selectedLotes, setSelectedLotes] = useState({}); // { insumoId: loteId }
   const [checkedMaterials, setCheckedMaterials] = useState({});
+  const [checkedEquipment, setCheckedEquipment] = useState({});
+  const [scannerInstance, setScannerInstance] = useState(null);
   
   const [formData, setFormData] = useState({
     recetaId: '',
@@ -65,8 +67,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       setLotesDisponibles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Suscripción a Recipientes (Consumibles y Empaque)
-    const qRecip = query(collection(db, "insumos_base"), where("categoria", "==", "Consumibles y Empaque"));
+    // Suscripción a Recipientes (Descartables y Reutilizables)
+    const qRecip = query(collection(db, "insumos_base"), where("categoria", "in", ["Descartables", "Reutilizables"]));
     const unsubscribeRecip = onSnapshot(qRecip, (snapshot) => {
       setRecipientes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -82,11 +84,11 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   useEffect(() => {
     let qrScanner = null;
     if (activeScannerForInsumo) {
-      setScanMessage('Iniciando cámara...');
+      const config = { fps: 10, qrbox: { width: 220, height: 220 } };
       const startQr = async () => {
+        setScanMessage('Iniciando cámara...');
         try {
           qrScanner = new Html5Qrcode("modal-scanner-reader");
-          const config = { fps: 10, qrbox: { width: 220, height: 220 } };
           await qrScanner.start(
             { facingMode: "environment" },
             config,
@@ -125,7 +127,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     }
   }, [activeScannerForInsumo]);
 
-  const handleScanSuccess = async (decodedText, insumoId, scanner) => {
+  async function handleScanSuccess(decodedText, insumoId, scanner) {
     if (scanner && scanner.isScanning) {
       await scanner.stop().catch(err => console.warn(err));
     }
@@ -134,7 +136,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     await verifyAndSelectLot(decodedText, insumoId);
   };
 
-  const verifyAndSelectLot = async (code, insumoId) => {
+  async function verifyAndSelectLot(code, insumoId) {
     setLoading(true);
     try {
       const matchingLote = lotesDisponibles.find(l => 
@@ -286,7 +288,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       await runTransaction(db, async (transaction) => {
         // 1. Verificar Stock de Insumos Base e Ingredientes
         const totalConsumo = {};
-        receta.ingredientes.forEach(ing => {
+        receta.ingredientes?.forEach(ing => {
           const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
           totalConsumo[ing.insumoId] = (totalConsumo[ing.insumoId] || 0) + (ing.cantidad * factor);
         });
@@ -325,16 +327,28 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           recipientesSnaps[recipienteId] = snap.data();
         }
 
-        // 3. Descontar stock de ingredientes
+        // 2.5. Leer los master refs de insumos_base ANTES de escribir
+        const masterRefs = {};
+        const masterDocs = {};
+
+        for (const insumoId in totalConsumo) {
+          masterRefs[insumoId] = doc(db, 'insumos_base', insumoId);
+          const masterSnap = await transaction.get(masterRefs[insumoId]);
+          if (masterSnap.exists()) {
+            masterDocs[insumoId] = masterSnap.data();
+          }
+        }
+
+        // 3. Descontar stock de ingredientes (SOLO escrituras a partir de acá)
         for (const insumoId in totalConsumo) {
           transaction.update(insumosRefs[insumoId], {
             cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
           });
-          const masterRef = doc(db, 'insumos_base', insumoId);
-          const masterSnap = await transaction.get(masterRef);
-          transaction.update(masterRef, {
-            stock_total_base: masterSnap.data().stock_total_base - totalConsumo[insumoId]
-          });
+          if (masterDocs[insumoId]) {
+            transaction.update(masterRefs[insumoId], {
+              stock_total_base: masterDocs[insumoId].stock_total_base - totalConsumo[insumoId]
+            });
+          }
         }
 
         // 4. Descontar stock de recipientes
@@ -405,11 +419,17 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               }))
             })),
             trazabilidad: {
-              insumos_consumidos: receta.ingredientes.map(ing => ({
+              estado: 'Activo',
+              receta_id: receta.id,
+              receta_nombre: receta.nombre,
+              insumos_consumidos: receta.ingredientes?.map(ing => ({
+                insumo_id: ing.insumoId,
+                nombre: ing.nombre || ing.insumoId,
+                lote_usado: selectedLotes[ing.insumoId] || 'No especificado',
                 insumoId: ing.insumoId,
                 loteId: selectedLotes[ing.insumoId],
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
-              })),
+              })) || [],
               fecha_preparacion: formData.fecha_preparacion,
               operador: 'Sistema',
               observaciones: formData.observaciones || ''
@@ -552,7 +572,9 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   };
 
   const dynamicMaterials = (currentReceta?.materiales_requeridos || []).map(scaleMaterial);
+  const dynamicEquipment = (currentReceta?.equipamiento_requerido || currentReceta?.equipamientoRequerido || []).map(scaleMaterial);
   const allChecked = dynamicMaterials.length === 0 || dynamicMaterials.every((mat, idx) => checkedMaterials[idx]);
+  const allEquipChecked = dynamicEquipment.length === 0 || dynamicEquipment.every((eq, idx) => checkedEquipment[idx]);
 
   // Check autoclave/plate capacity limit
   const checkEquipmentCapacityExceeded = () => {
@@ -654,12 +676,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             </div>
           </div>
 
+
+
           {/* ASISTENTE DE PESADO / CANTIDADES CALCULADAS */}
-          {currentReceta && (
+          {formData.recetaId && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
               <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.85rem', fontSize: '1rem' }}>⚖️ Cantidades Calculadas (Regla de Tres)</h4>
               <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                {currentReceta.ingredientes.map(ing => {
+                {((currentReceta?.ingredientes || []).filter(ing => ing.insumoId && ing.cantidad > 0)).map(ing => {
                   const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
                   const scaledQty = ing.cantidad * factor;
                   return (
@@ -675,6 +699,37 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                   );
                 })}
               </div>
+
+              {/* JUSTIFICACION SI FALTA STOCK */}
+              {(() => {
+                const ingredientesValidos = (currentReceta?.ingredientes || []).filter(ing => ing.insumoId && ing.cantidad > 0);
+                const hasMissingStock = ingredientesValidos.some(ing => {
+                  const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
+                  const scaledQty = ing.cantidad * factor;
+                  const availableStock = lotesDisponibles
+                    .filter(l => l.insumoId === ing.insumoId)
+                    .reduce((sum, l) => sum + l.cantidad_base_actual, 0);
+                  return availableStock < scaledQty;
+                });
+                
+                if (hasMissingStock) {
+                  return (
+                    <div className="animate-fade-in" style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid var(--danger-color)', padding: '1rem', borderRadius: '8px', marginTop: '1.25rem' }}>
+                      <label className="form-label" style={{ color: 'var(--danger-color)', fontWeight: 'bold' }}>⚠️ Justificación de Stock Faltante</label>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Estás avanzando con stock insuficiente según el sistema. Por favor indicá el motivo (ej. "Stock no actualizado en sistema", "Uso de otro lote no ingresado", etc.).</p>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        required
+                        placeholder="Motivo de la excepción..."
+                        value={formData.observaciones_stock}
+                        onChange={e => setFormData({...formData, observaciones_stock: e.target.value})}
+                      />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
 
@@ -723,20 +778,57 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             </div>
           )}
 
+          {/* PASO 0.5: ALISTAMIENTO DE EQUIPAMIENTO */}
+          {currentReceta && dynamicEquipment.length > 0 && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+              <h4 style={{ marginBottom: '0.75rem', color: '#3b82f6', fontSize: '1.05rem' }}>⚙️ Paso 0.5: Alistamiento de Equipamiento</h4>
+              
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Asegurate de que estos equipos estén limpios y calibrados:</p>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {dynamicEquipment.map((eq, idx) => (
+                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', border: checkedEquipment[idx] ? '2px solid #3b82f6' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
+                    <input 
+                      type="checkbox" 
+                      style={{ transform: 'scale(1.6)', accentColor: '#3b82f6' }} 
+                      checked={!!checkedEquipment[idx]}
+                      onChange={(e) => setCheckedEquipment({...checkedEquipment, [idx]: e.target.checked})}
+                    />
+                    <span style={{ fontSize: '1.05rem', fontWeight: '600', color: checkedEquipment[idx] ? '#3b82f6' : 'var(--text-primary)' }}>
+                      {formatMaterialLabel(eq)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* SECCIÓN 2: LOTES DE INSUMOS ACTIVOS (CON SCANNER QR INTEGRADO) */}
-          {formData.recetaId && allChecked && (
-            <div className="section-divider">
+          {formData.recetaId && (
+
+            <div className="section-divider animate-fade-in">
               <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>🔍 2. Lotes de Insumos Activos</h4>
               
               {/* QR Scanner Container Overlay */}
               {activeScannerForInsumo && (
-                <div style={{ background: 'rgba(15, 23, 42, 0.95)', border: '2px solid var(--primary-color)', padding: '1.25rem', borderRadius: '16px', marginBottom: '1.5rem', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h5 style={{ margin: 0 }}>Cámara activa para: <strong>{recetas.find(r => r.id === formData.recetaId)?.ingredientes.find(i => i.insumoId === activeScannerForInsumo)?.nombre || activeScannerForInsumo}</strong></h5>
-                    <button type="button" className="btn btn-danger" style={{ width: 'auto', minHeight: 'auto', padding: '0.4rem 1rem' }} onClick={() => setActiveScannerForInsumo(null)}>✕ Cerrar</button>
+                <div style={{ position: 'relative', width: '100%', maxWidth: '400px', margin: '0 auto 1rem auto' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.8)', color: 'white', padding: '0.5rem', textAlign: 'center', borderRadius: '8px 8px 0 0' }}>
+                    <h5 style={{ margin: 0 }}>Cámara activa para: <strong>{recetas.find(r => r.id === formData.recetaId)?.ingredientes?.find(i => i.insumoId === activeScannerForInsumo)?.nombre || activeScannerForInsumo}</strong></h5>
                   </div>
-                  <div id="modal-scanner-reader" style={{ width: '100%', maxWidth: '350px', height: '240px', margin: '0 auto', background: '#000', borderRadius: '12px', overflow: 'hidden' }}></div>
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{scanMessage}</p>
+                  <div id="modal-scanner-reader" style={{ width: '100%', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}></div>
+                  <button 
+                    type="button" 
+                    className="btn btn-outline" 
+                    style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none' }}
+                    onClick={() => {
+                      if (scannerInstance) { scannerInstance.stop(); setScannerInstance(null); }
+                      setActiveScannerForInsumo(null);
+                    }}
+                  >
+                    Cerrar Cámara
+                  </button>
+                  <div style={{ textAlign: 'center', marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    {scanMessage}
+                  </div>
                   
                   {/* Simulador para testing sin cámara */}
                   <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', textAlign: 'left' }}>
@@ -756,7 +848,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {recetas.find(r => r.id === formData.recetaId)?.ingredientes.map(ing => (
+                {recetas.find(r => r.id === formData.recetaId)?.ingredientes?.map(ing => (
                   <div key={ing.insumoId} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <label className="form-label" style={{ fontSize: '0.9rem', marginBottom: 0, fontWeight: '600' }}>{ing.nombre || ing.insumoId}</label>
@@ -805,8 +897,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* SECCIÓN 3: ENVASADO Y SUB-FRACCIONAMIENTO (GLOVE FRIENDLY) */}
-          {formData.recetaId && allChecked && (
-            <div className="section-divider" style={{ background: 'rgba(16, 185, 129, 0.02)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+          {formData.recetaId && allChecked && allEquipChecked && (
+            <div className="section-divider animate-fade-in" style={{ background: 'rgba(16, 185, 129, 0.02)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
               <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--accent-color)' }}>📦 3. Envasado y Sub-Fraccionamiento</h4>
               
               {/* Formulario rápido para añadir envase principal */}
@@ -981,7 +1073,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* OBSERVACIONES DEL LOTE */}
-          {formData.recetaId && allChecked && (
+          {formData.recetaId && allChecked && allEquipChecked && (
             <div className="section-divider animate-fade-in">
               <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>📝 Observaciones del Lote</h4>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1003,10 +1095,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             <button 
               type="submit" 
               className="btn btn-primary" 
-              disabled={loading || (formData.recetaId && !allChecked) || envasesList.length === 0} 
+              disabled={loading || !formData.recetaId || envasesList.length === 0 || !allChecked || !allEquipChecked} 
               style={{ 
                 flex: 1.5, 
-                opacity: (!formData.recetaId || !allChecked || envasesList.length === 0) ? 0.5 : 1,
+                opacity: (!formData.recetaId || envasesList.length === 0 || !allChecked || !allEquipChecked) ? 0.5 : 1,
                 height: '52px',
                 fontSize: '1.1rem',
                 fontWeight: 'bold'

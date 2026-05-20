@@ -22,6 +22,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     nombre: insumo.nombre || '',
     categoria: insumo.categoria || 'Medios y reactivos',
     tipo_uso: insumo.tipo_uso || '',
+    es_envase: !!insumo.es_envase,
     stock_minimo_vista: initialStockMinimoVista || 0,
     salaId: typeof insumo.ubicacion === 'object' ? insumo.ubicacion.salaId : (insumo.ubicacion || ''),
     detalleUbicacion: typeof insumo.ubicacion === 'object' ? insumo.ubicacion.detalle : '',
@@ -132,6 +133,7 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
         nombre: formData.nombre,
         categoria: formData.categoria,
         tipo_uso: formData.tipo_uso || null,
+        es_envase: !!formData.es_envase,
         stock_minimo_base: stockMinimoBase,
         ubicacion: {
           salaId: formData.salaId,
@@ -269,6 +271,24 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
                 <option value="reutilizable">🔄 Reutilizable</option>
               </select>
             </div>
+          </div>
+          
+          {['Descartables', 'Reutilizables', 'Equipamiento'].includes(formData.categoria) && (
+            <div className="form-group" style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', margin: 0 }}>
+                <input 
+                  type="checkbox" 
+                  style={{ transform: 'scale(1.5)', accentColor: 'var(--primary-color)' }}
+                  checked={formData.es_envase}
+                  onChange={e => setFormData({...formData, es_envase: e.target.checked})}
+                />
+                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>✅ Este ítem se utiliza como Envase / Contenedor</strong>
+              </label>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem', marginLeft: '2.25rem' }}>Marcá esta opción para que aparezca en el buscador rápido al envasar medios o cultivos.</p>
+            </div>
+          )}
+
+          <div className="grid-2">
             <div className="form-group">
                 <label className="form-label">📷 Foto del Producto (Bolsa/Envase)</label>
                 <input 

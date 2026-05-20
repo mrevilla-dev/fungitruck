@@ -30,6 +30,7 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
     salaId: '',
     detalleUbicacion: '',
     tipo_uso: '',
+    es_envase: false,
     
     // Entrada
     proveedor_nombre: '',
@@ -189,6 +190,7 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
           nombre: formData.nombre,
           categoria: formData.categoria,
           tipo_uso: formData.tipo_uso || null,
+          es_envase: !!formData.es_envase,
           unidad_compra: formData.unidad_compra,
           unidad_display: formData.unidad_display,
           unidad_base: formData.unidad_base,
@@ -411,6 +413,20 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
                 </select>
               </div>
             </div>
+            {['Descartables', 'Reutilizables', 'Equipamiento'].includes(formData.categoria) && (
+              <div className="form-group" style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', margin: 0 }}>
+                  <input 
+                    type="checkbox" 
+                    style={{ transform: 'scale(1.5)', accentColor: 'var(--primary-color)' }}
+                    checked={formData.es_envase}
+                    onChange={e => setFormData({...formData, es_envase: e.target.checked})}
+                  />
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>✅ Este ítem se utiliza como Envase / Contenedor</strong>
+                </label>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem', marginLeft: '2.25rem' }}>Marcá esta opción para que aparezca en el buscador rápido al envasar medios o cultivos.</p>
+              </div>
+            )}
               <div className="form-group">
                 <label className="form-label">📷 Foto del Producto (Bolsa/Envase)</label>
                 <input 

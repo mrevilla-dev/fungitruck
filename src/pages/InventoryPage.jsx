@@ -10,6 +10,7 @@ import PrintLabelsModal from '../components/PrintLabelsModal';
 import CultivosTable from '../components/CultivosTable';
 import NuevoCultivoModal from '../components/NuevoCultivoModal';
 import AuditInsumoModal from '../components/AuditInsumoModal';
+import AuditMedioModal from '../components/AuditMedioModal';
 import RecipeFormModal from '../components/RecipeFormModal';
 import EditLoteModal from '../components/EditLoteModal';
 
@@ -321,6 +322,7 @@ function InventoryPage() {
   const [recipeSearch, setRecipeSearch] = useState('');
   const [recipeCategory, setRecipeCategory] = useState('todas');
   const [recipeStatus, setRecipeStatus] = useState('activa');
+  const [mediosSearch, setMediosSearch] = useState('');
 
   const [showRegistroModal, setShowRegistroModal] = useState(false);
   const [showNuevoMedioModal, setShowNuevoMedioModal] = useState(false);
@@ -333,6 +335,7 @@ function InventoryPage() {
   const [editingBatch, setEditingBatch] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [auditingLote, setAuditingLote] = useState(null);
+  const [auditingMedio, setAuditingMedio] = useState(null);
   const [recipeToClone, setRecipeToClone] = useState(null);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -554,15 +557,33 @@ function InventoryPage() {
         )}
 
         {activeTab === 'medios' && (
-          <div>
-            <button className="btn btn-primary" onClick={() => setShowNuevoMedioModal(true)}>➕ Preparar Medio</button>
-            {medios.map(m => (
+          <div className="animate-fade-in">
+            <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <input 
+                type="text" 
+                className="form-control" 
+                style={{ flex: 1 }}
+                placeholder="🔍 Buscar medio (nombre, alias, lote)..." 
+                value={mediosSearch} 
+                onChange={e => setMediosSearch(e.target.value)} 
+              />
+              <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setShowNuevoMedioModal(true)}>➕ Preparar Medio</button>
+            </div>
+            
+            {medios.filter(m => {
+              if (!mediosSearch) return true;
+              const term = mediosSearch.toLowerCase();
+              return (m.alias?.toLowerCase().includes(term) || m.nombre_receta?.toLowerCase().includes(term) || m.id?.toLowerCase().includes(term) || (m.fecha_preparacion && m.fecha_preparacion.toLowerCase().includes(term)));
+            }).map(m => (
               <div key={m.id} className="card" style={{ padding: '1rem', marginTop: '0.5rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', alignItems: 'center' }}>
                 <div><strong>{m.alias}</strong></div>
                 <div>{m.nombre_receta}</div>
                 <div>{m.stock_bulk.cantidad_actual} {m.stock_bulk.unidad}</div>
                 <div>{m.estado}</div>
-                <button className="btn-icon" onClick={() => { setSelectedMedioForPrint([m]); setShowPrintModal(true); }}>🖨️</button>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button className="btn-icon" onClick={() => { setSelectedMedioForPrint([m]); setShowPrintModal(true); }}>🖨️</button>
+                  <button className="btn-icon" title="Auditoría de Lote" onClick={() => setAuditingMedio(m)}>🔍</button>
+                </div>
               </div>
             ))}
           </div>
@@ -611,6 +632,7 @@ function InventoryPage() {
       {editingInsumo && <EditInsumoModal insumo={editingInsumo} onClose={() => setEditingInsumo(null)} onSaved={() => setEditingInsumo(null)} />}
       {editingLote && <EditLoteModal lote={editingLote} onClose={() => setEditingLote(null)} onSaved={() => setEditingLote(null)} />}
       {auditingLote && <AuditInsumoModal lote={auditingLote} onClose={() => setAuditingLote(null)} />}
+      {auditingMedio && <AuditMedioModal medio={auditingMedio} onClose={() => setAuditingMedio(null)} />}
       {showPrintModal && selectedMedioForPrint && <PrintLabelsModal batches={selectedMedioForPrint} onClose={() => setShowPrintModal(false)} />}
       
       {confirmAction && (

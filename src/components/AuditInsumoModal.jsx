@@ -7,11 +7,11 @@ export default function AuditInsumoModal({ lote, onClose }) {
   const [loading, setLoading] = useState(true);
   const [affectedMedios, setAffectedMedios] = useState([]);
   const [affectedBatches, setAffectedBatches] = useState([]);
+  const [insumoMaster, setInsumoMaster] = useState(null);
   const [loteStatus, setLoteStatus] = useState(lote.estado_apertura || 'Cerrado');
-  const [estadoActual, setEstadoActual] = useState(lote.estado_actual || lote.estado_reutilizable || (insumoMaster?.categoria === 'Equipamiento' ? 'En Servicio' : 'Disponible'));
+  const [estadoActual, setEstadoActual] = useState(lote.estado_actual || lote.estado_reutilizable || 'Disponible');
   const [fechaMantenimiento, setFechaMantenimiento] = useState(lote.fecha_mantenimiento || '');
   const [proximoMantenimiento, setProximoMantenimiento] = useState(lote.proximo_mantenimiento || '');
-  const [insumoMaster, setInsumoMaster] = useState(null);
   const [observaciones, setObservaciones] = useState(lote.observaciones || '');
   const [isSavingObs, setIsSavingObs] = useState(false);
 
@@ -23,7 +23,13 @@ export default function AuditInsumoModal({ lote, onClose }) {
   const fetchMaster = async () => {
     try {
       const docSnap = await getDoc(doc(db, "insumos_base", lote.insumoId));
-      if (docSnap.exists()) setInsumoMaster(docSnap.data());
+      if (docSnap.exists()) {
+        const masterData = docSnap.data();
+        setInsumoMaster(masterData);
+        if (!lote.estado_actual && !lote.estado_reutilizable && masterData.categoria === 'Equipamiento') {
+          setEstadoActual('En Servicio');
+        }
+      }
     } catch (e) { console.error(e); }
   };
 
