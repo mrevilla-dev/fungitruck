@@ -17,6 +17,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const [selectedLotes, setSelectedLotes] = useState({}); // { insumoId: loteId }
   const [checkedMaterials, setCheckedMaterials] = useState({});
   const [checkedEquipments, setCheckedEquipments] = useState({});
+  const [checkedWeighing, setCheckedWeighing] = useState({});
   
   const [formData, setFormData] = useState({
     recetaId: '',
@@ -674,7 +675,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 <SearchableSelect
                   options={recetas.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.categoria})` }))}
                   value={formData.recetaId}
-                  onChange={(val) => { setFormData({...formData, recetaId: val}); setCheckedMaterials({}); setCheckedEquipments({}); setSelectedLotes({}); }}
+                  onChange={(val) => { setFormData({...formData, recetaId: val}); setCheckedMaterials({}); setCheckedEquipments({}); setCheckedWeighing({}); setSelectedLotes({}); }}
                   placeholder="-- Seleccioná Receta --"
                 />
               </div>
@@ -718,16 +719,57 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 {(currentReceta.ingredientes || []).map(ing => {
                   const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
                   const scaledQty = ing.cantidad * factor;
+                  
+                  const isChecked = !!checkedWeighing[ing.insumoId];
+                  
+                  const totalAvailable = lotesDisponibles
+                    .filter(l => l.insumoId === ing.insumoId)
+                    .reduce((acc, l) => acc + l.cantidad_base_actual, 0);
+                    
+                  const isLowStock = totalAvailable < scaledQty;
+
                   return (
-                    <div key={ing.insumoId} style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', fontWeight: '500' }}>{ing.nombre || ing.insumoId}</span>
-                      <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#10b981', display: 'block', margin: '0.3rem 0' }}>
+                    <label 
+                      key={ing.insumoId} 
+                      style={{ 
+                        background: isChecked ? 'rgba(16, 185, 129, 0.05)' : (isLowStock ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255, 255, 255, 0.03)'), 
+                        padding: '1rem', 
+                        borderRadius: '10px', 
+                        border: isChecked ? '2px solid #10b981' : (isLowStock ? '2px solid rgba(239, 68, 68, 0.5)' : '1px solid var(--border-color)'), 
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        position: 'relative'
+                      }}
+                    >
+                      <input 
+                        type="checkbox" 
+                        style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', transform: 'scale(1.4)', accentColor: '#10b981' }} 
+                        checked={isChecked}
+                        onChange={(e) => setCheckedWeighing({...checkedWeighing, [ing.insumoId]: e.target.checked})}
+                      />
+                      
+                      <span style={{ fontSize: '0.9rem', color: isChecked ? '#10b981' : 'var(--text-secondary)', display: 'block', fontWeight: '600', paddingRight: '1rem' }}>
+                        {ing.nombre || ing.insumoId}
+                      </span>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: isChecked ? '#10b981' : (isLowStock ? '#ef4444' : 'var(--text-primary)'), display: 'block', margin: '0.3rem 0' }}>
                         {scaledQty.toFixed(2)} {ing.unidad || 'g'}
                       </span>
+                      
+                      {isLowStock && !isChecked && (
+                        <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'block', fontWeight: 'bold', marginTop: '-0.2rem', marginBottom: '0.3rem' }}>
+                          ⚠️ Faltan {(scaledQty - totalAvailable).toFixed(1)} {ing.unidad} en lotes
+                        </span>
+                      )}
+                      
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        Base: {ing.cantidad} {ing.unidad} (para {currentReceta.rendimiento_teorico?.cantidad || 1000} ml/g)
+                        Base: {ing.cantidad} {ing.unidad}
                       </span>
-                    </div>
+                    </label>
                   );
                 })}
               </div>
