@@ -297,53 +297,51 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
 
         for (const insumoId in totalConsumo) {
           const selectedLoteId = selectedLotes[insumoId];
-          if (!selectedLoteId) throw new Error(`Debés seleccionar un lote para el insumo: ${insumoId}`);
-
-          insumosRefs[insumoId] = doc(db, 'insumos_lotes', selectedLoteId);
-          const loteSnap = await transaction.get(insumosRefs[insumoId]);
-          if (!loteSnap.exists()) throw new Error(`El lote seleccionado ya no existe.`);
-          
-          if (loteSnap.data().cantidad_base_actual < totalConsumo[insumoId]) {
-            throw new Error(`Stock insuficiente en LOTE ${loteSnap.data().lote_interno}.`);
+          if (selectedLoteId) {
+            insumosRefs[insumoId] = doc(db, 'insumos_lotes', selectedLoteId);
+            const loteSnap = await transaction.get(insumosRefs[insumoId]);
+            if (loteSnap.exists()) {
+              insumosDocs[insumoId] = loteSnap.data();
+            }
           }
-          insumosDocs[insumoId] = loteSnap.data();
         }
 
-        // 2. Verificar Stock de Recipientes
+        // 2. Verificar Stock de Recipientes (Sin bloquear por falta)
         const recipientesRefs = {};
         const recipientesSnaps = {};
 
         for (const recipienteId in recipientesDeductions) {
-          const qtyNeeded = recipientesDeductions[recipienteId] * itemsToCreate;
           recipientesRefs[recipienteId] = doc(db, 'insumos_base', recipienteId);
           const snap = await transaction.get(recipientesRefs[recipienteId]);
-          if (!snap.exists()) {
-            throw new Error(`El recipiente con ID "${recipienteId}" no existe.`);
+          if (snap.exists()) {
+            recipientesSnaps[recipienteId] = snap.data();
           }
-          if (snap.data().stock_total_base < qtyNeeded) {
-            throw new Error(`Stock insuficiente de "${snap.data().nombre}". Se requieren ${qtyNeeded} unidades.`);
-          }
-          recipientesSnaps[recipienteId] = snap.data();
         }
 
         // 3. Descontar stock de ingredientes
         for (const insumoId in totalConsumo) {
-          transaction.update(insumosRefs[insumoId], {
-            cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
-          });
+          if (insumosRefs[insumoId] && insumosDocs[insumoId]) {
+            transaction.update(insumosRefs[insumoId], {
+              cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
+            });
+          }
           const masterRef = doc(db, 'insumos_base', insumoId);
           const masterSnap = await transaction.get(masterRef);
-          transaction.update(masterRef, {
-            stock_total_base: masterSnap.data().stock_total_base - totalConsumo[insumoId]
-          });
+          if (masterSnap.exists()) {
+            transaction.update(masterRef, {
+              stock_total_base: (masterSnap.data().stock_total_base || 0) - totalConsumo[insumoId]
+            });
+          }
         }
 
         // 4. Descontar stock de recipientes
         for (const recipienteId in recipientesDeductions) {
-          const qtyToDeduct = recipientesDeductions[recipienteId] * itemsToCreate;
-          transaction.update(recipientesRefs[recipienteId], {
-            stock_total_base: recipientesSnaps[recipienteId].stock_total_base - qtyToDeduct
-          });
+          if (recipientesSnaps[recipienteId]) {
+            const qtyToDeduct = recipientesDeductions[recipienteId] * itemsToCreate;
+            transaction.update(recipientesRefs[recipienteId], {
+              stock_total_base: (recipientesSnaps[recipienteId].stock_total_base || 0) - qtyToDeduct
+            });
+          }
         }
 
         // 5. Crear Lotes de Medios Preparados
@@ -408,7 +406,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             trazabilidad: {
               insumos_consumidos: ingredientesValidos.map(ing => ({
                 insumoId: ing.insumoId,
-                loteId: selectedLotes[ing.insumoId],
+                loteId: selectedLotes[ing.insumoId] || null,
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
               })),
               fecha_preparacion: formData.fecha_preparacion,
@@ -725,7 +723,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* SECCIÓN 2: LOTES DE INSUMOS ACTIVOS (CON SCANNER QR INTEGRADO) */}
-          {formData.recetaId && allChecked && (
+          {formData.recetaId && (
             <div className="section-divider">
               <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>🔍 2. Lotes de Insumos Activos</h4>
               
@@ -783,12 +781,11 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <select 
                         className="form-control" 
-                        style={{ height: '48px', fontSize: '1rem' }}
-                        required 
+                        style={{ height: '48px', fontSize: '1rem', borderColor: !selectedLotes[ing.insumoId] ? '#f59e0b' : 'var(--border-color)' }}
                         value={selectedLotes[ing.insumoId] || ''} 
                         onChange={e => setSelectedLotes({...selectedLotes, [ing.insumoId]: e.target.value})}
                       >
-                        <option value="">-- Elegir Lote Abierto --</option>
+                        <option value="">-- Sin lote específico / No abierto --</option>
                         {lotesDisponibles.filter(l => l.insumoId === ing.insumoId).map(l => (
                           <option key={l.id} value={l.id}>{l.lote_interno} ({l.cantidad_base_actual.toFixed(1)} {l.unidad_base})</option>
                         ))}
@@ -806,7 +803,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* SECCIÓN 3: ENVASADO Y SUB-FRACCIONAMIENTO (GLOVE FRIENDLY) */}
-          {formData.recetaId && allChecked && (
+          {formData.recetaId && (
             <div className="section-divider" style={{ background: 'rgba(16, 185, 129, 0.02)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
               <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--accent-color)' }}>📦 3. Envasado y Sub-Fraccionamiento</h4>
               
@@ -982,7 +979,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* OBSERVACIONES DEL LOTE */}
-          {formData.recetaId && allChecked && (
+          {formData.recetaId && (
             <div className="section-divider animate-fade-in">
               <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>📝 Observaciones del Lote</h4>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1004,10 +1001,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             <button 
               type="submit" 
               className="btn btn-primary" 
-              disabled={loading || (formData.recetaId && !allChecked) || envasesList.length === 0} 
+              disabled={loading || envasesList.length === 0} 
               style={{ 
                 flex: 1.5, 
-                opacity: (!formData.recetaId || !allChecked || envasesList.length === 0) ? 0.5 : 1,
+                opacity: (!formData.recetaId || envasesList.length === 0) ? 0.5 : 1,
                 height: '52px',
                 fontSize: '1.1rem',
                 fontWeight: 'bold'
