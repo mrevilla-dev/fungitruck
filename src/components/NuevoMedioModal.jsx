@@ -25,6 +25,13 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     fecha_preparacion: new Date().toISOString().split('T')[0],
     observaciones: '',
     
+    // Quality Control Fields
+    ph_observado: '',
+    densidad_observada: '',
+    osmolaridad_observada: '',
+    peso_seco_muestra_g: '',
+    operario: '',
+
     // Campos Serie Experimental
     repeticiones: 1,
     variable_nombre: 'Respiración',
@@ -444,8 +451,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
               })),
               fecha_preparacion: formData.fecha_preparacion,
-              operador: 'Sistema',
+              operador: formData.operario || 'Sistema',
               observaciones: formData.observaciones || ''
+            },
+            control_calidad: {
+              ph_observado: formData.ph_observado ? Number(formData.ph_observado) : null,
+              densidad_observada: formData.densidad_observada ? Number(formData.densidad_observada) : null,
+              osmolaridad_observada: formData.osmolaridad_observada ? Number(formData.osmolaridad_observada) : null,
+              peso_seco_muestra_g: formData.peso_seco_muestra_g ? Number(formData.peso_seco_muestra_g) : null,
             },
             observaciones: formData.observaciones || '',
             createdAt: serverTimestamp(),
@@ -1120,7 +1133,44 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           {/* OBSERVACIONES DEL LOTE */}
           {formData.recetaId && (
             <div className="section-divider animate-fade-in">
-              <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>📝 Observaciones del Lote</h4>
+              <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>📝 Control de Calidad y Observaciones</h4>
+              
+              <div className="grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>pH Observado</label>
+                  <input type="number" step="0.1" className="form-control" placeholder="Ej: 5.5" value={formData.ph_observado} onChange={e => setFormData({...formData, ph_observado: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Densidad Observada</label>
+                  <input type="number" step="0.01" className="form-control" placeholder="Ej: 1.02" value={formData.densidad_observada} onChange={e => setFormData({...formData, densidad_observada: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Osmolaridad (mOsm/L)</label>
+                  <input type="number" step="1" className="form-control" placeholder="Ej: 300" value={formData.osmolaridad_observada} onChange={e => setFormData({...formData, osmolaridad_observada: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Muestra Peso Seco (g)</label>
+                  <input type="number" step="0.01" className="form-control" placeholder="Peso muestra..." value={formData.peso_seco_muestra_g} onChange={e => setFormData({...formData, peso_seco_muestra_g: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Operario / Responsable</label>
+                  <input 
+                    type="text" 
+                    list="operarios-list" 
+                    className="form-control" 
+                    placeholder="Escribí o seleccioná tu nombre..." 
+                    value={formData.operario} 
+                    onChange={e => setFormData({...formData, operario: e.target.value})} 
+                  />
+                  <datalist id="operarios-list">
+                    <option value="Maxi Revilla" />
+                    <option value="Laboratorio" />
+                    <option value="Becario" />
+                    <option value="Investigador" />
+                  </datalist>
+                </div>
+              </div>
+
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <textarea 
                   className="form-control" 
