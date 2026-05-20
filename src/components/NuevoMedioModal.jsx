@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, where, getDocs } from 'firebase/firestore';
 import PrintLabelsModal from './PrintLabelsModal';
 import { Html5Qrcode } from 'html5-qrcode';
+import SearchableSelect from './SearchableSelect';
 
 export default function NuevoMedioModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -669,10 +670,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           <div className="section-divider">
             <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.1rem' }}>1. Receta y Volumen General</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <select className="form-control" style={{ height: '48px', fontSize: '1.05rem' }} required value={formData.recetaId} onChange={e => { setFormData({...formData, recetaId: e.target.value}); setCheckedMaterials({}); setCheckedEquipments({}); setSelectedLotes({}); }}>
-                <option value="">-- Seleccioná Receta --</option>
-                {recetas.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.categoria})</option>)}
-              </select>
+              <div style={{ position: 'relative', zIndex: 50 }}>
+                <SearchableSelect
+                  options={recetas.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.categoria})` }))}
+                  value={formData.recetaId}
+                  onChange={(val) => { setFormData({...formData, recetaId: val}); setCheckedMaterials({}); setCheckedEquipments({}); setSelectedLotes({}); }}
+                  placeholder="-- Seleccioná Receta --"
+                />
+              </div>
 
               {currentReceta && (
                 <button 
@@ -869,18 +874,19 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select 
-                        className="form-control" 
-                        style={{ height: '48px', fontSize: '1rem', borderColor: !selectedLotes[ing.insumoId] ? '#f59e0b' : 'var(--border-color)' }}
-                        value={selectedLotes[ing.insumoId] || ''} 
-                        onChange={e => setSelectedLotes({...selectedLotes, [ing.insumoId]: e.target.value})}
-                      >
-                        <option value="">-- Sin lote específico / No abierto --</option>
-                        {lotesDisponibles.filter(l => l.insumoId === ing.insumoId).map(l => (
-                          <option key={l.id} value={l.id}>{l.lote_interno} ({l.cantidad_base_actual.toFixed(1)} {l.unidad_base})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div style={{ flex: 1, position: 'relative', zIndex: 40 }}>
+                        <SearchableSelect
+                          options={[
+                            { id: '', nombre: '-- Sin lote específico / No abierto --' },
+                            ...lotesDisponibles.filter(l => l.insumoId === ing.insumoId).map(l => ({ id: l.id, nombre: `Lote ${l.lote_interno} (${l.cantidad_base_actual.toFixed(1)} ${l.unidad_base})` }))
+                          ]}
+                          value={selectedLotes[ing.insumoId] || ''}
+                          onChange={(val) => setSelectedLotes({...selectedLotes, [ing.insumoId]: val})}
+                          placeholder="-- Buscar Lote Abierto --"
+                          hasWarning={!selectedLotes[ing.insumoId]}
+                        />
+                      </div>
                       {selectedLotes[ing.insumoId] && (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16, 185, 129, 0.1)', border: '2px solid #10b981', color: '#10b981', borderRadius: '8px', padding: '0 0.85rem', fontSize: '1.25rem', fontWeight: 'bold' }} title="Lote verificado y vinculado">
                           ✓
@@ -903,18 +909,17 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 <h5 style={{ marginBottom: '0.75rem', fontSize: '0.95rem', color: 'var(--text-primary)' }}>Registrar Envase Principal (Stock)</h5>
                 
                 <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
+                  <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 30 }}>
                     <label className="form-label" style={{ fontSize: '0.8rem' }}>Seleccionar Envase Principal</label>
-                    <select 
-                      className="form-control" 
-                      style={{ height: '48px', fontSize: '1rem' }}
-                      value={addEnvaseForm.recipienteId} 
-                      onChange={e => setAddEnvaseForm({...addEnvaseForm, recipienteId: e.target.value})}
-                    >
-                      <option value="">-- Seleccionar Envase --</option>
-                      <option value="generico">Otro / Genérico (No descuenta stock)</option>
-                      {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
-                    </select>
+                    <SearchableSelect
+                      options={[
+                        { id: 'generico', nombre: 'Otro / Genérico (No descuenta stock)' },
+                        ...recipientes.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.stock_total_base}u disp.)` }))
+                      ]}
+                      value={addEnvaseForm.recipienteId}
+                      onChange={(val) => setAddEnvaseForm({...addEnvaseForm, recipienteId: val})}
+                      placeholder="-- Seleccionar Envase --"
+                    />
                   </div>
                   
                   <div className="grid-2">
@@ -997,18 +1002,17 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                         <div style={{ marginTop: '1rem', background: 'rgba(139, 92, 246, 0.03)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '1rem', borderRadius: '10px', display: 'grid', gap: '1rem' }}>
                           <h6 style={{ margin: 0, fontSize: '0.9rem', color: '#8b5cf6' }}>Extraer y Sub-fraccionar:</h6>
                           
-                          <div className="form-group" style={{ marginBottom: 0 }}>
+                          <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 20 }}>
                             <label className="form-label" style={{ fontSize: '0.8rem' }}>Envase Destino (Fraccionado)</label>
-                            <select 
-                              className="form-control" 
-                              style={{ height: '48px', fontSize: '0.95rem' }}
-                              value={subFracForm.recipienteId} 
-                              onChange={e => setSubFracForm({...subFracForm, recipienteId: e.target.value})}
-                            >
-                              <option value="">-- Seleccionar Envase Secundario --</option>
-                              <option value="generico">Otro / Genérico (No descuenta stock)</option>
-                              {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
-                            </select>
+                            <SearchableSelect
+                              options={[
+                                { id: 'generico', nombre: 'Otro / Genérico (No descuenta stock)' },
+                                ...recipientes.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.stock_total_base}u disp.)` }))
+                              ]}
+                              value={subFracForm.recipienteId}
+                              onChange={(val) => setSubFracForm({...subFracForm, recipienteId: val})}
+                              placeholder="-- Seleccionar Envase Secundario --"
+                            />
                           </div>
 
                           <div className="grid-2">
