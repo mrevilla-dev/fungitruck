@@ -357,6 +357,32 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.25rem' }}>
+          {hideMasterConfig && preselectedInsumo && (
+            <div style={{ 
+              background: 'rgba(245, 158, 11, 0.08)', 
+              border: '2px solid rgba(245, 158, 11, 0.4)', 
+              borderRadius: '12px', 
+              padding: '1rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <div style={{ fontSize: '2rem' }}>📦</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#f59e0b' }}>
+                  Reponiendo: {preselectedInsumo.nombre}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  {preselectedInsumo.categoria} · Stock actual: <strong style={{ color: 'var(--danger-color)' }}>
+                    {((preselectedInsumo.stock_total_base || 0) / (preselectedInsumo.factor_display || 1)).toFixed(1)} {preselectedInsumo.unidad_display || preselectedInsumo.unidad_base || 'un'}
+                  </strong>
+                  {preselectedInsumo.stock_minimo_base > 0 && (
+                    <span> (Mín: {(preselectedInsumo.stock_minimo_base / (preselectedInsumo.factor_display || 1)).toFixed(1)})</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {!hideMasterConfig && (
             <div className="section-divider">
 

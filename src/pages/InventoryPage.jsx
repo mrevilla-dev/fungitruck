@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, orderBy, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -309,9 +310,12 @@ const RecetasTable = ({ recetas, insumos, onEdit, onDuplicate, onDelete, onArchi
 };
 
 function InventoryPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('insumos');
   const [loading, setLoading] = useState(true);
   const [insumos, setInsumos] = useState([]);
+  const [preselectedInsumoForReponer, setPreselectedInsumoForReponer] = useState(null);
   const [insumosLotes, setInsumosLotes] = useState([]);
   const [medios, setMedios] = useState([]);
   const [cultivos, setCultivos] = useState([]);
@@ -340,6 +344,29 @@ function InventoryPage() {
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
 
+
+  // Detect 'reponer' action from Dashboard redirect
+  useEffect(() => {
+    if (location.state?.action === 'reponer' && location.state?.insumoId) {
+      const targetId = location.state.insumoId;
+      // Wait for insumos to load, then open modal
+      const tryOpen = (attempts = 0) => {
+        setInsumos(current => {
+          const found = current.find(i => i.id === targetId);
+          if (found) {
+            setPreselectedInsumoForReponer(found);
+            setShowRegistroModal(true);
+          } else if (attempts < 10) {
+            setTimeout(() => tryOpen(attempts + 1), 300);
+          }
+          return current;
+        });
+      };
+      tryOpen();
+      // Clear state so modal doesn't re-open on back navigation
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), snap => {
@@ -606,7 +633,14 @@ function InventoryPage() {
         )}
       </main>
 
-      {showRegistroModal && <RegistroInsumoModal onClose={() => setShowRegistroModal(false)} onSaved={() => setShowRegistroModal(false)} />}
+      {showRegistroModal && (
+        <RegistroInsumoModal 
+          onClose={() => { setShowRegistroModal(false); setPreselectedInsumoForReponer(null); }} 
+          onSaved={() => { setShowRegistroModal(false); setPreselectedInsumoForReponer(null); }}
+          preselectedInsumo={preselectedInsumoForReponer}
+          hideMasterConfig={!!preselectedInsumoForReponer}
+        />
+      )}
       {showNuevoMedioModal && <NuevoMedioModal onClose={() => setShowNuevoMedioModal(false)} onSaved={() => setShowNuevoMedioModal(false)} />}
       {showNuevoCultivoModal && <NuevoCultivoModal onClose={() => setShowNuevoCultivoModal(false)} onSaved={() => setShowNuevoCultivoModal(false)} />}
       {showRecipeModal && (

@@ -14,6 +14,7 @@ export default function SearchableSelect({
   placeholder = '-- Seleccionar --',
   onCreateNew,
   createNewText = '➕ Crear nuevo',
+  hasWarning = false,
   style = {}
 }) {
   const [search, setSearch] = useState('');
@@ -95,7 +96,7 @@ export default function SearchableSelect({
             paddingRight: '2.5rem',
             background: 'var(--bg-input, rgba(255,255,255,0.05))',
             color: 'var(--text-primary, #fff)',
-            border: '1px solid rgba(255,255,255,0.15)',
+            border: hasWarning ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.15)',
             borderRadius: '8px',
             textOverflow: 'ellipsis'
           }}

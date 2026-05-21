@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, where, getDocs } from 'firebase/firestore';
 import PrintLabelsModal from './PrintLabelsModal';
 import { Html5Qrcode } from 'html5-qrcode';
+import SearchableSelect from './SearchableSelect';
 
 export default function NuevoMedioModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -15,8 +16,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   
   const [selectedLotes, setSelectedLotes] = useState({}); // { insumoId: loteId }
   const [checkedMaterials, setCheckedMaterials] = useState({});
-  const [checkedEquipment, setCheckedEquipment] = useState({});
-  const [scannerInstance, setScannerInstance] = useState(null);
+  const [checkedEquipments, setCheckedEquipments] = useState({});
+  const [checkedWeighing, setCheckedWeighing] = useState({});
   
   const [formData, setFormData] = useState({
     recetaId: '',
@@ -24,6 +25,13 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     fecha_preparacion: new Date().toISOString().split('T')[0],
     observaciones: '',
     
+    // Quality Control Fields
+    ph_observado: '',
+    densidad_observada: '',
+    osmolaridad_observada: '',
+    peso_muestra_humeda_g: '',
+    operario: '',
+
     // Campos Serie Experimental
     repeticiones: 1,
     variable_nombre: 'Respiración',
@@ -67,7 +75,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       setLotesDisponibles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Suscripción a Recipientes (Descartables y Reutilizables)
+    // Suscripción a Recipientes (Descartables + Reutilizables)
     const qRecip = query(collection(db, "insumos_base"), where("categoria", "in", ["Descartables", "Reutilizables"]));
     const unsubscribeRecip = onSnapshot(qRecip, (snapshot) => {
       setRecipientes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -84,11 +92,11 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   useEffect(() => {
     let qrScanner = null;
     if (activeScannerForInsumo) {
-      const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+      setScanMessage('Iniciando cámara...');
       const startQr = async () => {
-        setScanMessage('Iniciando cámara...');
         try {
           qrScanner = new Html5Qrcode("modal-scanner-reader");
+          const config = { fps: 10, qrbox: { width: 220, height: 220 } };
           await qrScanner.start(
             { facingMode: "environment" },
             config,
@@ -127,7 +135,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     }
   }, [activeScannerForInsumo]);
 
-  async function handleScanSuccess(decodedText, insumoId, scanner) {
+  const handleScanSuccess = async (decodedText, insumoId, scanner) => {
     if (scanner && scanner.isScanning) {
       await scanner.stop().catch(err => console.warn(err));
     }
@@ -136,7 +144,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     await verifyAndSelectLot(decodedText, insumoId);
   };
 
-  async function verifyAndSelectLot(code, insumoId) {
+  const verifyAndSelectLot = async (code, insumoId) => {
     setLoading(true);
     try {
       const matchingLote = lotesDisponibles.find(l => 
@@ -186,7 +194,9 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     if (!volumen || volumen <= 0) return alert("Ingresá un volumen válido");
     if (!cantidad || cantidad <= 0) return alert("Ingresá una cantidad válida");
 
-    const selectedRecip = recipientes.find(r => r.id === recipienteId);
+    const selectedRecip = recipienteId === 'generico' 
+      ? { nombre: 'Envase de Laboratorio (Genérico)' }
+      : recipientes.find(r => r.id === recipienteId);
     const newEnvases = [];
     const baseCount = envasesList.length + 1;
     
@@ -211,7 +221,9 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     if (!cantidad || cantidad <= 0) return alert("Ingresá una cantidad válida");
     if (!volumen_unidad || volumen_unidad <= 0) return alert("Ingresá un volumen de unidad válido");
 
-    const selectedRecip = recipientes.find(r => r.id === recipienteId);
+    const selectedRecip = recipienteId === 'generico'
+      ? { nombre: 'Envase Secundario (Genérico)' }
+      : recipientes.find(r => r.id === recipienteId);
     const totalSubVol = Number(cantidad) * Number(volumen_unidad);
 
     setEnvasesList(prev => prev.map(env => {
@@ -268,11 +280,38 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       return alert("Debés registrar al menos un envase de stock principal.");
     }
     
+    const receta = recetas.find(r => r.id === formData.recetaId);
+    const itemsToCreate = isExperimental ? Number(formData.repeticiones) : 1;
+
+    // --- Validación y Advertencia de Stock antes de guardar ---
+    const totalConsumoCheck = {};
+    const ingredientesValidosCheck = receta.ingredientes || [];
+    ingredientesValidosCheck.forEach(ing => {
+      const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
+      totalConsumoCheck[ing.insumoId] = (totalConsumoCheck[ing.insumoId] || 0) + (ing.cantidad * factor);
+    });
+
+    let warningMessages = [];
+    for (const insumoId in totalConsumoCheck) {
+      const selectedLoteId = selectedLotes[insumoId];
+      if (!selectedLoteId) {
+        warningMessages.push(`- Insumo ${ingredientesValidosCheck.find(i=>i.insumoId===insumoId)?.nombre || insumoId} sin lote seleccionado.`);
+      } else {
+        const lote = lotesDisponibles.find(l => l.id === selectedLoteId);
+        if (lote && lote.cantidad_base_actual < totalConsumoCheck[insumoId]) {
+          warningMessages.push(`- Stock insuficiente en Lote ${lote.lote_interno} (quedará negativo).`);
+        }
+      }
+    }
+
+    if (warningMessages.length > 0) {
+      const proceed = window.confirm("⚠️ Advertencia:\n\n" + warningMessages.join("\n") + "\n\n¿Querés guardar el medio de todos modos?");
+      if (!proceed) return;
+    }
+
     setLoading(true);
 
     try {
-      const receta = recetas.find(r => r.id === formData.recetaId);
-      const itemsToCreate = isExperimental ? Number(formData.repeticiones) : 1;
       const variableValoresArr = formData.variable_valores.split(',').map(v => v.trim());
       const batchesData = [];
 
@@ -288,7 +327,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       await runTransaction(db, async (transaction) => {
         // 1. Verificar Stock de Insumos Base e Ingredientes
         const totalConsumo = {};
-        receta.ingredientes?.forEach(ing => {
+        const ingredientesValidos = receta.ingredientes || [];
+        ingredientesValidos.forEach(ing => {
           const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
           totalConsumo[ing.insumoId] = (totalConsumo[ing.insumoId] || 0) + (ing.cantidad * factor);
         });
@@ -298,65 +338,51 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
 
         for (const insumoId in totalConsumo) {
           const selectedLoteId = selectedLotes[insumoId];
-          if (!selectedLoteId) throw new Error(`Debés seleccionar un lote para el insumo: ${insumoId}`);
-
-          insumosRefs[insumoId] = doc(db, 'insumos_lotes', selectedLoteId);
-          const loteSnap = await transaction.get(insumosRefs[insumoId]);
-          if (!loteSnap.exists()) throw new Error(`El lote seleccionado ya no existe.`);
-          
-          if (loteSnap.data().cantidad_base_actual < totalConsumo[insumoId]) {
-            throw new Error(`Stock insuficiente en LOTE ${loteSnap.data().lote_interno}.`);
+          if (selectedLoteId) {
+            insumosRefs[insumoId] = doc(db, 'insumos_lotes', selectedLoteId);
+            const loteSnap = await transaction.get(insumosRefs[insumoId]);
+            if (loteSnap.exists()) {
+              insumosDocs[insumoId] = loteSnap.data();
+            }
           }
-          insumosDocs[insumoId] = loteSnap.data();
         }
 
-        // 2. Verificar Stock de Recipientes
+        // 2. Verificar Stock de Recipientes (Sin bloquear por falta)
         const recipientesRefs = {};
         const recipientesSnaps = {};
 
         for (const recipienteId in recipientesDeductions) {
-          const qtyNeeded = recipientesDeductions[recipienteId] * itemsToCreate;
           recipientesRefs[recipienteId] = doc(db, 'insumos_base', recipienteId);
           const snap = await transaction.get(recipientesRefs[recipienteId]);
-          if (!snap.exists()) {
-            throw new Error(`El recipiente con ID "${recipienteId}" no existe.`);
+          if (snap.exists()) {
+            recipientesSnaps[recipienteId] = snap.data();
           }
-          if (snap.data().stock_total_base < qtyNeeded) {
-            throw new Error(`Stock insuficiente de "${snap.data().nombre}". Se requieren ${qtyNeeded} unidades.`);
-          }
-          recipientesSnaps[recipienteId] = snap.data();
         }
 
-        // 2.5. Leer los master refs de insumos_base ANTES de escribir
-        const masterRefs = {};
-        const masterDocs = {};
-
+        // 3. Descontar stock de ingredientes
         for (const insumoId in totalConsumo) {
-          masterRefs[insumoId] = doc(db, 'insumos_base', insumoId);
-          const masterSnap = await transaction.get(masterRefs[insumoId]);
+          if (insumosRefs[insumoId] && insumosDocs[insumoId]) {
+            transaction.update(insumosRefs[insumoId], {
+              cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
+            });
+          }
+          const masterRef = doc(db, 'insumos_base', insumoId);
+          const masterSnap = await transaction.get(masterRef);
           if (masterSnap.exists()) {
-            masterDocs[insumoId] = masterSnap.data();
-          }
-        }
-
-        // 3. Descontar stock de ingredientes (SOLO escrituras a partir de acá)
-        for (const insumoId in totalConsumo) {
-          transaction.update(insumosRefs[insumoId], {
-            cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
-          });
-          if (masterDocs[insumoId]) {
-            transaction.update(masterRefs[insumoId], {
-              stock_total_base: masterDocs[insumoId].stock_total_base - totalConsumo[insumoId]
+            transaction.update(masterRef, {
+              stock_total_base: (masterSnap.data().stock_total_base || 0) - totalConsumo[insumoId]
             });
           }
         }
 
         // 4. Descontar stock de recipientes
         for (const recipienteId in recipientesDeductions) {
-          const qtyToDeduct = recipientesDeductions[recipienteId] * itemsToCreate;
-          transaction.update(recipientesRefs[recipienteId], {
-            stock_total_base: recipientesSnaps[recipienteId].stock_total_base - qtyToDeduct
-          });
+          if (recipientesSnaps[recipienteId]) {
+            const qtyToDeduct = recipientesDeductions[recipienteId] * itemsToCreate;
+            transaction.update(recipientesRefs[recipienteId], {
+              stock_total_base: (recipientesSnaps[recipienteId].stock_total_base || 0) - qtyToDeduct
+            });
+          }
         }
 
         // 5. Crear Lotes de Medios Preparados
@@ -419,20 +445,20 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               }))
             })),
             trazabilidad: {
-              estado: 'Activo',
-              receta_id: receta.id,
-              receta_nombre: receta.nombre,
-              insumos_consumidos: receta.ingredientes?.map(ing => ({
-                insumo_id: ing.insumoId,
-                nombre: ing.nombre || ing.insumoId,
-                lote_usado: selectedLotes[ing.insumoId] || 'No especificado',
+              insumos_consumidos: ingredientesValidos.map(ing => ({
                 insumoId: ing.insumoId,
-                loteId: selectedLotes[ing.insumoId],
+                loteId: selectedLotes[ing.insumoId] || null,
                 cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
-              })) || [],
+              })),
               fecha_preparacion: formData.fecha_preparacion,
-              operador: 'Sistema',
+              operador: formData.operario || 'Sistema',
               observaciones: formData.observaciones || ''
+            },
+            control_calidad: {
+              ph_observado: formData.ph_observado ? Number(formData.ph_observado) : null,
+              densidad_observada: formData.densidad_observada ? Number(formData.densidad_observada) : null,
+              osmolaridad_observada: formData.osmolaridad_observada ? Number(formData.osmolaridad_observada) : null,
+              peso_muestra_humeda_g: formData.peso_muestra_humeda_g ? Number(formData.peso_muestra_humeda_g) : null,
             },
             observaciones: formData.observaciones || '',
             createdAt: serverTimestamp(),
@@ -572,9 +598,27 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   };
 
   const dynamicMaterials = (currentReceta?.materiales_requeridos || []).map(scaleMaterial);
-  const dynamicEquipment = (currentReceta?.equipamiento_requerido || currentReceta?.equipamientoRequerido || []).map(scaleMaterial);
-  const allChecked = dynamicMaterials.length === 0 || dynamicMaterials.every((mat, idx) => checkedMaterials[idx]);
-  const allEquipChecked = dynamicEquipment.length === 0 || dynamicEquipment.every((eq, idx) => checkedEquipment[idx]);
+  const dynamicEquipments = (currentReceta?.equipamiento_requerido || currentReceta?.equipamientoRequerido || []).map(scaleMaterial);
+
+  const toggleAllMaterials = () => {
+    if (dynamicMaterials.length > 0 && dynamicMaterials.every((_, idx) => checkedMaterials[idx])) {
+      setCheckedMaterials({});
+    } else {
+      const all = {};
+      dynamicMaterials.forEach((_, idx) => { all[idx] = true; });
+      setCheckedMaterials(all);
+    }
+  };
+
+  const toggleAllEquipments = () => {
+    if (dynamicEquipments.length > 0 && dynamicEquipments.every((_, idx) => checkedEquipments[idx])) {
+      setCheckedEquipments({});
+    } else {
+      const all = {};
+      dynamicEquipments.forEach((_, idx) => { all[idx] = true; });
+      setCheckedEquipments(all);
+    }
+  };
 
   // Check autoclave/plate capacity limit
   const checkEquipmentCapacityExceeded = () => {
@@ -640,10 +684,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           <div className="section-divider">
             <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.1rem' }}>1. Receta y Volumen General</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <select className="form-control" style={{ height: '48px', fontSize: '1.05rem' }} required value={formData.recetaId} onChange={e => { setFormData({...formData, recetaId: e.target.value}); setCheckedMaterials({}); setSelectedLotes({}); }}>
-                <option value="">-- Seleccioná Receta --</option>
-                {recetas.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.categoria})</option>)}
-              </select>
+              <div style={{ position: 'relative', zIndex: 50 }}>
+                <SearchableSelect
+                  options={recetas.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.categoria})` }))}
+                  value={formData.recetaId}
+                  onChange={(val) => { setFormData({...formData, recetaId: val}); setCheckedMaterials({}); setCheckedEquipments({}); setCheckedWeighing({}); setSelectedLotes({}); }}
+                  placeholder="-- Seleccioná Receta --"
+                />
+              </div>
 
               {currentReceta && (
                 <button 
@@ -676,67 +724,75 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             </div>
           </div>
 
-
-
           {/* ASISTENTE DE PESADO / CANTIDADES CALCULADAS */}
-          {formData.recetaId && (
+          {currentReceta && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
               <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.85rem', fontSize: '1rem' }}>⚖️ Cantidades Calculadas (Regla de Tres)</h4>
               <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                {((currentReceta?.ingredientes || []).filter(ing => ing.insumoId && ing.cantidad > 0)).map(ing => {
+                {(currentReceta.ingredientes || []).map(ing => {
                   const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
                   const scaledQty = ing.cantidad * factor;
+                  
+                  const isChecked = !!checkedWeighing[ing.insumoId];
+                  
+                  const totalAvailable = lotesDisponibles
+                    .filter(l => l.insumoId === ing.insumoId)
+                    .reduce((acc, l) => acc + l.cantidad_base_actual, 0);
+                    
+                  const isLowStock = totalAvailable < scaledQty;
+
                   return (
-                    <div key={ing.insumoId} style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', fontWeight: '500' }}>{ing.nombre || ing.insumoId}</span>
-                      <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#10b981', display: 'block', margin: '0.3rem 0' }}>
+                    <label 
+                      key={ing.insumoId} 
+                      style={{ 
+                        background: isChecked ? 'rgba(16, 185, 129, 0.05)' : (isLowStock ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255, 255, 255, 0.03)'), 
+                        padding: '1rem', 
+                        borderRadius: '10px', 
+                        border: isChecked ? '2px solid #10b981' : (isLowStock ? '2px solid rgba(239, 68, 68, 0.5)' : '1px solid var(--border-color)'), 
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        position: 'relative'
+                      }}
+                    >
+                      <input 
+                        type="checkbox" 
+                        style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', transform: 'scale(1.4)', accentColor: '#10b981' }} 
+                        checked={isChecked}
+                        onChange={(e) => setCheckedWeighing({...checkedWeighing, [ing.insumoId]: e.target.checked})}
+                      />
+                      
+                      <span style={{ fontSize: '0.9rem', color: isChecked ? '#10b981' : 'var(--text-secondary)', display: 'block', fontWeight: '600', paddingRight: '1rem' }}>
+                        {ing.nombre || ing.insumoId}
+                      </span>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: isChecked ? '#10b981' : (isLowStock ? '#ef4444' : 'var(--text-primary)'), display: 'block', margin: '0.3rem 0' }}>
                         {scaledQty.toFixed(2)} {ing.unidad || 'g'}
                       </span>
+                      
+                      {isLowStock && !isChecked && (
+                        <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'block', fontWeight: 'bold', marginTop: '-0.2rem', marginBottom: '0.3rem' }}>
+                          ⚠️ Faltan {(scaledQty - totalAvailable).toFixed(1)} {ing.unidad} en lotes
+                        </span>
+                      )}
+                      
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        Base: {ing.cantidad} {ing.unidad} (para {currentReceta.rendimiento_teorico?.cantidad || 1000} ml/g)
+                        Base: {ing.cantidad} {ing.unidad}
                       </span>
-                    </div>
+                    </label>
                   );
                 })}
               </div>
-
-              {/* JUSTIFICACION SI FALTA STOCK */}
-              {(() => {
-                const ingredientesValidos = (currentReceta?.ingredientes || []).filter(ing => ing.insumoId && ing.cantidad > 0);
-                const hasMissingStock = ingredientesValidos.some(ing => {
-                  const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
-                  const scaledQty = ing.cantidad * factor;
-                  const availableStock = lotesDisponibles
-                    .filter(l => l.insumoId === ing.insumoId)
-                    .reduce((sum, l) => sum + l.cantidad_base_actual, 0);
-                  return availableStock < scaledQty;
-                });
-                
-                if (hasMissingStock) {
-                  return (
-                    <div className="animate-fade-in" style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid var(--danger-color)', padding: '1rem', borderRadius: '8px', marginTop: '1.25rem' }}>
-                      <label className="form-label" style={{ color: 'var(--danger-color)', fontWeight: 'bold' }}>⚠️ Justificación de Stock Faltante</label>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Estás avanzando con stock insuficiente según el sistema. Por favor indicá el motivo (ej. "Stock no actualizado en sistema", "Uso de otro lote no ingresado", etc.).</p>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        required
-                        placeholder="Motivo de la excepción..."
-                        value={formData.observaciones_stock}
-                        onChange={e => setFormData({...formData, observaciones_stock: e.target.value})}
-                      />
-                    </div>
-                  );
-                }
-                return null;
-              })()}
             </div>
           )}
 
-          {/* PASO 0: ALISTAMIENTO DE MATERIALES */}
-          {currentReceta && dynamicMaterials.length > 0 && (
+          {/* PASO 0: ALISTAMIENTO DE MATERIALES Y EQUIPOS */}
+          {currentReceta && (dynamicMaterials.length > 0 || dynamicEquipments.length > 0) && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-              <h4 style={{ marginBottom: '0.75rem', color: '#f59e0b', fontSize: '1.05rem' }}>🧹 Paso 0: Alistamiento de Materiales</h4>
+              <h4 style={{ marginBottom: '0.75rem', color: '#f59e0b', fontSize: '1.05rem' }}>🧹 Paso 0: Alistamiento</h4>
               
               {showCapacityWarning && (
                 <div 
@@ -759,76 +815,78 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 </div>
               )}
 
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Asegurate de que estos materiales estén esterilizados y en la mesa de trabajo:</p>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                {dynamicMaterials.map((mat, idx) => (
-                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', border: checkedMaterials[idx] ? '2px solid #10b981' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ transform: 'scale(1.6)', accentColor: '#10b981' }} 
-                      checked={!!checkedMaterials[idx]}
-                      onChange={(e) => setCheckedMaterials({...checkedMaterials, [idx]: e.target.checked})}
-                    />
-                    <span style={{ fontSize: '1.05rem', fontWeight: '600', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>
-                      {formatMaterialLabel(mat)}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
+              <div className="grid-2" style={{ gap: '1.5rem' }}>
+                {/* MATERIALES */}
+                {dynamicMaterials.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Materiales y Vidriería</h5>
+                      <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', height: '32px', minHeight: '32px', padding: '0 0.5rem' }} onClick={toggleAllMaterials}>
+                        {dynamicMaterials.every((_, idx) => checkedMaterials[idx]) ? 'Desmarcar todo' : 'Marcar todo'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {dynamicMaterials.map((mat, idx) => (
+                        <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px', cursor: 'pointer', border: checkedMaterials[idx] ? '2px solid #10b981' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
+                          <input 
+                            type="checkbox" 
+                            style={{ transform: 'scale(1.4)', accentColor: '#10b981' }} 
+                            checked={!!checkedMaterials[idx]}
+                            onChange={(e) => setCheckedMaterials({...checkedMaterials, [idx]: e.target.checked})}
+                          />
+                          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: checkedMaterials[idx] ? '#10b981' : 'var(--text-primary)' }}>
+                            {formatMaterialLabel(mat)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-          {/* PASO 0.5: ALISTAMIENTO DE EQUIPAMIENTO */}
-          {currentReceta && dynamicEquipment.length > 0 && (
-            <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-              <h4 style={{ marginBottom: '0.75rem', color: '#3b82f6', fontSize: '1.05rem' }}>⚙️ Paso 0.5: Alistamiento de Equipamiento</h4>
-              
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Asegurate de que estos equipos estén limpios y calibrados:</p>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                {dynamicEquipment.map((eq, idx) => (
-                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', border: checkedEquipment[idx] ? '2px solid #3b82f6' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ transform: 'scale(1.6)', accentColor: '#3b82f6' }} 
-                      checked={!!checkedEquipment[idx]}
-                      onChange={(e) => setCheckedEquipment({...checkedEquipment, [idx]: e.target.checked})}
-                    />
-                    <span style={{ fontSize: '1.05rem', fontWeight: '600', color: checkedEquipment[idx] ? '#3b82f6' : 'var(--text-primary)' }}>
-                      {formatMaterialLabel(eq)}
-                    </span>
-                  </label>
-                ))}
+                {/* EQUIPOS */}
+                {dynamicEquipments.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Equipamiento</h5>
+                      <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', height: '32px', minHeight: '32px', padding: '0 0.5rem' }} onClick={toggleAllEquipments}>
+                        {dynamicEquipments.every((_, idx) => checkedEquipments[idx]) ? 'Desmarcar todo' : 'Marcar todo'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {dynamicEquipments.map((eq, idx) => (
+                        <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px', cursor: 'pointer', border: checkedEquipments[idx] ? '2px solid #3b82f6' : '1px solid var(--border-color)', transition: 'all 0.2s' }}>
+                          <input 
+                            type="checkbox" 
+                            style={{ transform: 'scale(1.4)', accentColor: '#3b82f6' }} 
+                            checked={!!checkedEquipments[idx]}
+                            onChange={(e) => setCheckedEquipments({...checkedEquipments, [idx]: e.target.checked})}
+                          />
+                          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: checkedEquipments[idx] ? '#3b82f6' : 'var(--text-primary)' }}>
+                            {formatMaterialLabel(eq)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* SECCIÓN 2: LOTES DE INSUMOS ACTIVOS (CON SCANNER QR INTEGRADO) */}
           {formData.recetaId && (
-
-            <div className="section-divider animate-fade-in">
+            <div className="section-divider">
               <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>🔍 2. Lotes de Insumos Activos</h4>
               
               {/* QR Scanner Container Overlay */}
               {activeScannerForInsumo && (
-                <div style={{ position: 'relative', width: '100%', maxWidth: '400px', margin: '0 auto 1rem auto' }}>
-                  <div style={{ background: 'rgba(0,0,0,0.8)', color: 'white', padding: '0.5rem', textAlign: 'center', borderRadius: '8px 8px 0 0' }}>
-                    <h5 style={{ margin: 0 }}>Cámara activa para: <strong>{recetas.find(r => r.id === formData.recetaId)?.ingredientes?.find(i => i.insumoId === activeScannerForInsumo)?.nombre || activeScannerForInsumo}</strong></h5>
+                <div style={{ background: 'rgba(15, 23, 42, 0.95)', border: '2px solid var(--primary-color)', padding: '1.25rem', borderRadius: '16px', marginBottom: '1.5rem', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h5 style={{ margin: 0 }}>Cámara activa para: <strong>{(recetas.find(r => r.id === formData.recetaId)?.ingredientes || []).find(i => i.insumoId === activeScannerForInsumo)?.nombre || activeScannerForInsumo}</strong></h5>
+                    <button type="button" className="btn btn-danger" style={{ width: 'auto', minHeight: 'auto', padding: '0.4rem 1rem' }} onClick={() => setActiveScannerForInsumo(null)}>✕ Cerrar</button>
                   </div>
-                  <div id="modal-scanner-reader" style={{ width: '100%', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}></div>
-                  <button 
-                    type="button" 
-                    className="btn btn-outline" 
-                    style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none' }}
-                    onClick={() => {
-                      if (scannerInstance) { scannerInstance.stop(); setScannerInstance(null); }
-                      setActiveScannerForInsumo(null);
-                    }}
-                  >
-                    Cerrar Cámara
-                  </button>
-                  <div style={{ textAlign: 'center', marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    {scanMessage}
-                  </div>
+                  <div id="modal-scanner-reader" style={{ width: '100%', maxWidth: '350px', height: '240px', margin: '0 auto', background: '#000', borderRadius: '12px', overflow: 'hidden' }}></div>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{scanMessage}</p>
                   
                   {/* Simulador para testing sin cámara */}
                   <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', textAlign: 'left' }}>
@@ -848,7 +906,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {recetas.find(r => r.id === formData.recetaId)?.ingredientes?.map(ing => (
+                {(recetas.find(r => r.id === formData.recetaId)?.ingredientes || []).map(ing => (
                   <div key={ing.insumoId} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <label className="form-label" style={{ fontSize: '0.9rem', marginBottom: 0, fontWeight: '600' }}>{ing.nombre || ing.insumoId}</label>
@@ -871,19 +929,19 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <select 
-                        className="form-control" 
-                        style={{ height: '48px', fontSize: '1rem' }}
-                        required 
-                        value={selectedLotes[ing.insumoId] || ''} 
-                        onChange={e => setSelectedLotes({...selectedLotes, [ing.insumoId]: e.target.value})}
-                      >
-                        <option value="">-- Elegir Lote Abierto --</option>
-                        {lotesDisponibles.filter(l => l.insumoId === ing.insumoId).map(l => (
-                          <option key={l.id} value={l.id}>{l.lote_interno} ({l.cantidad_base_actual.toFixed(1)} {l.unidad_base})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div style={{ flex: 1, position: 'relative', zIndex: 40 }}>
+                        <SearchableSelect
+                          options={[
+                            { id: '', nombre: '-- Sin lote específico / No abierto --' },
+                            ...lotesDisponibles.filter(l => l.insumoId === ing.insumoId).map(l => ({ id: l.id, nombre: `Lote ${l.lote_interno} (${l.cantidad_base_actual.toFixed(1)} ${l.unidad_base})` }))
+                          ]}
+                          value={selectedLotes[ing.insumoId] || ''}
+                          onChange={(val) => setSelectedLotes({...selectedLotes, [ing.insumoId]: val})}
+                          placeholder="-- Buscar Lote Abierto --"
+                          hasWarning={!selectedLotes[ing.insumoId]}
+                        />
+                      </div>
                       {selectedLotes[ing.insumoId] && (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16, 185, 129, 0.1)', border: '2px solid #10b981', color: '#10b981', borderRadius: '8px', padding: '0 0.85rem', fontSize: '1.25rem', fontWeight: 'bold' }} title="Lote verificado y vinculado">
                           ✓
@@ -897,8 +955,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* SECCIÓN 3: ENVASADO Y SUB-FRACCIONAMIENTO (GLOVE FRIENDLY) */}
-          {formData.recetaId && allChecked && allEquipChecked && (
-            <div className="section-divider animate-fade-in" style={{ background: 'rgba(16, 185, 129, 0.02)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+          {formData.recetaId && (
+            <div className="section-divider" style={{ background: 'rgba(16, 185, 129, 0.02)', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
               <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--accent-color)' }}>📦 3. Envasado y Sub-Fraccionamiento</h4>
               
               {/* Formulario rápido para añadir envase principal */}
@@ -906,17 +964,17 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 <h5 style={{ marginBottom: '0.75rem', fontSize: '0.95rem', color: 'var(--text-primary)' }}>Registrar Envase Principal (Stock)</h5>
                 
                 <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
+                  <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 30 }}>
                     <label className="form-label" style={{ fontSize: '0.8rem' }}>Seleccionar Envase Principal</label>
-                    <select 
-                      className="form-control" 
-                      style={{ height: '48px', fontSize: '1rem' }}
-                      value={addEnvaseForm.recipienteId} 
-                      onChange={e => setAddEnvaseForm({...addEnvaseForm, recipienteId: e.target.value})}
-                    >
-                      <option value="">-- Seleccionar Envase --</option>
-                      {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
-                    </select>
+                    <SearchableSelect
+                      options={[
+                        { id: 'generico', nombre: 'Otro / Genérico (No descuenta stock)' },
+                        ...recipientes.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.stock_total_base}u disp.)` }))
+                      ]}
+                      value={addEnvaseForm.recipienteId}
+                      onChange={(val) => setAddEnvaseForm({...addEnvaseForm, recipienteId: val})}
+                      placeholder="-- Seleccionar Envase --"
+                    />
                   </div>
                   
                   <div className="grid-2">
@@ -999,17 +1057,17 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                         <div style={{ marginTop: '1rem', background: 'rgba(139, 92, 246, 0.03)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '1rem', borderRadius: '10px', display: 'grid', gap: '1rem' }}>
                           <h6 style={{ margin: 0, fontSize: '0.9rem', color: '#8b5cf6' }}>Extraer y Sub-fraccionar:</h6>
                           
-                          <div className="form-group" style={{ marginBottom: 0 }}>
+                          <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 20 }}>
                             <label className="form-label" style={{ fontSize: '0.8rem' }}>Envase Destino (Fraccionado)</label>
-                            <select 
-                              className="form-control" 
-                              style={{ height: '48px', fontSize: '0.95rem' }}
-                              value={subFracForm.recipienteId} 
-                              onChange={e => setSubFracForm({...subFracForm, recipienteId: e.target.value})}
-                            >
-                              <option value="">-- Seleccionar Envase Secundario --</option>
-                              {recipientes.map(r => <option key={r.id} value={r.id}>{r.nombre} ({r.stock_total_base}u disp.)</option>)}
-                            </select>
+                            <SearchableSelect
+                              options={[
+                                { id: 'generico', nombre: 'Otro / Genérico (No descuenta stock)' },
+                                ...recipientes.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.stock_total_base}u disp.)` }))
+                              ]}
+                              value={subFracForm.recipienteId}
+                              onChange={(val) => setSubFracForm({...subFracForm, recipienteId: val})}
+                              placeholder="-- Seleccionar Envase Secundario --"
+                            />
                           </div>
 
                           <div className="grid-2">
@@ -1073,9 +1131,46 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           )}
 
           {/* OBSERVACIONES DEL LOTE */}
-          {formData.recetaId && allChecked && allEquipChecked && (
+          {formData.recetaId && (
             <div className="section-divider animate-fade-in">
-              <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>📝 Observaciones del Lote</h4>
+              <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--primary-color)' }}>📝 Control de Calidad y Observaciones</h4>
+              
+              <div className="grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>pH Observado</label>
+                  <input type="number" step="0.1" className="form-control" placeholder="Ej: 5.5" value={formData.ph_observado} onChange={e => setFormData({...formData, ph_observado: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Densidad Observada</label>
+                  <input type="number" step="0.01" className="form-control" placeholder="Ej: 1.02" value={formData.densidad_observada} onChange={e => setFormData({...formData, densidad_observada: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Osmolaridad (mOsm/L)</label>
+                  <input type="number" step="1" className="form-control" placeholder="Ej: 300" value={formData.osmolaridad_observada} onChange={e => setFormData({...formData, osmolaridad_observada: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Peso Muestra Húmeda (g)</label>
+                  <input type="number" step="0.01" className="form-control" placeholder="Peso húmedo..." value={formData.peso_muestra_humeda_g} onChange={e => setFormData({...formData, peso_muestra_humeda_g: e.target.value})} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Operario / Responsable</label>
+                  <input 
+                    type="text" 
+                    list="operarios-list" 
+                    className="form-control" 
+                    placeholder="Escribí o seleccioná tu nombre..." 
+                    value={formData.operario} 
+                    onChange={e => setFormData({...formData, operario: e.target.value})} 
+                  />
+                  <datalist id="operarios-list">
+                    <option value="Maxi Revilla" />
+                    <option value="Laboratorio" />
+                    <option value="Becario" />
+                    <option value="Investigador" />
+                  </datalist>
+                </div>
+              </div>
+
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <textarea 
                   className="form-control" 
@@ -1095,10 +1190,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             <button 
               type="submit" 
               className="btn btn-primary" 
-              disabled={loading || !formData.recetaId || envasesList.length === 0 || !allChecked || !allEquipChecked} 
+              disabled={loading || envasesList.length === 0} 
               style={{ 
                 flex: 1.5, 
-                opacity: (!formData.recetaId || envasesList.length === 0 || !allChecked || !allEquipChecked) ? 0.5 : 1,
+                opacity: (!formData.recetaId || envasesList.length === 0) ? 0.5 : 1,
                 height: '52px',
                 fontSize: '1.1rem',
                 fontWeight: 'bold'
