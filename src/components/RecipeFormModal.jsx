@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, serverTimestamp, query, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, query, onSnapshot, writeBatch, arrayUnion } from 'firebase/firestore';
 import { getFallbackCN } from '../utils/cnDatabase';
 import SearchableSelect from './SearchableSelect';
 
@@ -18,6 +18,10 @@ const cleanFirestoreId = (str) => {
 export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSaved }) {
   const [insumosBase, setInsumosBase] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [categorias, setCategorias] = useState(['Agar', 'Grano', 'Sustrato', 'Líquido', 'Semilla', 'Suplemento']);
+  const [showOtroInput, setShowOtroInput] = useState(false);
+  const [otraCategoria, setOtraCategoria] = useState('');
+
   const [form, setForm] = useState({
     nombre: recipeToClone ? (isEdit ? recipeToClone.nombre : `${recipeToClone.nombre} (copia)`) : '',
     categoria: recipeToClone?.categoria || 'Agar',
@@ -46,6 +50,21 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'config', 'categorias_recetas'), (docSnap) => {
+      if (docSnap.exists()) {
+        const list = docSnap.data().categorias || [];
+        const initialCat = recipeToClone?.categoria;
+        if (initialCat && !list.includes(initialCat)) {
+          setCategorias([...list, initialCat]);
+        } else {
+          setCategorias(list);
+        }
+      }
+    }, err => console.error("Error loading categories in modal:", err));
+    return () => unsubscribe();
+  }, [recipeToClone]);
 
   const cnData = useMemo(() => {
     let sumC = 0;
@@ -267,13 +286,20 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     e.preventDefault();
     setLoading(true);
     try {
+      const finalCategory = showOtroInput ? otraCategoria.trim() : form.categoria;
+      if (showOtroInput && !finalCategory) {
+        alert("⚠️ Por favor, ingrese el nombre de la nueva categoría.");
+        setLoading(false);
+        return;
+      }
+
       const recipeId = cleanFirestoreId(form.nombre);
-      
-      // Si estamos editando y el nombre cambió, deberíamos considerar si eliminar el anterior.
-      // Pero por ahora seguiremos la lógica de setDoc que sobreescribe si el ID coincide.
-      
-      await setDoc(doc(db, "recetas", recipeId), {
+      const batch = writeBatch(db);
+
+      const recipeRef = doc(db, "recetas", recipeId);
+      const recipeData = {
         ...form,
+        categoria: finalCategory,
         peso_seco_por_unidad_g: form.peso_seco_por_unidad_g ? Number(form.peso_seco_por_unidad_g) : null,
         densidad_g_ml: form.densidad_g_ml ? Number(form.densidad_g_ml) : null,
         osmolaridad_esperada_mOsm: form.osmolaridad_esperada_mOsm ? Number(form.osmolaridad_esperada_mOsm) : null,
@@ -285,7 +311,16 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
         tiempo_estimado_confeccion: form.tiempo_estimado_confeccion || null,
         updatedAt: serverTimestamp(),
         createdAt: (isEdit && recipeToClone) ? recipeToClone.createdAt : serverTimestamp()
-      });
+      };
+
+      batch.set(recipeRef, recipeData);
+
+      if (showOtroInput) {
+        const configRef = doc(db, 'config', 'categorias_recetas');
+        batch.set(configRef, { categorias: arrayUnion(finalCategory) }, { merge: true });
+      }
+
+      await batch.commit();
       alert("✅ Receta guardada correctamente.");
       onSaved();
       onClose();
@@ -314,23 +349,41 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
 
           <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
 
-            <div className="form-group">
+             <div className="form-group">
               <label className="form-label">Categoría</label>
-              <select className="form-control" value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})}>
-                <option value="Agar">Agar</option>
-                <option value="Grano">Grano</option>
-                <option value="Sustrato">Sustrato</option>
-                <option value="Líquido">Líquido</option>
-                <option value="Suplemento">Suplemento</option>
+              <select className="form-control" value={showOtroInput ? 'Otro' : form.categoria} onChange={e => {
+                if (e.target.value === 'Otro') {
+                  setShowOtroInput(true);
+                } else {
+                  setShowOtroInput(false);
+                  setForm({...form, categoria: e.target.value});
+                  setOtraCategoria('');
+                }
+              }}>
+                {categorias.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="Otro">Otro</option>
               </select>
+              {showOtroInput && (
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ marginTop: '0.5rem' }}
+                  placeholder="Escriba la nueva categoría"
+                  value={otraCategoria}
+                  onChange={e => setOtraCategoria(e.target.value)}
+                  required
+                />
+              )}
             </div>
             <div className="form-group">
               <label className="form-label" title="Volumen o masa total final que produce esta receta">Total a Preparar (ml/g)</label>
-              <input type="number" className="form-control" value={form.rendimiento_teorico.cantidad} onChange={e => setForm({...form, rendimiento_teorico: {...form.rendimiento_teorico, cantidad: Number(e.target.value)}})} />
+              <input type="number" step="any" min="0" className="form-control" value={form.rendimiento_teorico.cantidad} onChange={e => setForm({...form, rendimiento_teorico: {...form.rendimiento_teorico, cantidad: Number(e.target.value)}})} />
             </div>
             <div className="form-group">
               <label className="form-label" title="Peso del material seco antes de hidratar (referencia para EB)">Peso Seco / Unidad (g)</label>
-              <input type="number" step="0.1" className="form-control" placeholder="Ej: 500" value={form.peso_seco_por_unidad_g} onChange={e => setForm({...form, peso_seco_por_unidad_g: e.target.value})} />
+              <input type="number" step="any" min="0" className="form-control" placeholder="Ej: 500" value={form.peso_seco_por_unidad_g} onChange={e => setForm({...form, peso_seco_por_unidad_g: e.target.value})} />
               {cnData.sumDryWeight > 0 && (
                 <div style={{ fontSize: '0.72rem', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-secondary)' }}>
                   <span>Teórico: <strong>{cnData.sumDryWeight.toFixed(1)} g</strong></span>
@@ -352,7 +405,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             <div className="grid-2" style={{ marginBottom: '0.5rem' }}>
               <div className="form-group">
                 <label className="form-label">Densidad Esperada (g/ml)</label>
-                <input type="number" step="0.01" className="form-control" placeholder="Ej: 1.05" value={form.densidad_g_ml} onChange={e => setForm({...form, densidad_g_ml: e.target.value})} />
+                <input type="number" step="any" min="0" className="form-control" placeholder="Ej: 1.05" value={form.densidad_g_ml} onChange={e => setForm({...form, densidad_g_ml: e.target.value})} />
               </div>
               <div className="form-group">
                 <label className="form-label">Tonicidad</label>
@@ -367,11 +420,11 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
             <div className="grid-2">
               <div className="form-group">
                 <label className="form-label">Osmolaridad Esp. (mOsm)</label>
-                <input type="number" className="form-control" placeholder="Ej: 300" value={form.osmolaridad_esperada_mOsm} onChange={e => setForm({...form, osmolaridad_esperada_mOsm: e.target.value})} />
+                <input type="number" step="any" min="0" className="form-control" placeholder="Ej: 300" value={form.osmolaridad_esperada_mOsm} onChange={e => setForm({...form, osmolaridad_esperada_mOsm: e.target.value})} />
               </div>
               <div className="form-group">
                 <label className="form-label">pH Esperado</label>
-                <input type="number" step="0.01" className="form-control" placeholder="Ej: 5.6" value={form.ph_esperado} onChange={e => setForm({...form, ph_esperado: e.target.value})} />
+                <input type="number" step="any" min="0" className="form-control" placeholder="Ej: 5.6" value={form.ph_esperado} onChange={e => setForm({...form, ph_esperado: e.target.value})} />
               </div>
             </div>
             <div style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '8px', border: '2px solid #8b5cf6', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
@@ -391,15 +444,15 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
           <div className="grid-3" style={{ gridTemplateColumns: '1fr 1fr 1fr', background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
             <div className="form-group">
               <label className="form-label">🔥 Autoclave (min)</label>
-              <input type="number" className="form-control" placeholder="Ej: 20" value={form.tiempo_autoclave_min} onChange={e => setForm({...form, tiempo_autoclave_min: e.target.value})} />
+              <input type="number" step="any" min="0" className="form-control" placeholder="Ej: 20" value={form.tiempo_autoclave_min} onChange={e => setForm({...form, tiempo_autoclave_min: e.target.value})} />
             </div>
             <div className="form-group">
               <label className="form-label">🌡️ Temp. (°C)</label>
-              <input type="number" className="form-control" placeholder="Ej: 121" value={form.temperatura_autoclave_c} onChange={e => setForm({...form, temperatura_autoclave_c: e.target.value})} />
+              <input type="number" step="any" className="form-control" placeholder="Ej: 121" value={form.temperatura_autoclave_c} onChange={e => setForm({...form, temperatura_autoclave_c: e.target.value})} />
             </div>
             <div className="form-group">
               <label className="form-label" title="Tiempo máximo de stock en heladera antes de vencer (en días)">❄️ Heladera (días)</label>
-              <input type="number" className="form-control" placeholder="Ej: 45" value={form.tiempo_max_heladera_dias} onChange={e => setForm({...form, tiempo_max_heladera_dias: e.target.value})} />
+              <input type="number" step="any" min="0" className="form-control" placeholder="Ej: 45" value={form.tiempo_max_heladera_dias} onChange={e => setForm({...form, tiempo_max_heladera_dias: e.target.value})} />
             </div>
           </div>
 
@@ -463,7 +516,8 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                       <label className="form-label" style={{ fontSize: '0.75rem' }}>Cantidad</label>
                       <input 
                         type="number" 
-                        step="0.01"
+                        step="any"
+                        min="0"
                         className="form-control" 
                         value={ing.cantidad} 
                         onChange={e => {
@@ -569,6 +623,8 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                   <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cantidad Requerida</label>
                   <input 
                     type="number" 
+                    step="any"
+                    min="0" 
                     className="form-control" 
                     value={mat.cantidad} 
                     onChange={e => {
@@ -661,6 +717,8 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
                   <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cantidad Requerida</label>
                   <input 
                     type="number" 
+                    step="any"
+                    min="0" 
                     className="form-control" 
                     value={equip.cantidad} 
                     onChange={e => {

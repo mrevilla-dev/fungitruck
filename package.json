@@ -10,12 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.0.1",
+    "@xyflow/react": "^12.11.1",
+    "dagre": "^0.8.5",
     "firebase": "^12.12.1",
     "firebase-tools": "^15.18.0",
     "html5-qrcode": "^2.3.8",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.14.2"
   },
   "devDependencies": {

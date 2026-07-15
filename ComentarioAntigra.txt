@@ -1,0 +1,61 @@
+Esta es la primera vez que entrás al proyecto FungiTrack. Estamos corrigiendo bugs críticos en el Árbol Genealógico (deep29.md). La sesión anterior se quedó sin créditos justo cuando iba a ejecutar las correcciones.
+
+Contexto mínimo del proyecto:
+
+FungiTrack es un LIMS de trazabilidad micológica.
+
+Stack: React 19 + Vite + Firebase Firestore + Firebase Auth + Google Drive + Zebra ZD220.
+
+Web: https://fungitrack-9b463.web.app
+
+Repositorio local: c:/Users/Usuario/Documents/maxi
+
+Estado actual del Árbol Genealógico:
+
+Tarea 1 (Edges con tipo): ✅ Completada.
+
+Tarea 2 (CustomNodes con Tailwind): ⚠️ Completada pero los nodos se apilan porque dagre no recibió las dimensiones lógicas.
+
+Tarea 3 (Conectores semánticos): ❌ No ejecutada.
+
+Tarea 4 (Panel lateral): ❌ No ejecutada.
+
+Las fotos no se muestran porque construirArbolGenealogico.js no está pasando fotoUrl en data.
+
+Lo que tenés que hacer AHORA (sin planes, solo código):
+
+Corregir layout en CustomNodes.jsx: Agregar style={{ width: '...', height: '...' }} a cada nodo con estos valores:
+
+Esporoma: 240x70
+
+Ejemplar: 240x60
+
+Hibridación: 120x120
+
+Pasajes: 160x40
+
+Evento: 200x50
+
+Aplicar estilos de edges en ArbolGenealogicoVisual.jsx: Mapear edge.data.tipo:
+
+genetico: violeta sólido
+
+hibridacion: rosa sólido
+
+pasaje: gris punteado
+
+Corregir panel lateral: Reemplazar "N/A" por valores reales, badge ámbar para "En evaluación", botón "Ver en árbol".
+
+Fotos: Asegurar que construirArbolGenealogico.js pase fotoUrl en data de Esporoma y Ejemplar.
+
+Build y deploy.
+
+Reglas:
+
+Leé cada archivo completo antes de tocarlo.
+
+No rompas nada de lo que ya funciona.
+
+Al finalizar, ejecutá npm run build, deployá a Firebase Hosting y confirmame.
+
+No me mandes planes. Solo código ejecutado.

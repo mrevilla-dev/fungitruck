@@ -1,0 +1,8 @@
+Aprobado el plan. Respondo las 2 preguntas:
+
+1. /medios e /inoculaciones: dejarlas comentadas como // pendiente. No redirigir a /inventario.
+
+2. Rutas faltantes: agregar /ingreso-material y /equipos al menú mobile. No agregar /crio — es la ruta legacy que está pendiente de eliminar.
+
+Procedé con el Bloque 1. Build y confirmame.
+

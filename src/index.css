@@ -601,3 +601,75 @@ input:checked + .slider:before {
 .print-modal-grid ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+/* ═══════════════════════════════════════════
+   MEJORAS MOBILE — FungiTrack
+   Aplicado solo en viewports < 768px
+   No modifica estilos desktop
+═══════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+
+  /* En mobile, ocultar la navbar superior original */
+  .navbar-desktop {
+    display: none;
+  }
+
+  /* Área táctil mínima para todos los botones,
+     EXCEPTO los marcados explícitamente como compactos
+     (ej: botones de eliminar en cards, íconos inline chicos) */
+  button:not(.btn-compact), [role="button"]:not(.btn-compact), a:not(.btn-compact) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Excepción explícita para botones chicos existentes —
+     mantienen su tamaño original, no se agranda por esta regla */
+  .btn-compact {
+    min-height: unset;
+    min-width: unset;
+  }
+
+  /* Inputs más grandes y fáciles de tocar */
+  input, select, textarea {
+    font-size: 16px; /* evita zoom automático en iOS */
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  /* Labels más legibles */
+  label {
+    font-size: 15px;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  /* Cards con más padding para tocar cómodo */
+  .card, [class*="card"] {
+    padding: 16px;
+  }
+
+  /* Tablas — scroll horizontal en lugar de comprimir */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modales — ocupar más pantalla en mobile */
+  .modal, [class*="modal"] {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 10px auto;
+  }
+
+  /* Texto mínimo legible */
+  body {
+    font-size: 15px;
+  }
+
+  /* Evitar text overflow en títulos */
+  h1, h2, h3 {
+    word-break: break-word;
+  }
+}

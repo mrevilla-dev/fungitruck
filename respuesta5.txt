@@ -1,0 +1,27 @@
+Para Antigravity:
+
+Estamos implementando el prompt deep23.md (Rutas faltantes en Módulo 4). El Bloque 1 ya está completo y deployado: se creó el componente AltaRapidaEjemplarExterno.jsx.
+
+El Bloque 2 fue aprobado por Maxi: el plan de implementación de la Ruta Grano (Spawn) ya está listo. Solo falta que lo ejecutes.
+
+Bloque 2 — Ruta Grano (Spawn):
+
+Modificar NuevoCultivoModal.jsx.
+
+Agregar la ruta hacia_grano con selector de origen (Interno/Externo).
+
+Integrar AltaRapidaEjemplarExterno.jsx para el flujo externo.
+
+Implementar destino, descuento de stock y checkbox de agotado.
+
+Reglas estrictas:
+
+Leé cada archivo completo antes de tocarlo.
+
+No rompas nada de lo que ya funciona.
+
+Al finalizar, ejecutá npm run build y confirmá que no haya errores.
+
+Deployá a Firebase Hosting.
+
+Ejecutá el Bloque 2. Cuando termines, mostrame el plan para el Bloque 3 (Ruta Sustrato definitivo).

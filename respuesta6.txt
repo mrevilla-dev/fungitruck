@@ -1,0 +1,22 @@
+> Te adjunto dos archivos:
+> - `deep24.md`: Prompt técnico con los 4 bloques de implementación.
+> - `deep25.md`: Documento de diseño conceptual con todas las decisiones tomadas (para referencia).
+>
+> Implementá los cambios en **4 bloques separados**, en orden:
+> - **Bloque 1:** Función `construirArbolGenealogico.js` (lógica de datos, sin UI).
+> - **Bloque 2:** Componente visual base con React Flow (colapsado, nodos custom).
+> - **Bloque 3:** Punto de entrada (buscador de texto + lectura de QR).
+> - **Bloque 4:** Ficha de detalle (panel superpuesto).
+>
+> **Reglas:**
+> - Un bloque a la vez.
+> - Antes de escribir código, mostrame un plan de implementación y esperá mi confirmación.
+> - Al finalizar cada bloque, ejecutá `npm run build`, deployá a Firebase Hosting y confirmame.
+> - Maxi va a revisar cada bloque cuando pueda. No avances al siguiente hasta que él te confirme.
+> - Este módulo es de solo lectura. No tocar la lógica de creación de Ejemplares/Batches/Eventos.
+>
+> Arrancá con el Bloque 1.
+
+---
+
+¿Lo enviamos?

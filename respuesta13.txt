@@ -1,0 +1,32 @@
+🚨 Parche de Emergencia para Antigravity
+FungiTrack — Parche de Emergencia: Colapso de Layout en Árbol
+El Problema
+Al modificar el tamaño visual de los nodos en la Tarea 2 (agregar fotos, paddings, bordes), los nodos se están superponiendo unos sobre otros. El algoritmo de layout (seguramente dagre o el layout jerárquico que estés usando) no sabe que los nodos ahora son más anchos y altos, y los está calculando con las dimensiones viejas.
+
+Acciones Requeridas (URGENTE)
+1. Actualizar dimensiones lógicas en el Layout
+Busca la función donde configuras el layout del árbol (donde defines nodeSpacing, rankSpacing, o donde aplicas dagreGraph.setNode).
+
+Si usas dagre, debes inyectarle el ancho y alto real a cada nodo antes de calcular las posiciones. Los nuevos valores lógicos aproximados que deben ir en el layout son:
+
+Esporoma: Ancho 220, Alto 70 (por la foto y el padding del glow).
+Ejemplar: Ancho 220, Alto 60.
+Hibridación (Rombo): Ancho 120, Alto 120 (al ser rombo, necesita más espacio libre a los costados).
+Pasajes: Ancho 160, Alto 40.
+Evento: Ancho 180, Alto 50.
+Asegúrate de que estos valores coincidan con el espacio real que ocupan los nuevos estilos de Tailwind, de lo contrario seguirán pisándose.
+
+2. Aumentar separación global
+Si tienes variables de separación global (ej. direction: 'LR', nodeSpacing: 50, rankSpacing: 100), duplicá esos valores (ej. nodeSpacing: 100, rankSpacing: 200). El árbol necesita "respirar" ahora que los nodos tienen más presencia.
+
+3. Verificar estilos de fondo (Si siguen viéndose blancos/grises)
+Revisá en CustomNodes.jsx que los nodos efectivamente tengan las clases de Tailwind que pedimos en la Tarea 2.
+
+Esporoma debe tener: bg-gradient-to-br from-violet-900 to-slate-900 border-2 border-violet-400
+Ejemplar debe tener: bg-slate-800/90 border-[1.5px] border-violet-500
+Si las clases están puestas pero se ven blancas, puede ser que el contenedor padre de React Flow tenga un fondo blanco que tapa el bg-slate-800. En ese caso, al contenedor principal de React Flow agregale la clase !bg-transparent o aseguráte de que el fondo del body sea oscuro.
+
+Verificación
+npm run build.
+El árbol debe verse espaciado. Ningún nodo debe tocar a otro.
+El Esporoma debe verse como una "tarjeta" oscura con borde violeta brillante, no un bloque blanco.

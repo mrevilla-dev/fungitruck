@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, orderBy, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, collectionGroup, query, onSnapshot, orderBy, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 import BatchEditModal from '../components/BatchEditModal';
 import RegistroInsumoModal from '../components/RegistroInsumoModal';
@@ -12,18 +13,23 @@ import CultivosTable from '../components/CultivosTable';
 import NuevoCultivoModal from '../components/NuevoCultivoModal';
 import AuditInsumoModal from '../components/AuditInsumoModal';
 import AuditMedioModal from '../components/AuditMedioModal';
+import SanitizacionAccordion from '../components/SanitizacionAccordion';
+import AuditoriaAccordion from '../components/AuditoriaAccordion';
+import SubfraccionamientoAccordion from '../components/SubfraccionamientoAccordion';
+
 import RecipeFormModal from '../components/RecipeFormModal';
 import EditLoteModal from '../components/EditLoteModal';
+import AgotarMedioModal from '../components/AgotarMedioModal';
 
 
 // --- Mini modal de confirmación (evita window.confirm bloqueado) ---
-const ConfirmModal = ({ message, onConfirm, onCancel }) => (
+const ConfirmModal = ({ message, onConfirm, onCancel, confirmText = "Sí, eliminar" }) => (
   <div className="modal-overlay" style={{ zIndex: 4000 }}>
     <div className="modal-box animate-fade-in" style={{ maxWidth: '400px', textAlign: 'center' }}>
       <p style={{ margin: '1rem 0 1.5rem', fontSize: '0.95rem' }}>{message}</p>
       <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
         <button className="btn btn-outline" onClick={onCancel}>Cancelar</button>
-        <button className="btn btn-danger" onClick={onConfirm}>Sí, eliminar</button>
+        <button className="btn btn-danger" onClick={onConfirm}>{confirmText}</button>
       </div>
     </div>
   </div>
@@ -217,6 +223,7 @@ const InsumosTable = ({ insumos, lotes, salas, onRegistrarCompra, onEdit, onEdit
         message={confirmAction.message}
         onConfirm={confirmAction.onConfirm}
         onCancel={() => setConfirmAction(null)}
+        confirmText={confirmAction.confirmText}
       />
     )}
     </React.Fragment>
@@ -314,19 +321,73 @@ function InventoryPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('insumos');
   const [loading, setLoading] = useState(true);
+  const [categorias, setCategorias] = useState(['Agar', 'Grano', 'Sustrato', 'Líquido', 'Semilla', 'Suplemento']);
+
+  useEffect(() => {
+    const initializeCategories = async () => {
+      try {
+        const configRef = doc(db, 'config', 'categorias_recetas');
+        const configSnap = await getDoc(configRef);
+        
+        const defaultCats = ['Agar', 'Grano', 'Sustrato', 'Líquido', 'Semilla', 'Suplemento'];
+        let configCats = [];
+        if (configSnap.exists()) {
+          configCats = configSnap.data().categorias || [];
+        }
+        
+        const recipesSnap = await getDocs(collection(db, 'recetas'));
+        const recipeCats = recipesSnap.docs
+          .map(d => d.data().categoria)
+          .filter(Boolean);
+          
+        const mergedCats = Array.from(new Set([
+          ...defaultCats,
+          ...configCats,
+          ...recipeCats
+        ]));
+        
+        await setDoc(configRef, { categorias: mergedCats }, { merge: true });
+      } catch (err) {
+        console.error('Error during categories initialization/migration:', err);
+      }
+    };
+    initializeCategories();
+  }, []);
+
+  useEffect(() => {
+    const unsubCategorias = onSnapshot(doc(db, 'config', 'categorias_recetas'), docSnap => {
+      if (docSnap.exists()) {
+        setCategorias(docSnap.data().categorias || ['Agar', 'Grano', 'Sustrato', 'Líquido', 'Semilla', 'Suplemento']);
+      }
+    }, err => console.error("Error loading categories config:", err));
+    return () => unsubCategorias();
+  }, []);
+
   const [insumos, setInsumos] = useState([]);
   const [preselectedInsumoForReponer, setPreselectedInsumoForReponer] = useState(null);
   const [insumosLotes, setInsumosLotes] = useState([]);
   const [medios, setMedios] = useState([]);
+  const [allSubfracciones, setAllSubfracciones] = useState([]);
   const [cultivos, setCultivos] = useState([]);
   const [recetas, setRecetas] = useState([]);
   const [salas, setSalas] = useState([]);
   const [filters, setFilters] = useState({ search: '', status: 'todas', sala: 'todas' });
-  const [insumoFilters, setInsumoFilters] = useState({ search: '', categoria: 'todas', salaId: 'todas', tipoUso: 'todos' });
+  const [insumoFilters, setInsumoFilters] = useState({ search: '', categoria: 'todas', salaId: 'todas', tipoUso: 'todos', estadoRevision: 'todos' });
   const [recipeSearch, setRecipeSearch] = useState('');
   const [recipeCategory, setRecipeCategory] = useState('todas');
   const [recipeStatus, setRecipeStatus] = useState('activa');
   const [mediosSearch, setMediosSearch] = useState('');
+  const [mediosFilters, setMediosFilters] = useState({ ubicacion: 'todas', categoria: 'todas', operario: 'todos' });
+
+  const uniqueOperarios = useMemo(() => {
+    const ops = new Set(medios.map(m => m.operario).filter(Boolean));
+    return Array.from(ops).sort();
+  }, [medios]);
+
+  const uniqueEquipos = useMemo(() => {
+    const eqs = new Set(medios.map(m => m.sanitizacion?.equipo_empleado).filter(Boolean));
+    return Array.from(eqs).sort();
+  }, [medios]);
 
   const [showRegistroModal, setShowRegistroModal] = useState(false);
   const [showNuevoMedioModal, setShowNuevoMedioModal] = useState(false);
@@ -340,9 +401,13 @@ function InventoryPage() {
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [auditingLote, setAuditingLote] = useState(null);
   const [auditingMedio, setAuditingMedio] = useState(null);
+  const [agotarMedio, setAgotarMedio] = useState(null);
   const [recipeToClone, setRecipeToClone] = useState(null);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [expanded, setExpanded] = useState({});
+  const [viewMode, setViewMode] = useState('activos'); // 'activos' o 'historial'
+  const [hideDeleted, setHideDeleted] = useState(false);
 
 
   // Detect 'reponer' action from Dashboard redirect
@@ -372,19 +437,67 @@ function InventoryPage() {
     const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), snap => {
       setCultivos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    });
-    const unsubInsumos = onSnapshot(query(collection(db, "insumos_base"), orderBy("nombre", "asc")), snap => setInsumos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubLotes = onSnapshot(query(collection(db, "insumos_lotes"), orderBy("createdAt", "desc")), snap => setInsumosLotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubMedios = onSnapshot(query(collection(db, "medios_preparados"), orderBy("createdAt", "desc")), snap => setMedios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubRecetas = onSnapshot(query(collection(db, "recetas"), orderBy("nombre", "asc")), snap => setRecetas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubSalas = onSnapshot(collection(db, "salas"), snap => setSalas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    }, err => console.error("Error batches:", err));
+    const unsubInsumos = onSnapshot(query(collection(db, "insumos_base"), orderBy("nombre", "asc")), snap => setInsumos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Insumos: " + err.message));
+    const unsubLotes = onSnapshot(query(collection(db, "insumos_lotes"), orderBy("createdAt", "desc")), snap => setInsumosLotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Lotes: " + err.message));
+    const unsubMedios = onSnapshot(query(collection(db, "medios_preparados"), orderBy("createdAt", "desc")), snap => setMedios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Medios: " + err.message));
+    const unsubRecetas = onSnapshot(query(collection(db, "recetas"), orderBy("nombre", "asc")), snap => setRecetas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Recetas: " + err.message));
+    const unsubSalas = onSnapshot(collection(db, "salas"), snap => setSalas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Salas: " + err.message));
+    const unsubSubfrac = onSnapshot(collectionGroup(db, 'subfracciones'), snap => {
+      setAllSubfracciones(snap.docs.map(d => ({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() })));
+    }, err => console.warn('Subfracciones collectionGroup:', err.message));
 
     return () => {
-      unsubBatches(); unsubInsumos(); unsubLotes(); unsubMedios(); unsubRecetas(); unsubSalas();
+      unsubBatches(); unsubInsumos(); unsubLotes(); unsubMedios(); unsubRecetas(); unsubSalas(); unsubSubfrac();
     };
   }, []);
 
-  const handlePrintBatch = (batch) => { setSelectedMedioForPrint([batch]); setShowPrintModal(true); };
+  // Mapa: medioId -> Set de ubicaciones (bulk + bolsas)
+  const ubicacionesPorMedio = useMemo(() => {
+    const mapa = {};
+    medios.forEach(m => {
+      const locs = new Set();
+      if (m.ubicacion) locs.add(m.ubicacion);
+      mapa[m.id] = locs;
+    });
+    allSubfracciones.forEach(s => {
+      if (s.medioId && s.ubicacion) {
+        if (!mapa[s.medioId]) mapa[s.medioId] = new Set();
+        mapa[s.medioId].add(s.ubicacion);
+      }
+    });
+    return mapa;
+  }, [medios, allSubfracciones]);
+
+  const handlePrintBatch = (batch) => { 
+    const getZplProfile = (soporte) => {
+      const s = (soporte || '').toLowerCase();
+      if (s.includes('placa') || s.includes('petri')) return 'SLIM_PETRI';
+      if (s.includes('eppendorf') || s.includes('tubo')) return 'PORTAOBJETOS';
+      if (s.includes('frasco') || s.includes('botella')) return 'STANDARD';
+      return 'STANDARD';
+    };
+    
+    const medio = medios.find(m => m.id === batch.medioPrepId);
+    
+    const batchMapped = {
+      id: batch.id,
+      especie: `${batch.genero || ''} ${batch.especie || ''} ${batch.cepa || batch.codigo_cepa || ''}`.trim() || batch.especie || 'Desconocido',
+      tipo_inoculacion: batch.tipo_inoculacion || 'aislamiento_primario',
+      generacion: batch.generacion || batch.numero_transferencia || 0,
+      fecha: batch.fechaInoculacion || batch.fecha || '',
+      operario: batch.operator || batch.operario || 'Sistema',
+      sala: batch.destinoNombre || '',
+      alias: `${batch.genero || ''} ${batch.especie || ''}`.trim() || batch.especie,
+      nombre_receta: medio?.nombre_receta || medio?.alias || batch.medioPrepId || 'Medio',
+      tipo_uso: batch.tipo_inoculacion || 'repique',
+      tipo_etiqueta: getZplProfile(batch.soporte || batch.recipiente),
+      soporte: batch.soporte || batch.recipiente || 'No definido'
+    };
+
+    setSelectedMedioForPrint([batchMapped]); 
+    setShowPrintModal(true); 
+  };
 
   const handleDeleteLote = async (lote) => {
     try {
@@ -449,6 +562,175 @@ function InventoryPage() {
     }
   };
 
+  // --- Handlers para tarjetas de Medios ---
+  const handleEdit = (medioId) => {
+    const medio = medios.find(m => m.id === medioId);
+    if (medio) setAuditingMedio(medio);
+  };
+
+  const handlePrintLabels = (medioId) => {
+    const medio = medios.find(m => m.id === medioId);
+    if (medio) { setSelectedMedioForPrint([medio]); setShowPrintModal(true); }
+  };
+
+  const handleMarkOutOfStock = (medioId) => {
+    const medio = medios.find(m => m.id === medioId);
+    if (medio) setAgotarMedio(medio);
+  };
+
+  const handleArchive = (medioId) => {
+    setConfirmAction({
+      message: '¿Archivar este medio? Pasará al historial.',
+      confirmText: 'Sí, archivar',
+      onConfirm: async () => {
+        try {
+          await updateDoc(doc(db, 'medios_preparados', medioId), { estado: 'Archivado' });
+        } catch(e) {
+          console.error("Error archivando:", e);
+        }
+        setConfirmAction(null);
+      }
+    });
+  };
+
+  const handleRestore = (medioId) => {
+    setConfirmAction({
+      message: '¿Restaurar este medio a la vista activa?',
+      confirmText: 'Sí, restaurar',
+      onConfirm: async () => {
+        try {
+          await updateDoc(doc(db, 'medios_preparados', medioId), { estado: 'Personalizado' });
+        } catch(e) {
+          console.error("Error restaurando:", e);
+        }
+        setConfirmAction(null);
+      }
+    });
+  };
+
+  const handleDelete = (medioId) => {
+    setConfirmAction({
+      message: '¿Eliminar este medio? Esta acción no se puede deshacer y devolverá automáticamente los ingredientes descontados al stock.',
+      onConfirm: async () => {
+        try {
+          const auth = getAuth();
+          const operarioName = auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema';
+
+          await runTransaction(db, async (transaction) => {
+            const medioRef = doc(db, 'medios_preparados', medioId);
+            const medioSnap = await transaction.get(medioRef);
+
+            if (!medioSnap.exists()) {
+              throw new Error("El medio no existe.");
+            }
+
+            const data = medioSnap.data();
+            if (data.eliminado) return;
+
+            const consumos = data.trazabilidad?.insumos_consumidos || [];
+
+            // ============================================
+            // FASE 1: LECTURAS (adicionales a partir de consumos)
+            // ============================================
+            const masterSnaps = {};
+            const loteSnaps = {};
+
+            for (const consumo of consumos) {
+              const { insumoId, loteId } = consumo;
+              
+              if (!masterSnaps[insumoId]) {
+                const masterRef = doc(db, 'insumos_base', insumoId);
+                masterSnaps[insumoId] = await transaction.get(masterRef);
+              }
+
+              if (loteId && !loteSnaps[loteId]) {
+                const loteRef = doc(db, 'insumos_lotes', loteId);
+                loteSnaps[loteId] = await transaction.get(loteRef);
+              }
+            }
+
+            // ============================================
+            // FASE 2: CÁLCULOS
+            // ============================================
+            const updatesToApply = [];
+            const auditsToCreate = [];
+
+            for (const consumo of consumos) {
+              const { insumoId, loteId, cantidad } = consumo;
+              if (cantidad <= 0) continue;
+
+              // Devolver a lote si existe
+              if (loteId) {
+                const snap = loteSnaps[loteId];
+                if (snap && snap.exists()) {
+                  const currentQty = snap.data().cantidad_base_actual || 0;
+                  updatesToApply.push({
+                    ref: snap.ref,
+                    data: {
+                      cantidad_base_actual: currentQty + cantidad,
+                      updatedAt: serverTimestamp()
+                    }
+                  });
+                }
+              }
+
+              // Devolver al stock general maestro
+              const masterSnap = masterSnaps[insumoId];
+              if (masterSnap && masterSnap.exists()) {
+                const currentMasterStock = masterSnap.data().stock_total_base || 0;
+                updatesToApply.push({
+                  ref: masterSnap.ref,
+                  data: {
+                    stock_total_base: currentMasterStock + cantidad,
+                    updatedAt: serverTimestamp()
+                  }
+                });
+              }
+
+              // Registrar auditoría de devolución automática
+              const auditRef = doc(collection(db, `insumos_base/${insumoId}/auditorias`));
+              auditsToCreate.push({
+                ref: auditRef,
+                data: {
+                  tipo: "Devolución Automática",
+                  cantidad: cantidad,
+                  medioId: medioId,
+                  fecha: serverTimestamp(),
+                  operario: operarioName
+                }
+              });
+            }
+
+            // ============================================
+            // FASE 3: ESCRITURAS (todas juntas al final)
+            // ============================================
+
+            // 1. Aplicar actualizaciones de stock
+            for (const update of updatesToApply) {
+              transaction.update(update.ref, update.data);
+            }
+
+            // 2. Crear auditorías
+            for (const audit of auditsToCreate) {
+              transaction.set(audit.ref, audit.data);
+            }
+
+            // 3. Marcar el medio como eliminado
+            transaction.update(medioRef, {
+              eliminado: true,
+              fecha_eliminacion: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+          });
+        } catch(e) {
+          console.error("Error eliminando:", e);
+          alert("Error al eliminar el medio: " + e.message);
+        }
+        setConfirmAction(null);
+      }
+    });
+  };
+
 
   return (
     <div className="inventory-page container animate-fade-in">
@@ -460,6 +742,7 @@ function InventoryPage() {
             {activeTab === 'insumos' && <button className="btn btn-primary" onClick={() => setShowRegistroModal(true)}>➕ Registrar Compra</button>}
             {activeTab === 'cultivos' && <button className="btn btn-primary" onClick={() => setShowNuevoCultivoModal(true)}>➕ Nueva Inoculación</button>}
             {activeTab === 'recetas' && <button className="btn btn-primary" onClick={() => setShowRecipeModal(true)}>➕ Nueva Receta</button>}
+            {activeTab === 'medios' && <button className="btn btn-primary" onClick={() => setShowNuevoMedioModal(true)}>➕ Preparar Medio</button>}
           </div>
         </header>
 
@@ -495,7 +778,6 @@ function InventoryPage() {
                 <option value="Descartables">Descartables</option>
                 <option value="Reutilizables">Reutilizables</option>
                 <option value="Bioseguridad">Bioseguridad</option>
-                <option value="Equipamiento">Equipamiento</option>
               </select>
             </div>
             <div style={{ flex: 1, minWidth: '150px' }}>
@@ -508,6 +790,17 @@ function InventoryPage() {
                 <option value="descartable">♻️ Descartable</option>
                 <option value="reutilizable">🔄 Reutilizable</option>
                 <option value="sin_clasificar">Sin clasificar</option>
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: '150px' }}>
+              <select 
+                className="form-control" 
+                value={insumoFilters.estadoRevision} 
+                onChange={e => setInsumoFilters({...insumoFilters, estadoRevision: e.target.value})}
+                style={{ border: insumoFilters.estadoRevision === 'pendientes' ? '1px solid var(--danger-color)' : '' }}
+              >
+                <option value="todos">Todos los Estados</option>
+                <option value="pendientes">⚠️ Pendientes / Incompletos</option>
               </select>
             </div>
           </div>
@@ -526,9 +819,9 @@ function InventoryPage() {
             />
             <select className="form-control" style={{ flex: 1 }} value={recipeCategory} onChange={e => setRecipeCategory(e.target.value)}>
               <option value="todas">Categorías</option>
-              <option value="Agar">Agar</option>
-              <option value="Grano">Grano</option>
-              <option value="Sustrato">Sustrato</option>
+              {categorias.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
             <select className="form-control" style={{ flex: 1 }} value={recipeStatus} onChange={e => setRecipeStatus(e.target.value)}>
               <option value="activa">Activas</option>
@@ -540,6 +833,12 @@ function InventoryPage() {
       </div>
 
       <main>
+        {activeTab === 'insumos' && insumoFilters.categoria === 'Equipamiento' && (
+          <div className="card animate-fade-in" style={{ padding: '1rem 1.2rem', borderLeft: '4px solid #2196F3', marginBottom: '1rem', background: 'rgba(33,150,243,0.08)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.3rem' }}>⚙️</span>
+            <span>Los equipos ahora se gestionan en el módulo <strong>Equipos</strong>. <a href="/equipos" style={{ color: '#2196F3' }}>Ir a Equipos →</a></span>
+          </div>
+        )}
         {activeTab === 'insumos' && (
           <InsumosTable 
             insumos={insumos.filter(i => {
@@ -555,7 +854,12 @@ function InventoryPage() {
                                    (insumoFilters.tipoUso === 'sin_clasificar' && !i.tipo_uso) || 
                                    i.tipo_uso === insumoFilters.tipoUso;
               
-              return matchesSearch && matchesCat && matchesSala && matchesTipo;
+              const isIncomplete = !i.categoria || !i.unidad_base || !i.nombre || i.nombre.trim() === '';
+              const matchesRevision = insumoFilters.estadoRevision === 'todos' || 
+                                      (insumoFilters.estadoRevision === 'pendientes' && isIncomplete);
+              
+              const notMigrated = !i.migrado_a_equipos;
+              return notMigrated && matchesSearch && matchesCat && matchesSala && matchesTipo && matchesRevision;
             })} 
             lotes={insumosLotes} 
             salas={salas}
@@ -573,7 +877,9 @@ function InventoryPage() {
                 proveedor: lote.proveedor,
                 fecha: lote.fecha_ingreso || lote.createdAt?.toDate()?.toISOString()?.split('T')[0],
                 trazabilidad: { fecha_preparacion: lote.fecha_ingreso || '' },
-                tipo: 'LOTE_INSUMO'
+                tipo: 'LOTE_INSUMO',
+                ubicacion: lote.ubicacion,
+                operador: lote.operario || lote.operador || ''
               }]);
               setShowPrintModal(true);
             }}
@@ -585,37 +891,163 @@ function InventoryPage() {
 
         {activeTab === 'medios' && (
           <div className="animate-fade-in">
-            <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <input 
                 type="text" 
                 className="form-control" 
-                style={{ flex: 1 }}
+                style={{ flex: 1, minWidth: '200px' }}
                 placeholder="🔍 Buscar medio (nombre, alias, lote)..." 
                 value={mediosSearch} 
                 onChange={e => setMediosSearch(e.target.value)} 
               />
-              <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setShowNuevoMedioModal(true)}>➕ Preparar Medio</button>
+              <select className="form-control" style={{ width: 'auto' }} value={mediosFilters.ubicacion} onChange={e => setMediosFilters({...mediosFilters, ubicacion: e.target.value})}>
+                <option value="todas">📍 Todas las ubicaciones</option>
+                <option value="Heladera Lab">Heladera Lab</option>
+                <option value="Heladera Facultad">Heladera Facultad</option>
+                <option value="Freezer -20°C">Freezer -20°C</option>
+                <option value="Freezer -80°C">Freezer -80°C</option>
+                <option value="Temperatura ambiente">Temperatura ambiente</option>
+                <option value="Otra">Otra</option>
+              </select>
+              <select className="form-control" style={{ width: 'auto' }} value={mediosFilters.categoria} onChange={e => setMediosFilters({...mediosFilters, categoria: e.target.value})}>
+                <option value="todas">🏷️ Todas las categorías</option>
+                {categorias.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <select className="form-control" style={{ width: 'auto' }} value={mediosFilters.operario} onChange={e => setMediosFilters({...mediosFilters, operario: e.target.value})}>
+                <option value="todos">👤 Todos los operarios</option>
+                {uniqueOperarios.map(op => <option key={op} value={op}>{op}</option>)}
+              </select>
+              
+              <button 
+                className="btn btn-outline" 
+                style={{ width: 'auto', minHeight: '48px', fontWeight: 'bold', borderColor: viewMode === 'historial' ? 'var(--primary-color)' : '#94a3b8', color: viewMode === 'historial' ? 'var(--primary-color)' : '#64748b' }} 
+                onClick={() => setViewMode(viewMode === 'activos' ? 'historial' : 'activos')}
+              >
+                {viewMode === 'activos' ? '🗃️ Ver Historial' : '🔙 Volver a Activos'}
+              </button>
+
+              {viewMode === 'historial' && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', padding: '0 1rem', borderRadius: '8px', minHeight: '48px' }}>
+                  <input type="checkbox" checked={hideDeleted} onChange={(e) => setHideDeleted(e.target.checked)} style={{ width: '18px', height: '18px' }} />
+                  <span style={{ fontSize: '0.9rem' }}>Ocultar Eliminados</span>
+                </label>
+              )}
+
+          
             </div>
             
-            {medios.filter(m => {
-              if (!mediosSearch) return true;
-              const term = mediosSearch.toLowerCase();
-              return (m.alias?.toLowerCase().includes(term) || m.nombre_receta?.toLowerCase().includes(term) || m.id?.toLowerCase().includes(term) || (m.fecha_preparacion && m.fecha_preparacion.toLowerCase().includes(term)));
-            }).map(m => (
-              <div key={m.id} className="card" style={{ padding: '1rem', marginTop: '0.5rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.5fr', alignItems: 'center' }}>
-                <div><strong>{m.alias}</strong></div>
-                <div>{m.nombre_receta}</div>
-                <div>{m.stock_bulk.cantidad_actual} {m.stock_bulk.unidad}</div>
-                <div>{m.estado}</div>
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                  <button className="btn-icon" onClick={() => { setSelectedMedioForPrint([m]); setShowPrintModal(true); }}>🖨️</button>
-                  <button className="btn-icon" title="Auditoría de Lote" onClick={() => setAuditingMedio(m)}>🔍</button>
+      {medios.filter(m => {
+                if (viewMode === 'activos') {
+                  if (m.eliminado) return false;
+                  if (m.estado === 'Archivado') return false;
+                } else {
+                  if (!m.eliminado && m.estado !== 'Archivado') return false;
+                  if (hideDeleted && m.eliminado) return false;
+                }
+
+                if (mediosFilters.ubicacion !== 'todas') {
+                  const locs = ubicacionesPorMedio[m.id];
+                  if (!locs || !locs.has(mediosFilters.ubicacion)) return false;
+                }
+                if (mediosFilters.categoria !== 'todas' && m.categoria !== mediosFilters.categoria) return false;
+                if (mediosFilters.operario !== 'todos' && m.operario !== mediosFilters.operario) return false;
+
+                if (!mediosSearch) return true;
+                const term = mediosSearch.toLowerCase();
+                return (
+                  m.alias?.toLowerCase().includes(term) ||
+                  m.nombre_receta?.toLowerCase().includes(term) ||
+                  m.stock_bulk?.cantidad_actual?.toString().toLowerCase().includes(term) ||
+                  m.estado?.toLowerCase().includes(term)
+                );
+              }).map(m => {
+                  let vencido = false;
+                  if (m.createdAt && m.vida_util_dias) {
+                     const createdAtDate = m.createdAt.toDate ? m.createdAt.toDate() : new Date(m.createdAt);
+                     const vencimientoDate = new Date(createdAtDate.getTime() + m.vida_util_dias * 24 * 60 * 60 * 1000);
+                     if (new Date() > vencimientoDate) vencido = true;
+                  }
+                  const fechaPrep = m.createdAt ? (m.createdAt.toDate ? m.createdAt.toDate().toLocaleDateString() : new Date(m.createdAt).toLocaleDateString()) : 'N/A';
+                  return (
+                   <React.Fragment key={m.id}>
+                <div className="card" style={{ background: 'rgba(0,123,255,0.08)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ flex: 1, minWidth: '250px' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                        {(() => {
+                          const locs = ubicacionesPorMedio[m.id];
+                          const ubicaciones = locs ? Array.from(locs) : (m.ubicacion ? [m.ubicacion] : []);
+                          return ubicaciones.length > 0 && (
+                            <span className="badge" style={{ background: '#e0e0e0', color: '#333', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.8em' }}>
+                              📍 {ubicaciones.join(' · ')}
+                            </span>
+                          );
+                        })()}
+                        {m.categoria && <span className="badge" style={{ background: '#d0ebff', color: '#0056b3', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.8em' }}>🏷️ {m.categoria}</span>}
+                        {vencido && <span className="badge" style={{ background: '#ffcdd2', color: '#c62828', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.8em', fontWeight: 'bold' }}>⚠️ VENCIDO</span>}
+                      </div>
+                      <strong>{m.alias}</strong> <span style={{ fontSize: '0.85em', color: '#666' }}>({fechaPrep})</span>
+                      <div>{m.nombre_receta}</div>
+                      
+                      {m.total_subfracciones > 0 && (
+                        <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#8b5cf6', fontWeight: '600' }}>
+                          🧫 {m.total_subfracciones} envase{m.total_subfracciones > 1 ? 's' : ''} ({m.subfracciones_disponibles === m.total_subfracciones ? 'todos disponibles' : `${m.subfracciones_disponibles} disponible${m.subfracciones_disponibles !== 1 ? 's' : ''}`})
+                        </div>
+                      )}
+                      
+                      {viewMode === 'historial' && (
+                        <div style={{ marginTop: '0.5rem', color: m.eliminado ? 'var(--danger-color)' : '#64748b', fontWeight: 'bold' }}>
+                          {m.eliminado ? '🛑 ELIMINADO' : '🗃️ ARCHIVADO'}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
+                        {viewMode === 'activos' ? (
+                          <>
+                            <button className="btn btn-primary" onClick={() => handleEdit(m.id)} title="Editar" style={{ flex: '1 1 45%', minHeight: '48px' }}>✏️ Editar</button>
+                            <button className="btn btn-primary" onClick={() => handlePrintLabels(m.id)} title="Reimprimir" style={{ flex: '1 1 45%', minHeight: '48px' }}>🖨️ Reimprimir</button>
+                            {(m.estado || 'Activo') === 'Activo' && (
+                              <button className="btn btn-primary" onClick={() => handleMarkOutOfStock(m.id)} title="Marcar agotado" style={{ flex: '1 1 45%', minHeight: '48px' }}>✓ Agotar</button>
+                            )}
+                            <button className="btn btn-primary" onClick={() => handleArchive(m.id)} title="Archivar" style={{ flex: '1 1 45%', minHeight: '48px' }}>🗃️ Archivar</button>
+                            <button className="btn btn-primary" onClick={() => handleDelete(m.id)} title="Eliminar" style={{ flex: '1 1 45%', minHeight: '48px' }}>🗑️ Eliminar</button>
+                          </>
+                        ) : (
+                          <>
+                            {!m.eliminado && (
+                              <button className="btn btn-primary" onClick={() => handleRestore(m.id)} title="Restaurar" style={{ flex: '1 1 100%', minHeight: '48px', background: '#10b981', borderColor: '#10b981' }}>🔄 Restaurar a Activos</button>
+                            )}
+                          </>
+                        )}
+                        <button className="btn btn-primary" onClick={() => setExpanded(prev => ({ ...prev, [m.id]: !prev[m.id] }))} title="Detalles" style={{ flex: '1 1 100%', minHeight: '48px' }}>
+                          {expanded[m.id] ? '▲ Ocultar Detalles' : '▼ Ver Detalles'}
+                        </button>
+                      </div>
+                      {expanded[m.id] && (
+                        <div className="accordion-content" style={{ marginTop: '1rem' }}>
+                          <SanitizacionAccordion medio={m} operariosList={uniqueOperarios} equiposList={uniqueEquipos} readOnly={viewMode === 'historial'} />
+                          <SubfraccionamientoAccordion 
+                            medio={m} 
+                            operariosList={uniqueOperarios} 
+                            salasList={salas} 
+                            insumosList={insumos} 
+                            readOnly={viewMode === 'historial'} 
+                          />
+                          <AuditoriaAccordion medio={m} readOnly={viewMode === 'historial'} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+                </React.Fragment>
+                );
+              })}
           </div>
         )}
-        {activeTab === 'cultivos' && <CultivosTable cultivos={cultivos} filters={filters} setFilters={setFilters} onEdit={setEditingBatch} onPrint={handlePrintBatch} />}
+        {activeTab === 'cultivos' && <CultivosTable cultivos={cultivos} medios={medios} filters={filters} setFilters={setFilters} onEdit={setEditingBatch} onPrint={handlePrintBatch} onCriopreservar={(batch) => navigate('/criobanco/nuevo/batch/' + batch.id)} />}
         {activeTab === 'recetas' && (
           <RecetasTable 
             recetas={recetas} 
@@ -667,6 +1099,7 @@ function InventoryPage() {
       {editingLote && <EditLoteModal lote={editingLote} onClose={() => setEditingLote(null)} onSaved={() => setEditingLote(null)} />}
       {auditingLote && <AuditInsumoModal lote={auditingLote} onClose={() => setAuditingLote(null)} />}
       {auditingMedio && <AuditMedioModal medio={auditingMedio} onClose={() => setAuditingMedio(null)} />}
+      {agotarMedio && <AgotarMedioModal medio={agotarMedio} onClose={() => setAgotarMedio(null)} onSaved={() => setAgotarMedio(null)} />}
       {showPrintModal && selectedMedioForPrint && <PrintLabelsModal batches={selectedMedioForPrint} onClose={() => setShowPrintModal(false)} />}
       
       {confirmAction && (
@@ -674,6 +1107,7 @@ function InventoryPage() {
           message={confirmAction.message} 
           onConfirm={confirmAction.onConfirm} 
           onCancel={() => setConfirmAction(null)} 
+          confirmText={confirmAction.confirmText}
         />
       )}
 

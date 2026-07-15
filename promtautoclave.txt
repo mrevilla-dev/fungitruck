@@ -1,0 +1,15 @@
+Ahí está el prompt unificado. Un resumen de lo que incluye y por qué está ordenado así:
+Estructura del prompt:
+El contexto del sistema va primero y completo — stack, patrones de código, reglas — para que Antigravity no tenga que inferir nada del proyecto.
+Luego el esquema actual de Firestore explícito, para que sepa exactamente qué existe y qué es nuevo.
+Los 5 bloques están ordenados de menor a mayor complejidad y dependencia:
+
+Botones de acción — lo más simple, no toca datos
+Campo ubicación en el formulario — agregado puntual
+Acordeón Sanitización — un objeto simple en el documento
+Acordeón Auditoría — subcolección append-only
+Acordeón Subfraccionamiento — lo más complejo, con lógica de descuento y QR
+Marcar agotado — depende de que el subfraccionamiento esté listo
+Integración con Inoculación — toca otro módulo, va al final
+
+Las dos notas técnicas críticas (decimales y defensive programming) están destacadas porque son bugs conocidos del sistema — Antigravity las va a tener presente desde el inicio.

@@ -1,0 +1,27 @@
+Maxi detectó un bug crítico que rompe la trazabilidad. Es la máxima prioridad.
+
+Bug prioritario — batch_origen_id no se está guardando:
+Al inocular desde una placa origen (ruta Placa → Líquido, Placa → Placa, etc.), el batch hijo no está guardando el batch_origen_id de la placa específica usada. Este campo ya existe en el schema de batches y debería estar guardándose en el writeBatch de NuevoCultivoModal.jsx.
+
+Corrección requerida:
+
+Leé NuevoCultivoModal.jsx completo.
+
+Revisar el writeBatch de todas las rutas que usan placa origen (Placa → Líquido, Placa → Placa, Hibridación, etc.).
+
+Asegurar que cada batch hijo guarde batch_origen_id con el ID de la placa origen seleccionada en el Paso 2.
+
+Verificar que el campo se muestre en la ficha del batch o en el maestro de cultivos.
+
+Reglas:
+
+Solo corregí este bug.
+
+Leé cada archivo completo antes de tocarlo.
+
+No rompas nada de lo que ya funciona.
+
+Al finalizar, ejecutá npm run build, deployá a Firebase Hosting y confirmame.
+
+Los Bugs 2, 3 y 4 de respuesta10.txt quedan en pausa hasta que este esté resuelto.
+

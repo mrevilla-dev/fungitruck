@@ -1,0 +1,30 @@
+ALTO. Hay una desincronización total.
+
+En tu mensaje anterior me dijiste que la Tarea 4 estaba terminada y el build limpio. Ahora me dices que la Tarea 3 está solo en plan. Esto es un error de seguimiento. El árbol en producción está completamente roto.
+
+El Bug Crítico (Por qué no se ve nada):
+En la Tarea 2 cambiaste el CSS visual (le agregaste bordes, paddings, foto), pero NO actualizaste las dimensiones lógicas que el motor de layout (dagre) usa para calcular el espacio. Como el motor cree que los nodos miden 0x0, te los apiló a todos en la misma coordenada. Por eso ves un "chorizo" blanco y no se ven las fotos ni los textos.
+
+VAS A HACER LO SIGUIENTE (Sin escribir más planes, solo código):
+
+1. CORREGIR TAREA 2 (Layout Roto):
+En CustomNodes.jsx, envolvé el contenedor principal de CADA nodo con un style explícito de ancho y alto para que dagre pueda leerlo. Usá estos valores exactos:
+
+Esporoma: <div style={{ width: '240px', height: '70px' }} className="bg-gradient-to-br from-violet-900...
+Ejemplar: <div style={{ width: '240px', height: '60px' }} className="bg-slate-800/90...
+Hibridación: <div style={{ width: '120px', height: '120px' }} className="bg-pink-900/60...
+Pasajes: <div style={{ width: '160px', height: '40px' }} className="bg-slate-900/60...
+Evento: <div style={{ width: '200px', height: '50px' }} className="...
+2. EJECUTAR TAREA 3 (Conectores):
+Dejá de planear y aplicá el mapeo de edges que ya habías propuesto (genetico=violeta, hibridacion=rosa, pasaje=punteado gris).
+
+3. EJECUTAR TAREA 4 (Panel Lateral):
+Aplicá la resolución del bug del "N/A", el badge ámbar y el botón "Ver en árbol".
+
+4. VERIFICAR FOTOS:
+Asegúrate de que en construirArbolGenealogico.js estés pasando fotoUrl: esporomaData.fotoUrl dentro del objeto data del nodo de Esporoma, y lo mismo para Ejemplar. Si el campo en la base de datos se llama distinto (ej. foto_principal), usá ese.
+
+Quiero que ejecutes estos 4 puntos, corrás npm run build y me avises. No me envíes más planes de implementación, envió código ejecutado y build limpio.
+
+
+

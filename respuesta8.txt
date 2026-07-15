@@ -1,0 +1,10 @@
+Para Antigravity:
+
+Te equivocaste en el Bloque 4. Lo que proponés (eliminar AltaRapidaEjemplarExterno.jsx) no es lo que dice deep26.md.
+
+Volvé a leer el Bloque 4 de deep26.md. El objetivo es:
+
+Crear DerivacionEsporomaModal.jsx y agregar el botón "+ Nueva Derivación" en la ficha de cada Esporoma existente, para permitir derivaciones asincrónicas (días después de haber registrado el Esporoma).
+
+Mostrame un plan de implementación corregido para este Bloque 4.
+

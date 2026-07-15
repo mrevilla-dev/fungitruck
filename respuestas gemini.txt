@@ -1,0 +1,17 @@
+[plugin:vite:oxc] Transform failed with 1 error:
+
+[PARSE_ERROR] Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+     ╭─[ src/pages/InventoryPage.jsx:667:13 ]
+     │
+ 667 │             }).map(m => (
+     │             │ 
+     │             ╰─ 
+─────╯
+C:/Users/Usuario/Documents/maxi/src/pages/InventoryPage.jsx
+    at transformWithOxc (file:///C:/Users/Usuario/Documents/maxi/node_modules/vite/dist/node/chunks/node.js:3742:19)
+    at TransformPluginContext.transform (file:///C:/Users/Usuario/Documents/maxi/node_modules/vite/dist/node/chunks/node.js:3810:26)
+    at EnvironmentPluginContainer.transform (file:///C:/Users/Usuario/Documents/maxi/node_modules/vite/dist/node/chunks/node.js:30141:51)
+    at async loadAndTransform (file:///C:/Users/Usuario/Documents/maxi/node_modules/vite/dist/node/chunks/node.js:24489:26)
+    at async viteTransformMiddleware (file:///C:/Users/Usuario/Documents/maxi/node_modules/vite/dist/node/chunks/node.js:24283:20)
+Click outside, press Esc key, or fix the code to dismiss.
+You can also disable this overlay by setting server.hmr.overlay to false in vite.config.js.

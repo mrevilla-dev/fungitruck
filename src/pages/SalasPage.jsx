@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, updateDoc, serverTimestamp, addDoc, where } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import SalaFormModal from '../components/SalaFormModal';
 
 function SalaCard({ sala, onDesinfectar, onEdit }) {
   const [batches, setBatches] = useState([]);
   const [showBatches, setShowBatches] = useState(false);
+  const [equipos, setEquipos] = useState([]);
+  const [showEquipos, setShowEquipos] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (showBatches) {
@@ -16,6 +20,16 @@ function SalaCard({ sala, onDesinfectar, onEdit }) {
       return unsubscribe;
     }
   }, [showBatches, sala.id]);
+
+  useEffect(() => {
+    if (showEquipos) {
+      const q = query(collection(db, 'equipos'), where('sala_actual_id', '==', sala.id));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setEquipos(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      return unsubscribe;
+    }
+  }, [showEquipos, sala.id]);
 
   const getTipoLabel = (tipo) => {
     switch (tipo) {
@@ -60,6 +74,9 @@ function SalaCard({ sala, onDesinfectar, onEdit }) {
         </div>
         <div className="flex-gap">
           <button className="btn btn-outline btn-sm" onClick={() => onDesinfectar(sala.id)}>🧼 Clean</button>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowEquipos(!showEquipos)}>
+            {showEquipos ? 'Ocultar Eq' : `Equipos`}
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => setShowBatches(!showBatches)}>
             {showBatches ? 'Cerrar' : `Lotes (${batches.length})`}
           </button>
@@ -74,6 +91,27 @@ function SalaCard({ sala, onDesinfectar, onEdit }) {
               <span>{b.especie}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {showEquipos && (
+        <div className="animate-fade-in" style={{ marginTop: '1rem', background: 'rgba(33, 150, 243, 0.1)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(33, 150, 243, 0.3)' }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#2196F3' }}>⚙️ Equipos asignados</h4>
+          {equipos.length === 0 ? (
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>No hay equipos en esta sala.</p>
+          ) : (
+            equipos.map(eq => (
+              <div key={eq.id} style={{ fontSize: '0.75rem', padding: '0.35rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong style={{ display: 'block' }}>{eq.nombre}</strong>
+                  <span style={{ color: 'var(--text-secondary)' }}>{eq.categoria} · {eq.estado_operativo}</span>
+                </div>
+                <button className="btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: '0.65rem' }} onClick={() => navigate(`/equipos/${eq.id}`)}>
+                  Ficha
+                </button>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

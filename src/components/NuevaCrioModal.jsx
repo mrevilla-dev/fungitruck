@@ -45,7 +45,7 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
     // Cargar batches activos para el selector de origen
     const q = query(collection(db, 'batches'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, snap => {
-      setBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => b.status !== 'Planificado'));
     });
     return unsub;
   }, []);

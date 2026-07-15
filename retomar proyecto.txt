@@ -1,0 +1,531 @@
+# FungiTrack — Handoff Completo para Claude
+> Actualizado: Mayo 2026 · Versión 2
+> IMPORTANTE: Subir este archivo + FungiTrack_Recetas_Base.md + fungitrack_v3_completo.drawio al Proyecto de Claude llamado "FungiTrack - Trazabilidad"
+
+---
+
+## 1. Qué es FungiTrack
+
+LIMS (Laboratory Information Management System) especializado en micología aplicada.
+Desarrollado por Maxi (investigador, maestría en biotecnología, emprendimiento propio).
+Usado en dos contextos: laboratorio de la facultad (Veterinaria) y laboratorio propio.
+
+**Objetivo central:** trazabilidad completa del ciclo de producción de hongos,
+desde el material genético hasta la cosecha, con soporte para diseño experimental
+y conservación de germoplasma (cepario).
+
+---
+
+## 2. Stack Tecnológico
+
+| Capa | Tecnología |
+|---|---|
+| Frontend | React 18 + Vite |
+| Routing | react-router-dom |
+| Base de datos | Firebase Firestore (NoSQL) |
+| Autenticación | Firebase Auth (Google Sign-In) |
+| Imágenes | Google Drive vía Apps Script proxy |
+| QR generación | qrcode.react (SVG) |
+| QR lectura | html5-qrcode (cámara) |
+| Deploy | Firebase Hosting |
+| Versiones | GitHub |
+
+App en producción: https://fungitrack-9b463.web.app/
+
+---
+
+## 3. Especies que maneja el sistema
+
+- *Cordyceps militaris* (prioridad investigación / tesis)
+- *Hericium erinaceus* (melena de león)
+- *Pleurotus ostreatus* y otras spp.
+- *Ganoderma* spp.
+- *Lentinula edodes* (shiitake)
+
+Cada especie puede tener flujos distintos (sustrato, sistema de respiración, sala).
+
+---
+
+## 4. Esquema de Base de Datos Actual (Firestore)
+
+### `batches` — Lotes de cultivo (entidad central)
+```json
+{
+  "id": "PLO-OST-APD-20260428-001",
+  "batchGroupId": "GRP-1714320000000",
+  "genero": "Pleurotus",
+  "especie": "ostreatus",
+  "cepa": "CEPA-01",
+  "generacion": 2,
+  "genetica": "Diploide",
+  "esporomaId": "ESP-...",
+  "parentId": "PLO-OST-APD-...",
+  "batchIndex": 1,
+  "batchTotal": 5,
+  "substrate": "Agar Papa Dextrosa (APD)",
+  "substrateCode": "APD",
+  "medioPrepId": "medprep-xyz",
+  "destinoId": "sala-abc",
+  "destinoNombre": "Sala Incubación 1",
+  "tipoContenedor": "placa_petri",
+  "observaciones": "...",
+  "operator": "Maxi",
+  "fotoUrl": "https://drive.google.com/...",
+  "fechaInoculacion": "2026-04-28",
+  "status": "Inoculado"
+}
+```
+
+**Estados posibles:** Inoculado → Incubando → Fructificando → Cosechado | Contaminado
+
+### `esporomas` — Banco de germoplasma
+```json
+{
+  "id": "ESP-20260415-001",
+  "genero": "Pleurotus",
+  "especie": "ostreatus",
+  "genetica": "Diploide",
+  "lugarRecoleccion": "...",
+  "fechaRecoleccion": "2026-04-15",
+  "fotoUrl": "https://drive.google.com/...",
+  "observaciones": "..."
+}
+```
+
+### `medios_preparados`
+```json
+{
+  "id": "medprep-xyz",
+  "nombre_medio": "Agar Papa Dextrosa",
+  "alias": "APD Lote 3",
+  "recetaId": "rec-001",
+  "cantidad_inicial": 20,
+  "cantidad_actual": 14,
+  "es_fraccionado": true,
+  "operator": "Maxi"
+}
+```
+
+### `recetas_medios`
+```json
+{
+  "id": "rec-001",
+  "nombre": "Agar Papa Dextrosa",
+  "ingredientes": [
+    { "insumoId": "ins-xyz", "nombre": "Agar", "cantidad": 20, "unidad": "g" }
+  ],
+  "volumen_base_L": 1
+}
+```
+
+### `insumos_base`
+```json
+{
+  "id": "ins-xyz",
+  "nombre": "Agar bacteriológico",
+  "unidad": "g",
+  "stock_actual": 450,
+  "stock_minimo": 100,
+  "proveedor": "..."
+}
+```
+
+### `salas`
+```json
+{
+  "id": "sala-abc",
+  "nombre": "Sala Incubación Principal",
+  "tipo": "incubacion",
+  "estanterias": [{ "id": "est-1", "nombre": "Estante A", "cantidad": 5 }],
+  "ultimaDesinfeccion": "2026-04-28T...",
+  "capacidad": 100
+}
+```
+
+---
+
+## 5. Sistema de IDs Semánticos
+
+**Formato:** `GEN-ESP-MED-AAAAMMDD-NNN`
+
+Ejemplo: `PLO-OST-APD-20260428-001`
+- `PLO` = género (Pleurotus)
+- `OST` = especie (ostreatus)
+- `APD` = sustrato/medio
+- `20260428` = fecha
+- `001` = secuencia del día
+
+**Este ID ES el QR** — se imprime en etiqueta física y se escanea para acceder al historial.
+
+---
+
+## 6. Módulos Construidos
+
+| Módulo | Ruta | Estado |
+|---|---|---|
+| Dashboard | `/` | ✅ Métricas generales, lotes por estado |
+| Nueva Inoculación | `/new` | ✅ Core, genera IDs + QR |
+| Inventario | `/inventory` | ✅ Insumos / Medios / Cultivos |
+| Esporomas | `/esporomas` | ✅ Germoplasma + fotos Drive |
+| Salas | `/salas` | ✅ Sala → estanterías, log desinfección |
+| Scanner QR | `/scan` | ✅ Cámara → historial lote |
+| Mantenimiento | `/maintenance` | ✅ Limpiezas y equipamiento |
+| Admin Reset | `/admin` | ✅ Hard reset protegido |
+
+---
+
+## 7. Flujo Biológico Completo
+
+### Fase 0 — Origen genético
+- Esporoma de campo / comprado / ciclo anterior
+- Liberación de esporas sobre placa MEA → colonias haploides
+- Explanto → micelio primario o secundario
+- PCR para confirmar tipo MAT (MAT 1-1 / MAT 1-2)
+
+### Fase A — Inventario y compras
+- Registro de compra con control de recepción (calidad, vencimiento, condiciones)
+- Stock con alerta de mínimo
+- Sistema de costos (precio por insumo → costo por lote)
+
+### Fase B — Material reciclable
+- Post-uso: lavado → acondicionado → estibado
+- QR actualiza estado a "disponible"
+- Aplica a: frascos, placas de vidrio, potes reutilizables
+
+### Fase C — Preparación de medios
+Cada tipo tiene su propio proceso y pasa por autoclave:
+
+**Agar:**
+Pesado → disolución → frascos → autoclave → stock (bulk o placas)
+→ QR por frasco/placa
+
+**Medio líquido (LC):**
+Formulación → autoclave → stock bulk o fraccionado → heladera
+→ QR por frasco/bolsa
+
+**Spawn (semillas):**
+Lavado → cocción (según especie) → oreado → adjuntos (sulfato calcio, etc.)
+→ frascos PP → autoclave → cajones espera → inoculación
+→ QR por lote de spawn (proceso multi-día, registro por etapa)
+
+**Sustrato definitivo:**
+- Pleurotus: virutas + paja trigo + pellet soja → bolsas PP → autoclave o pasteurización
+- Cordyceps: caldo formulado → potes PP con tapa + filtro → dosificado → autoclave
+→ Peso seco registrado al momento de preparación (necesario para calcular EB)
+
+### Fase D — Criopreservación (módulo en construcción)
+Punto de decisión después de inoculación o desde placa/LC.
+Material va a sustrato pensado para congelar (líquido, semillas, perlitas) en criovial.
+
+```json
+{
+  "id": "CRIO-...",
+  "batchOrigenId": "...",
+  "cepaId": "...",
+  "soporte": "semillas | perlitas | liquido | otro",
+  "crioprotector": "glicerol | DMSO | otro",
+  "concentracion_pct": 10,
+  "protocolo_descenso": "gradual | directo",
+  "temperatura_final": -80,
+  "almacenamiento": "freezer_80 | nitrogeno_liquido | heladera_4",
+  "fecha_congelacion": "...",
+  "operador": "...",
+  "viabilidad_post": null,
+  "fecha_descongelacion": null,
+  "observaciones": "..."
+}
+```
+
+### Fase E — Diseño experimental (factorial)
+Va ANTES de la inoculación.
+Define factores (medio, subcultivo, sistema respiración) y niveles.
+Genera grupos de lotes — cada lote hereda su tratamiento.
+Resultados se comparan entre grupos al cosechar.
+
+### Fase F — Inoculación
+Escaneo QR cepa + QR medio → trazabilidad cruzada automática.
+Genera lote con ID semántico.
+Vinculado a experimento si aplica.
+Destinos: placa / sustrato / criopreservación.
+
+### Fase G — Seguimiento de cultivos
+Por lote, mediante escaneo QR:
+- Fotos → Drive → link en ficha
+- Observaciones con timestamp
+- Medición de crecimiento (placas)
+- Registro de pinning (Cordyceps)
+- Detección de contaminación → dispara registro de no conformidad
+
+### Fase H — Gestión de salas (paralela)
+- Sala común (incubación): T°, HR, CO₂
+- Terraza (Pleurotus): fructificación
+- Bioterio (Cordyceps): fotoperíodo, T°
+- Registros: limpieza, MIP, infraestructura
+- Registro ambiental: hoy manual, futuro con sensores conectados
+
+### Fase I — Cosecha y métricas
+Por lote al cierre del ciclo:
+- N° de esporomas
+- Tamaño de esporomas
+- Peso fresco cosechado
+- Peso seco sustrato (registrado en preparación)
+- **Eficiencia Biológica = Peso fresco / Materia seca sustrato**
+- Comparación entre grupos experimentales
+- Destino: investigación / venta / procesado
+
+### Cierre de ciclo
+Esporomas cosechados → generación de haploides → retorno al cepario.
+Este cierre NO está implementado todavía. Es crítico.
+
+---
+
+## 8. Taxonomía Genética (a implementar — reemplaza campo `genetica` actual)
+
+El campo actual `genetica: "Diploide | Haploide | Dicarión"` es incorrecto.
+**Reemplazar por tres campos separados:**
+
+| Campo | Valores | Notas |
+|---|---|---|
+| `ploidia` | Haploide / Diploide | Estado nuclear real |
+| `tipo_micelio` | Monocarión / Dicarión / Población | Organización del micelio |
+| `mat` | MAT 1-1 / MAT 1-2 / No determinado / Mixto | Solo haploides con PCR |
+
+**Población** = sella de esporas sin aislar. Mezcla de haploides y diploides.
+Alta variación genética. No es monocarión ni dicarión.
+
+**Flujo correcto:**
+Población → aislamiento monospórico → Monocarión (MAT pendiente)
+→ PCR → Monocarión confirmado (MAT 1-1 o 1-2) → apareamiento → Dicarión
+
+---
+
+## 9. Sistema de QR — Puntos de escaneo
+
+Todo objeto físico tiene QR. Al escanear se accede a su ficha completa.
+
+Puntos de escaneo clave:
+- Frasco/placa de medio preparado (al preparar y al usar)
+- Lote de spawn (al preparar y al inocular)
+- Bolsa/pote de sustrato (al preparar y al inocular)
+- Cepa en cepario
+- Criovial
+- Lote de cultivo (seguimiento, cosecha, contaminación)
+
+Impresora de etiquetas: pendiente de compra (prioridad antes que sensores digitales).
+
+---
+
+## 10. Gaps Conocidos (Backlog)
+
+| Gap | Prioridad | Notas |
+|---|---|---|
+| Taxonomía genética (3 campos) | 🔴 Alta | Base de todo el cepario |
+| Módulo cosecha + EB | 🔴 Alta | Cierra el ciclo productivo |
+| Cierre ciclo cosecha → cepario | 🔴 Alta | Hoy el ciclo no cierra |
+| Criopreservación como módulo | 🔴 Alta | Central para la tesis |
+| pH en medios de cultivo | 🟡 Media | Hoy va a observaciones |
+| Autoclaves como entidad propia | 🟡 Media | Hoy en mantenimiento genérico |
+| Indicadores esterilización | 🟡 Media | Hoy va a observaciones |
+| Códigos de cepa estandarizados | 🟡 Media | Hoy texto libre |
+| Peso seco en preparación sustrato | 🟡 Media | Necesario para calcular EB |
+| Registro ambiental estructurado | 🟡 Media | Hoy en mantenimiento libre |
+| Trazabilidad agua (pH, conductividad) | 🟢 Baja | |
+| Sistema de costos por lote | 🟢 Baja | Base de insumos existe |
+| Material reciclable (ciclo lavado) | 🟢 Baja | |
+| Caracterización morfológica | 🟢 Baja | Segunda etapa |
+| PCR / citometría en sistema | 🟢 Baja | Tercera etapa |
+
+---
+
+## 11. Usuarios y Roles
+
+| Usuario | Rol | Acceso |
+|---|---|---|
+| Maxi | Director | Total |
+| Nacho | Investigador | Cepario, cultivos, experimentos, cosecha |
+| Moni | Investigador | Cepario, cultivos, experimentos, cosecha |
+| Magui | Investigador | Cepario, cultivos, experimentos, cosecha |
+| Becarios | Colaborador | Escaneo QR, observaciones, fotos, registros ambientales, MIP |
+
+---
+
+## 12. Dashboard y Alertas (parcialmente implementado)
+
+**Dashboard actual:** métricas generales, lotes por estado.
+**Pendiente:**
+- Vista filtrable por hongo y/o sector
+- Conteo por estado: incubando / fructificando / listos para cosechar
+- Alertas de stock mínimo
+- Tareas pendientes por rol (revisar T°, pasar incubación→fructificación, lavar material)
+- Notificaciones push por usuario
+
+---
+
+## 13. Decisiones de Arquitectura Tomadas
+
+| Decisión | Elección | Razón |
+|---|---|---|
+| DB | Firestore NoSQL | Tiempo real, sin servidor, costo mínimo |
+| Imágenes | Google Drive vía Apps Script | Firebase Storage tiene costo |
+| ID lote = QR | ID semántico legible | Trazabilidad humana y máquina |
+| Stock atómico | writeBatch Firestore | Decremento + creación en una operación |
+| Salas jerárquicas | sala → estanterías | Refleja estructura física real |
+| Generación auto-incremental | campo `generacion` entero | Se incrementa al heredar de padre |
+
+---
+
+## 14. Tesis de Maestría (contexto investigación)
+
+Especie: *Cordyceps militaris*
+Tema: criopreservación de monocariones haploides y recuperación del vigor reproductivo.
+
+**Diseño experimental:**
+- Obtención de monocariones (aislamiento monospórico + PCR MAT)
+- Criopreservación en distintos soportes (semillas, perlitas, líquido)
+- Distintos crioprotectores y concentraciones
+- Almacenamiento a -80°C y N₂ líquido
+- Post-descongelación: viabilidad, compatibilidad sexual (apareamiento 1a × 1b)
+- Rendimiento esporomas F1 (pre vs. post congelación)
+
+**Variables de resultado:**
+- Tasa de recuperación post-descongelación
+- Éxito de apareamiento (matcheo)
+- Eficiencia biológica esporomas F1
+
+FungiTrack debe poder registrar y comparar todos estos parámetros.
+
+---
+
+## 15. Estado Actual del Sistema (Mayo 2026)
+
+| Módulo | Estado |
+|---|---|
+| Inventario + compras | ✅ Funcionando |
+| Categorías de insumos | ⚠️ Pendiente migración a 6 categorías nuevas |
+| Medios preparados | ✅ Funcionando |
+| Recetas | ⚠️ Faltan campos: ph_esperado, peso_seco_por_unidad_g, protocolo_url |
+| Inoculación + trazabilidad | ✅ Funcionando |
+| Cosecha + EB acumulada | ✅ Implementado |
+| Oleadas (flushes) | ✅ Implementado |
+| Cierre ciclo → cepario | ⚠️ Parcial — verificar herencia al generar esporoma |
+| Criopreservación | ✅ Modelo implementado · UI pendiente verificar |
+| Equipos | ❌ No existe |
+| Diseño experimental factorial | ❌ Segunda fase |
+| Registro ambiental estructurado | ❌ Pendiente |
+| Roles y permisos | ❌ Pendiente |
+| Mobile-first / glove-friendly | ❌ Pendiente para miércoles |
+
+---
+
+## 16. Próximas Acciones en Orden
+
+1. Crear Proyecto en Claude y subir los 3 archivos de contexto
+2. Migrar categorías de inventario (prompt listo — ver sección 17)
+3. Agregar campos faltantes a recetas (ph_esperado, peso_seco_por_unidad_g, protocolo_url)
+4. Cargar insumos faltantes para las recetas base
+5. Cargar las 7 recetas base (ver FungiTrack_Recetas_Base.md)
+6. Prueba de flujo completo: receta → medio → inoculación → oleadas → cosecha → cierre
+7. Configurar impresora Zebra ZD220 en FungiTrack (ZPL o driver Zebra)
+8. Mobile-first UX (botones grandes, tarjetas, zona del pulgar)
+
+---
+
+## 17. Prompt Listo para Antigravity — Categorías + Campos Recetas
+
+*"Necesito dos cambios antes de arrancar con recetas:*
+
+*CAMBIO 1 — Reemplazar categorías de insumos actuales (Químicos/Medios, Granos/Sustratos, Consumibles y Empaque, Sanidad) por estas seis:*
+- *Medios y reactivos*
+- *Sustratos y granos*
+- *Descartables (con campo: unidad de consumo, esterilidad de origen sí/no)*
+- *Reutilizables (con campo: estado por unidad = disponible / en uso / en lavado, estado inicial, tipo de contenedor, capacidad)*
+- *Bioseguridad (con campo: concentración de uso, dilución estándar)*
+- *Equipamiento (con campos: propietario = facultad/emprendimiento/personal, fecha adquisición, valor compra, vida útil años, valor residual, amortización mensual calculada automáticamente, calibración: sí/no + frecuencia + última fecha + próxima calculada, mantenimiento: sí/no + frecuencia + última fecha, estado = operativo/en mantenimiento/fuera de servicio)*
+
+*Migrar todos los registros existentes a la categoría correspondiente. No perder ningún dato.*
+
+*CAMBIO 2 — Agregar a la colección recetas y su formulario:*
+- *ph_esperado (número decimal, opcional)*
+- *peso_seco_por_unidad_g (número, opcional) — se hereda al medio preparado y de ahí al batch*
+- *protocolo_url (string, opcional) — link a Google Docs con el protocolo detallado*
+
+*Confirmar cuando esté listo antes de avanzar."*
+
+---
+
+## 18. Hardware
+
+**Impresora:** Zebra ZD220 — Transferencia Térmica — USB
+- Sin WiFi ni Bluetooth
+- Conectada a PC como servidor de impresión
+- Pendiente: configurar ZPL o driver Zebra en FungiTrack
+- Etiquetas: resistentes a humedad, alcohol y frío (-80°C) con transferencia térmica
+
+---
+
+## 19. Recetas Base Disponibles
+
+Ver archivo: **FungiTrack_Recetas_Base.md**
+
+Recetas incluidas:
+1. MEA — Agar Extracto de Malta
+2. APD — Agar Papa Dextrosa
+3. APDA — APD enriquecido
+4. MEA-Cell-He — Agar Malta Celulósico para Hericium erinaceus
+5. LC-General — Medio líquido general
+6. LC-Cordyceps — Medio líquido para Cordyceps militaris
+7. Caldo-Cord — Sustrato definitivo para potes PP de Cordyceps
+
+---
+
+*Documento actualizado por Claude (Anthropic) · Mayo 2026*
+
+---
+
+## 20. Actualizaciones Semana 12-19 Mayo 2026
+
+### Módulos nuevos implementados
+- **Impresión ZPL nativa** para Zebra ZD220 — 6 perfiles en rollo único 100x150mm con tiling
+- **Escáner mejorado** — cámara trasera por defecto, reconoce 5 tipos de registros
+- **Acceso multiusuario** — initra.citometria@fvet.uba.ar y maximiliano.revilla@gmail.com
+- **Seeding de 30 envases** en /admin-reset (¡OJO: reclasificar Reutilizables — ver abajo)
+
+### Problema pendiente urgente
+Los 30 envases del seeding se cargaron todos como "Descartables". Hay que reclasificar:
+- **Reutilizables:** frascos Schott, Erlenmeyers, probetas graduadas, portaobjetos
+- **Descartables (quedan así):** Eppendorfs, crioviales, Falcons, placas Petri, bolsas incubación
+
+### Campos pendientes de agregar a recetas
+- `ph_esperado` (número decimal)
+- `peso_seco_por_unidad_g` (número) — se hereda al medio y al batch
+- `protocolo_url` (string) — link Google Docs
+- `densidad_esperada_brix` (número) — referencia para refractómetro
+- `osmolaridad_esperada_mOsm` (número) — opcional, para cuando haya osmómetro
+- Cálculo automático de **relación C/N** desde los ingredientes
+
+### Campos pendientes en medios preparados
+- `ph_real` — medido antes de agregar agar
+- `densidad_real_brix` — medido antes de agregar agar
+- `osmolaridad_real_mOsm` — opcional
+
+### Primera receta cargada
+- **ML-ECA** — Agar de Inducción Enzimática y Contraste Negro para Hericium erinaceus
+
+### Próximas acciones inmediatas
+1. Reclasificar envases del seeding
+2. Agregar campos faltantes a recetas
+3. Preparar medio ML-ECA (primer medio real)
+4. Registrar autoclave del medio
+5. Imprimir etiquetas con Zebra (perfil SLIM_PETRI para placas)
+6. Cargar esporoma de Ganoderma (campo o cultivo previo)
+7. Primer explanto real → primera inoculación trazada
+
+### Almacenamiento imágenes
+VERIFICAR: el informe de Antigravity menciona Firebase Storage pero antes se había migrado a Google Drive vía Apps Script. Confirmar cuál está activo.
+
+### Flujo para primer explanto de Ganoderma
+1. Registrar esporoma origen (dónde, fecha, foto)
+2. Crear ficha de cepa (dicarión, explanto)
+3. Preparar medio → autoclave → placas
+4. Inoculación → QR → etiqueta Zebra
+5. Seguimiento con fotos a Drive

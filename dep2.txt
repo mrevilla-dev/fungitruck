@@ -1,0 +1,15 @@
+Asegurarse de que el dato se pase correctamente desde el frontend al endpoint de impresión.
+
+No se implementa multipaquete ni cola de impresión.
+
+---
+
+## ELEMENTOS POSPUESTOS (NO TOCAR)
+
+- Escáner continuo ("always-on").
+- Impresión multipaquete con IDs únicos por frasco.
+- Cualquier modificación a `ScannerPage.jsx`.
+
+---
+
+## ORDEN DE EJECUCIÓN

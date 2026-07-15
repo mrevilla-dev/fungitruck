@@ -1,0 +1,26 @@
+Buen trabajo, el layout ya no se apila. Pero hay dos detalles visuales menores en CustomNodes.jsx que necesitan corrección inmediata:
+
+1. El texto literal "Foto":
+En el nodo Esporoma (y Ejemplar), en lugar de la palabra "Foto", debe haber un condicional de renderizado.
+Reemplazá ese texto por esta lógica exacta:
+
+jsx
+
+{data.fotoUrl ? (
+  <img 
+    src={data.fotoUrl} 
+    alt="Foto Esporoma" 
+    className="w-9 h-9 rounded-full object-cover border-2 border-violet-300" 
+  />
+) : (
+  // Si no hay URL, mostrá un ícono SVG genérico de imagen o hongo, NO texto.
+  <svg className="w-9 h-9 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+)}
+2. Singular/Plural en Pasajes:
+Donde se muestra el texto del nodo comprimido, corregí la lógica para que diga "pasaje" si es 1, y "pasajes" si es mayor a 1.
+Ejemplo: ${data.cantidad === 1 ? '🔁 1 pasaje' : 🔁 ${data.cantidad} pasajes}
+
+Acción: Hacé estos dos cambios en CustomNodes.jsx, corré npm run build y deployá.
+

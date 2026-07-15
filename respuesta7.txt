@@ -1,0 +1,32 @@
+Para Antigravity:
+
+Esta es la primera vez que entrás al proyecto FungiTrack. Necesito que leas el archivo deep26.md que te adjunto abajo. Es un prompt completo para implementar el módulo Ventanilla Única de Ingreso de Material.
+
+Contexto mínimo del proyecto:
+
+FungiTrack es un LIMS de trazabilidad micológica.
+
+Stack: React 19 + Vite + Firebase Firestore + Firebase Auth + Google Drive + Zebra ZD220.
+
+Web: https://fungitrack-9b463.web.app
+
+Repositorio local: c:/Users/Usuario/Documents/maxi
+
+Las colecciones principales son: esporomas, ejemplares, batches, medios_preparados, eventos_aislamiento, contenedores, cola_impresion, config.
+
+Lo que tenés que hacer:
+
+Leé deep26.md completo.
+
+Implementá los cambios en 4 bloques separados, en orden.
+
+Antes de escribir código de cada bloque, mostrame un plan de implementación y esperá mi confirmación.
+
+Al finalizar cada bloque, ejecutá npm run build, deployá a Firebase Hosting y confirmame.
+
+No rompas nada de lo que ya funciona.
+
+Todos los cambios son aditivos.
+
+Arrancá con el Bloque 1.
+

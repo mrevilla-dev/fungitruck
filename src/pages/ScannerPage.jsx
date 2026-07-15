@@ -20,7 +20,7 @@ function ScannerPage() {
     let html5QrCode;
     if (!scanResult) {
       html5QrCode = new Html5Qrcode("reader");
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      const config = { fps: 20, qrbox: { width: 250, height: 250 } };
       
       html5QrCode.start(
         { facingMode: "environment" }, 

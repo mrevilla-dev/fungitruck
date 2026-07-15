@@ -1,0 +1,34 @@
+Para Antigravity:
+
+Esta es la primera vez que entrás al proyecto FungiTrack. Necesito que corrijas un bug puntual.
+
+Contexto mínimo:
+
+FungiTrack es un LIMS de trazabilidad micológica.
+
+Stack: React 19 + Vite + Firebase Firestore + Firebase Auth + Google Drive + Zebra ZD220.
+
+Web: https://fungitrack-9b463.web.app
+
+Repositorio local: c:/Users/Usuario/Documents/maxi
+
+Bug a corregir:
+En IngresoMaterialPage.jsx, los batches creados desde una derivación húmeda (Ruta A) aparecen como "Sin soporte" en el maestro de cultivos. El writeBatch no está guardando el campo soporte.
+
+Corrección requerida:
+
+Leé IngresoMaterialPage.jsx completo.
+
+Buscá el writeBatch que crea el batch de la derivación húmeda.
+
+Agregar el campo soporte tomado del medio o subfracción seleccionada (igual que ya se hizo en NuevoCultivoModal.jsx, NuevoEventoAislamientoModal.jsx y DerivacionEsporomaModal.jsx).
+
+Reglas:
+
+Leé el archivo completo antes de tocarlo.
+
+No rompas nada de lo que ya funciona.
+
+Al finalizar, ejecutá npm run build, deployá a Firebase Hosting y confirmame.
+
+Solo corregí este bug.

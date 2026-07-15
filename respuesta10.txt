@@ -1,0 +1,24 @@
+Para Antigravity:
+
+Esta es la primera vez que entrás al proyecto FungiTrack. Estamos implementando el deep35.md (Navegación Mobile-First). El plan del Bloque 1 fue aprobado.
+
+Contexto mínimo:
+
+FungiTrack es un LIMS de trazabilidad micológica.
+
+Stack: React 19 + Vite + Firebase Firestore + Firebase Auth + Google Drive + Zebra ZD220.
+
+Web: https://fungitrack-9b463.web.app
+
+Repositorio local: c:/Users/Usuario/Documents/maxi
+
+Decisiones ya tomadas:
+
+/medios e /inoculaciones van comentadas como // pendiente.
+
+Agregar /ingreso-material y /equipos al menú mobile.
+
+No agregar /crio (ruta legacy pendiente de eliminar).
+
+Procedé con el Bloque 1: Leer la navegación existente. Solo lectura, no modificar nada. Build y confirmame.
+

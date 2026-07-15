@@ -1,0 +1,126 @@
+PROMPT COMPLETO PARA ANTIGRAVITY
+markdown
+# FungiTrack — Refactorización de Ejemplares y Eventos de Aislamiento
+## Módulo: Genética
+> Junio 2026
+
+---
+
+## REGLAS DE ORO (LEER ANTES DE EMPEZAR)
+
+1.  **Un bloque a la vez.** Leer cada archivo completo antes de tocarlo.
+2.  **Al finalizar cada bloque, ejecutar `npm run build` y confirmar que no haya errores.**
+3.  **No romper nada.** Todos los cambios son aditivos. No eliminar lógica existente ni campos de Firestore.
+4.  **Defensive programming:** `campo?.subcampo ?? fallback` siempre.
+5.  **No modificar** la colección `esporomas` ni ningún otro componente fuera de los listados.
+
+---
+
+## BLOQUE 1 — Nuevos campos en el formulario de `ejemplares`
+
+**Objetivo:** Agregar los campos `codigo_cepa`, `tipo_material` y `procedencia` al formulario de alta y edición de ejemplares. Implementar el nuevo formato de ID semántico.
+
+**Archivo a modificar:** `src/pages/EjemplaresPage.jsx`.
+
+### 1.1 — Campo `codigo_cepa` (si no existe)
+- **Tipo:** texto, opcional.
+- **Label:** "Código de cepa".
+- **Placeholder:** "Ej: He3, A01".
+- **Validación visual:** Mostrar aviso "Evitar puntos (.) y guiones (-)" debajo del campo.
+
+### 1.2 — Campo `tipo_material`
+- **Tipo:** select, obligatorio.
+- **Label:** "Forma de ingreso del material".
+- **Opciones y códigos para el ID:**
+  - "Esporas (placa/sella)" → `ESP`
+  - "Explanto" → `EXP`
+  - "Jeringa (LC)" → `JER`
+  - "Micelio en agar" → `AGA`
+  - "Micelio en grano" → `GRA`
+  - "Desconocido" → `DES`
+- **Este campo NO reemplaza ni duplica `ploidia` ni `tipo_micelio`.** Deben coexistir.
+
+### 1.3 — Campo `procedencia`
+- **Tipo:** select, obligatorio.
+- **Label:** "Procedencia".
+- **Opciones:** "Recolección propia", "Compra a productor", "Comercial", "Generado internamente", "Desconocido".
+
+### 1.4 — Nuevo formato de ID
+Al guardar, generar el ID semántico con el siguiente formato:
+`EJE-[GENERO][ESPECIE]-[CODIGO_CEPA]-[TIPO_MATERIAL]-AAMMDD-NNN`
+
+- `GENERO`: 3 primeras letras del género.
+- `ESPECIE`: 3 primeras letras de la especie.
+- `CODIGO_CEPA`: si no tiene, se omite este segmento (y el guión que lo precede).
+- `TIPO_MATERIAL`: código de 3 letras según la tabla del punto 1.2.
+- `AAMMDD`: fecha de ingreso (2 dígitos para el año).
+- `NNN`: secuencia del día (3 dígitos, reinicia cada día). Usar un contador en `metadata/counters`.
+
+**Ejemplos:**
+`EJE-HERERI-He3-EXP-260619-001`
+`EJE-CORMI-JER-260521-001` (sin código de cepa)
+
+### 1.5 — No modificar
+- Los `ejemplares` existentes (conservan su ID actual).
+- Los campos `ploidia`, `tipo_micelio` y `estado`.
+- La colección `esporomas`.
+
+---
+
+## BLOQUE 2 — Nueva colección `eventos_aislamiento`
+
+**Objetivo:** Crear la entidad que agrupa derivados de un mismo aislamiento y vincularla a los ejemplares.
+
+### 2.1 — Colección `eventos_aislamiento`
+Crear la colección con la siguiente estructura:
+```javascript
+{
+  id: "EVT-[GENERO][ESPECIE]-AAMMDD-NNN",
+  ejemplar_origen_id: string, // ID del ejemplar padre
+  tecnica: string, // "Agotamiento en superficie" | "Aislamiento monospórico" | "Subcultivo" | "Explanto directo" | "Esporulación directa" | "N/A"
+  medio_utilizado: string, // opcional, texto libre
+  temperatura_C: number, // opcional
+  dias_incubacion: number, // opcional
+  cantidad_derivados: number,
+  fecha: string,
+  operario: string,
+  observaciones: string
+}
+2.2 — Formulario de alta de eventos_aislamiento
+Crear un formulario accesible desde un botón en la página de ejemplares. Debe incluir:
+
+ejemplar_origen_id: SearchableSelect de ejemplares.
+
+tecnica: select obligatorio con las opciones listadas.
+
+medio_utilizado, temperatura_C, dias_incubacion: opcionales.
+
+cantidad_derivados: número, mínimo 1.
+
+fecha: fecha actual por defecto.
+
+operario: precargado de Firebase Auth, editable.
+
+observaciones: textarea opcional.
+
+2.3 — Campo evento_aislamiento_id en ejemplares
+Agregar un campo opcional evento_aislamiento_id en el formulario de alta de ejemplares y en la colección. Es un SearchableSelect que busca en eventos_aislamiento.
+
+BLOQUE 3 — Ajustes finales
+Objetivo: Correcciones menores y verificación de consistencia.
+
+3.1 — Campo tecnica_aislamiento en ejemplares
+Agregar un campo opcional tecnica_aislamiento (select) en el formulario de ejemplares con las mismas opciones que en eventos_aislamiento. Es útil cuando el ejemplar se crea directamente sin pasar por un evento.
+
+3.2 — Verificar IDs de esporomas
+Confirmar que el formato ESP-[GEN][ESP]-[CEPA]-[ORIGEN][NN]-AAMMDD-NNN funciona correctamente y que el contador metadata/counters se crea sin errores.
+
+3.3 — Deploy final
+Ejecutar npm run build && npx firebase deploy --only hosting y confirmar que la web está actualizada.
+
+ORDEN DE IMPLEMENTACIÓN
+text
+BLOQUE 1 → Formulario ejemplares + nuevo ID
+BLOQUE 2 → Colección eventos_aislamiento
+BLOQUE 3 → Ajustes finales
+Cada bloque debe ser deployado y confirmado por Maxi antes de continuar.

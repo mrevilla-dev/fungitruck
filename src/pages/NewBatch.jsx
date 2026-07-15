@@ -69,9 +69,13 @@ function NewBatch() {
     });
     
     // Fetch Medios Preparados for selection
-    const qMedios = query(collection(db, "medios_preparados"), where("cantidad_actual", ">", 0));
+    const qMedios = query(collection(db, "medios_preparados"));
     const unsubscribeMedios = onSnapshot(qMedios, (snapshot) => {
-      setMediosPrepList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMediosPrepList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => {
+        if (m.estado === 'Agotado' || m.eliminado) return false;
+        const disp = m.stock_bulk?.cantidad_actual ?? m.cantidad_actual ?? 0;
+        return disp > 0;
+      }));
     });
 
     return () => {
@@ -187,14 +191,17 @@ function NewBatch() {
         
         if (medio.medioPrepId && medio.medioPrepId !== 'custom') {
            const mpDoc = await getDoc(doc(db, 'medios_preparados', medio.medioPrepId));
-           if (!mpDoc.exists() || mpDoc.data().cantidad_actual < clonesCount) {
-              alert(`❌ Stock insuficiente para el lote de medio seleccionado. Hay ${mpDoc.data()?.cantidad_actual || 0} disponibles, solicitaste ${clonesCount}.`);
+           const mpData = mpDoc.data();
+           const disp = mpData?.stock_bulk?.cantidad_actual ?? mpData?.cantidad_actual ?? 0;
+           if (!mpDoc.exists() || disp < clonesCount) {
+              alert(`❌ Stock insuficiente para el lote de medio seleccionado. Hay ${disp} disponibles, solicitaste ${clonesCount}.`);
               setLoading(false);
               return;
            }
            // Agregamos el decremento al batch
            const mpRef = doc(db, 'medios_preparados', medio.medioPrepId);
-           writeBatchOp.update(mpRef, { cantidad_actual: increment(-clonesCount) });
+           const newDisp = disp - clonesCount;
+           writeBatchOp.update(mpRef, { 'stock_bulk.cantidad_actual': newDisp });
         }
       }
       
@@ -202,9 +209,11 @@ function NewBatch() {
       for (const medio of medios) {
         if (!medio.nombre.trim() && !medio.medioPrepId) continue;
         
-        const finalSubstrateName = medio.medioPrepId && medio.medioPrepId !== 'custom' 
-            ? mediosPrepList.find(m => m.id === medio.medioPrepId)?.nombre_medio 
-            : medio.nombre;
+        const mpObj = medio.medioPrepId && medio.medioPrepId !== 'custom' 
+            ? mediosPrepList.find(m => m.id === medio.medioPrepId) 
+            : null;
+
+        const finalSubstrateName = mpObj ? mpObj.nombre_medio : medio.nombre;
 
         // And for each medium, we can create multiple clones (quantity)
         for (let i = 0; i < (medio.cantidad || 1); i++) {
@@ -242,6 +251,9 @@ function NewBatch() {
             tipoContenedor: formData.tipoContenedor === 'otro' ? formData.otroContenedorNombre : formData.tipoContenedor,
             peso_seco_sustrato_g: Number(medio.peso_seco_sustrato_g || 0),
             peso_seco_es_medido: Boolean(medio.peso_seco_es_medido),
+            peso_seco_pct: mpObj?.peso_seco_pct || null,
+            ph_real: mpObj?.ph_real || null,
+            densidad_real_brix: mpObj?.densidad_real_brix || null,
             observaciones: formData.observaciones,
 
             operator: formData.operator,
@@ -531,7 +543,7 @@ function NewBatch() {
                   >
                     <option value="">— Elegir Medio de Inventario —</option>
                     {mediosPrepList.map(mp => (
-                      <option key={mp.id} value={mp.id}>{mp.nombre_medio} - Lote {mp.lote_preparacion} ({mp.cantidad_actual} disp.)</option>
+                      <option key={mp.id} value={mp.id}>{mp.nombre_medio} - Lote {mp.lote_preparacion} ({mp.stock_bulk?.cantidad_actual ?? mp.cantidad_actual ?? 0} disp.)</option>
                     ))}
                     <option value="custom">Otro / Sin inventariar</option>
                   </select>

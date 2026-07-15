@@ -1,9 +1,29 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, where, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, runTransaction, serverTimestamp, where, getDocs, getDoc, writeBatch, updateDoc, increment, addDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import PrintLabelsModal from './PrintLabelsModal';
 import { Html5Qrcode } from 'html5-qrcode';
 import SearchableSelect from './SearchableSelect';
+
+function extraerCodigoMedio(alias) {
+  if (!alias) return 'MED';
+  const partes = alias.split(' ');
+  const codigo = partes.find(p =>
+    !['lote', 'batch', 'nro', 'n°'].includes(p.toLowerCase()) && isNaN(p)
+  );
+  return (codigo || 'MED').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+}
+
+function buildBagId(codigoMedio, existingCount) {
+  const today = new Date();
+  const yyyymmdd =
+    today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0');
+  const letter = String.fromCharCode(65 + existingCount); // A=0, B=1…
+  return `FRAC-${codigoMedio}-${yyyymmdd}-${letter}`;
+}
 
 export default function NuevoMedioModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -25,12 +45,18 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     fecha_preparacion: new Date().toISOString().split('T')[0],
     observaciones: '',
     
+    // New Block 2 fields
+    categoria: '',
+    ubicacion: '',
+    ubicacion_detalle: '',
+    operario: '',
+    vida_util_dias: '',
+
     // Quality Control Fields
     ph_observado: '',
     densidad_observada: '',
     osmolaridad_observada: '',
     peso_muestra_humeda_g: '',
-    operario: '',
 
     // Campos Serie Experimental
     repeticiones: 1,
@@ -59,6 +85,15 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const [scanMessage, setScanMessage] = useState('');
 
   useEffect(() => {
+    // Pre-fill operario with logged in user
+    const auth = getAuth();
+    if (auth.currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        operario: auth.currentUser.displayName || auth.currentUser.email || ''
+      }));
+    }
+
     // Suscripción a Recetas
     const q = query(collection(db, "recetas"));
     const unsubscribeRecetas = onSnapshot(q, (snapshot) => {
@@ -88,52 +123,60 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     };
   }, []);
 
-  // --- Cámara y QR Scanner hook-like effect ---
   useEffect(() => {
+    if (!activeScannerForInsumo) return;
+
     let qrScanner = null;
-    if (activeScannerForInsumo) {
-      setScanMessage('Iniciando cámara...');
-      const startQr = async () => {
+    let isMounted = true;
+
+    setScanMessage('Iniciando cámara...');
+
+    const startQr = async () => {
+      try {
+        qrScanner = new Html5Qrcode("modal-scanner-reader");
+        const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+        await qrScanner.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            if (isMounted) handleScanSuccess(decodedText, activeScannerForInsumo, qrScanner);
+          },
+          () => {}
+        );
+        if (isMounted) setScanMessage('Cámara activa. Enfocá el QR del lote.');
+      } catch (err) {
+        console.error("Camera error:", err);
         try {
-          qrScanner = new Html5Qrcode("modal-scanner-reader");
           const config = { fps: 10, qrbox: { width: 220, height: 220 } };
           await qrScanner.start(
-            { facingMode: "environment" },
+            { facingMode: "user" },
             config,
             (decodedText) => {
-              handleScanSuccess(decodedText, activeScannerForInsumo, qrScanner);
+              if (isMounted) handleScanSuccess(decodedText, activeScannerForInsumo, qrScanner);
             },
             () => {}
           );
-          setScanMessage('Cámara activa. Enfocá el QR del lote.');
-        } catch (err) {
-          console.error("Camera error:", err);
-          try {
-            await qrScanner.start(
-              { facingMode: "user" },
-              config,
-              (decodedText) => {
-                handleScanSuccess(decodedText, activeScannerForInsumo, qrScanner);
-              },
-              () => {}
-            );
-            setScanMessage('Cámara activa (frontal). Enfocá el QR del lote.');
-          } catch (userErr) {
-            console.error("User camera error:", userErr);
-            setScanMessage('No se pudo acceder a la cámara. Usá el simulador de abajo.');
-          }
+          if (isMounted) setScanMessage('Cámara activa (frontal). Enfocá el QR del lote.');
+        } catch (userErr) {
+          console.error("User camera error:", userErr);
+          if (isMounted) setScanMessage('No se pudo acceder a la cámara. Usá el simulador de abajo.');
         }
-      };
-      
-      const timer = setTimeout(startQr, 300);
-      return () => {
-        clearTimeout(timer);
-        if (qrScanner && qrScanner.isScanning) {
-          qrScanner.stop().catch(err => console.warn("Error stopping scanner", err));
-        }
-      };
-    }
+      }
+    };
+
+    const timer = setTimeout(startQr, 300);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      if (qrScanner) {
+        qrScanner.isScanning
+          ? qrScanner.stop().catch(err => console.warn("Error stopping scanner", err))
+          : Promise.resolve();
+      }
+    };
   }, [activeScannerForInsumo]);
+
 
   const handleScanSuccess = async (decodedText, insumoId, scanner) => {
     if (scanner && scanner.isScanning) {
@@ -197,6 +240,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     const selectedRecip = recipienteId === 'generico' 
       ? { nombre: 'Envase de Laboratorio (Genérico)' }
       : recipientes.find(r => r.id === recipienteId);
+      
+    if (!selectedRecip) return alert("Recipiente no encontrado o inválido.");
     const newEnvases = [];
     const baseCount = envasesList.length + 1;
     
@@ -222,8 +267,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     if (!volumen_unidad || volumen_unidad <= 0) return alert("Ingresá un volumen de unidad válido");
 
     const selectedRecip = recipienteId === 'generico'
-      ? { nombre: 'Envase Secundario (Genérico)' }
+      ? { nombre: 'Fraccionamiento (Genérico)' }
       : recipientes.find(r => r.id === recipienteId);
+      
+    if (!selectedRecip) return alert("Envase secundario no encontrado o inválido.");
     const totalSubVol = Number(cantidad) * Number(volumen_unidad);
 
     setEnvasesList(prev => prev.map(env => {
@@ -276,9 +323,6 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.recetaId) return alert("Seleccioná una receta");
-    if (envasesList.length === 0) {
-      return alert("Debés registrar al menos un envase de stock principal.");
-    }
     
     const receta = recetas.find(r => r.id === formData.recetaId);
     const itemsToCreate = isExperimental ? Number(formData.repeticiones) : 1;
@@ -286,32 +330,75 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
     // --- Validación y Advertencia de Stock antes de guardar ---
     const totalConsumoCheck = {};
     const ingredientesValidosCheck = receta.ingredientes || [];
+    const theoreticalYieldCheck = typeof receta.rendimiento_teorico === 'object' 
+      ? Number(receta.rendimiento_teorico?.cantidad ?? 1000) 
+      : Number(receta.rendimiento_teorico || 1000);
+
     ingredientesValidosCheck.forEach(ing => {
-      const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
+      const factor = (Number(formData.cantidad_preparada) * itemsToCreate) / theoreticalYieldCheck;
       totalConsumoCheck[ing.insumoId] = (totalConsumoCheck[ing.insumoId] || 0) + (ing.cantidad * factor);
     });
-
-    let warningMessages = [];
-    for (const insumoId in totalConsumoCheck) {
-      const selectedLoteId = selectedLotes[insumoId];
-      if (!selectedLoteId) {
-        warningMessages.push(`- Insumo ${ingredientesValidosCheck.find(i=>i.insumoId===insumoId)?.nombre || insumoId} sin lote seleccionado.`);
-      } else {
-        const lote = lotesDisponibles.find(l => l.id === selectedLoteId);
-        if (lote && lote.cantidad_base_actual < totalConsumoCheck[insumoId]) {
-          warningMessages.push(`- Stock insuficiente en Lote ${lote.lote_interno} (quedará negativo).`);
-        }
-      }
-    }
-
-    if (warningMessages.length > 0) {
-      const proceed = window.confirm("⚠️ Advertencia:\n\n" + warningMessages.join("\n") + "\n\n¿Querés guardar el medio de todos modos?");
-      if (!proceed) return;
-    }
 
     setLoading(true);
 
     try {
+      // 1. Obtener detalles de Insumos Base y lotes abiertos antes de la transacción
+      const masterDocs = {};
+      const lotesByInsumo = {};
+
+      for (const insumoId in totalConsumoCheck) {
+        const mSnap = await getDoc(doc(db, 'insumos_base', insumoId));
+        if (mSnap.exists()) {
+          masterDocs[insumoId] = mSnap.data();
+        }
+
+        const qLotes = query(
+          collection(db, 'insumos_lotes'),
+          where('insumoId', '==', insumoId),
+          where('estado_apertura', '==', 'Abierto'),
+          where('cantidad_base_actual', '>', 0)
+        );
+        const lSnap = await getDocs(qLotes);
+        const sortedLotes = lSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+        
+        // Ordenar FIFO: fecha_ingreso asc, luego createdAt asc
+        sortedLotes.sort((a, b) => {
+          const dateA = a.fecha_ingreso ? new Date(a.fecha_ingreso + 'T00:00:00') : new Date(0);
+          const dateB = b.fecha_ingreso ? new Date(b.fecha_ingreso + 'T00:00:00') : new Date(0);
+          if (dateA.getTime() === dateB.getTime()) {
+            const timeA = a.createdAt?.seconds || 0;
+            const timeB = b.createdAt?.seconds || 0;
+            return timeA - timeB;
+          }
+          return dateA - dateB;
+        });
+        lotesByInsumo[insumoId] = sortedLotes;
+      }
+
+      // 2. Verificar stock insuficiente y mostrar advertencia
+      let warningMessages = [];
+      const advertenciasStock = [];
+
+      for (const insumoId in totalConsumoCheck) {
+        const reqQty = totalConsumoCheck[insumoId];
+        const masterDoc = masterDocs[insumoId];
+        const insumoNombre = masterDoc?.nombre || insumoId;
+        const stockTotal = masterDoc?.stock_total_base || 0;
+
+        if (stockTotal < reqQty) {
+          warningMessages.push(`⚠️ Stock insuficiente: ${insumoNombre} — disponible: ${stockTotal.toFixed(1)} — requerido: ${reqQty.toFixed(1)}.`);
+          advertenciasStock.push(insumoId);
+        }
+      }
+
+      if (warningMessages.length > 0) {
+        const proceed = window.confirm(warningMessages.join("\n") + "\n\n¿Continuar?");
+        if (!proceed) {
+          setLoading(false);
+          return;
+        }
+      }
+
       const variableValoresArr = formData.variable_valores.split(',').map(v => v.trim());
       const batchesData = [];
 
@@ -325,75 +412,134 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       });
 
       await runTransaction(db, async (transaction) => {
-        // 1. Verificar Stock de Insumos Base e Ingredientes
-        const totalConsumo = {};
-        const ingredientesValidos = receta.ingredientes || [];
-        ingredientesValidos.forEach(ing => {
-          const factor = (formData.cantidad_preparada * itemsToCreate) / receta.rendimiento_teorico.cantidad;
-          totalConsumo[ing.insumoId] = (totalConsumo[ing.insumoId] || 0) + (ing.cantidad * factor);
-        });
-
-        const insumosRefs = {};
-        const insumosDocs = {};
-
-        for (const insumoId in totalConsumo) {
-          const selectedLoteId = selectedLotes[insumoId];
-          if (selectedLoteId) {
-            insumosRefs[insumoId] = doc(db, 'insumos_lotes', selectedLoteId);
-            const loteSnap = await transaction.get(insumosRefs[insumoId]);
-            if (loteSnap.exists()) {
-              insumosDocs[insumoId] = loteSnap.data();
-            }
-          }
-        }
-
-        // 2. Verificar Stock de Recipientes (Sin bloquear por falta)
-        const recipientesRefs = {};
+        // ============================================
+        // FASE 1: LECTURAS (todas juntas al principio)
+        // ============================================
+        const masterSnaps = {};
+        const loteSnaps = {};
         const recipientesSnaps = {};
 
-        for (const recipienteId in recipientesDeductions) {
-          recipientesRefs[recipienteId] = doc(db, 'insumos_base', recipienteId);
-          const snap = await transaction.get(recipientesRefs[recipienteId]);
-          if (snap.exists()) {
-            recipientesSnaps[recipienteId] = snap.data();
-          }
-        }
-
-        // 3. Descontar stock de ingredientes
-        for (const insumoId in totalConsumo) {
-          if (insumosRefs[insumoId] && insumosDocs[insumoId]) {
-            transaction.update(insumosRefs[insumoId], {
-              cantidad_base_actual: insumosDocs[insumoId].cantidad_base_actual - totalConsumo[insumoId]
-            });
-          }
+        // 1. Leer masters de ingredientes
+        for (const insumoId in totalConsumoCheck) {
           const masterRef = doc(db, 'insumos_base', insumoId);
-          const masterSnap = await transaction.get(masterRef);
-          if (masterSnap.exists()) {
-            transaction.update(masterRef, {
-              stock_total_base: (masterSnap.data().stock_total_base || 0) - totalConsumo[insumoId]
+          masterSnaps[insumoId] = await transaction.get(masterRef);
+        }
+
+        // 2. Leer lotes de ingredientes
+        for (const insumoId in totalConsumoCheck) {
+          const lotes = lotesByInsumo[insumoId] || [];
+          loteSnaps[insumoId] = [];
+          for (const lote of lotes) {
+            const snap = await transaction.get(lote.ref);
+            loteSnaps[insumoId].push({
+              id: lote.id,
+              ref: lote.ref,
+              snap: snap
             });
           }
         }
 
-        // 4. Descontar stock de recipientes
+        // 3. Leer stock de recipientes
         for (const recipienteId in recipientesDeductions) {
-          if (recipientesSnaps[recipienteId]) {
-            const qtyToDeduct = recipientesDeductions[recipienteId] * itemsToCreate;
-            transaction.update(recipientesRefs[recipienteId], {
-              stock_total_base: (recipientesSnaps[recipienteId].stock_total_base || 0) - qtyToDeduct
+          const recipRef = doc(db, 'insumos_base', recipienteId);
+          recipientesSnaps[recipienteId] = await transaction.get(recipRef);
+        }
+
+        // ============================================
+        // FASE 2: CÁLCULOS (usando datos ya leídos)
+        // ============================================
+        const insumosConsumidosPorMedio = [];
+        const updatesToApply = [];
+
+        for (const insumoId in totalConsumoCheck) {
+          const totalReq = totalConsumoCheck[insumoId];
+          let pendingDeduction = totalReq;
+          const lotes = loteSnaps[insumoId] || [];
+
+          for (const lote of lotes) {
+            if (pendingDeduction <= 0) break;
+
+            const snap = lote.snap;
+            if (snap.exists()) {
+              const currentLoteQty = snap.data().cantidad_base_actual || 0;
+              if (currentLoteQty > 0) {
+                const deductQty = Math.min(currentLoteQty, pendingDeduction);
+                
+                updatesToApply.push({
+                  ref: lote.ref,
+                  data: {
+                    cantidad_base_actual: currentLoteQty - deductQty,
+                    updatedAt: serverTimestamp()
+                  }
+                });
+
+                insumosConsumidosPorMedio.push({
+                  insumoId: insumoId,
+                  loteId: lote.id,
+                  cantidad: deductQty
+                });
+
+                pendingDeduction -= deductQty;
+              }
+            }
+          }
+
+          // Si queda pendiente (o si no tiene lotes), se asocia al stock general
+          if (pendingDeduction > 0) {
+            insumosConsumidosPorMedio.push({
+              insumoId: insumoId,
+              loteId: null,
+              cantidad: pendingDeduction
+            });
+          }
+
+          // Actualizar el maestro de insumos_base
+          const masterSnap = masterSnaps[insumoId];
+          if (masterSnap && masterSnap.exists()) {
+            const currentMasterStock = masterSnap.data().stock_total_base || 0;
+            updatesToApply.push({
+              ref: masterSnap.ref,
+              data: {
+                stock_total_base: currentMasterStock - totalReq,
+                updatedAt: serverTimestamp()
+              }
             });
           }
         }
 
-        // 5. Crear Lotes de Medios Preparados
+        // Descontar stock de recipientes
+        for (const recipienteId in recipientesDeductions) {
+          const snap = recipientesSnaps[recipienteId];
+          if (snap && snap.exists()) {
+            const qtyToDeduct = recipientesDeductions[recipienteId] * itemsToCreate;
+            const currentRecipStock = snap.data().stock_total_base || 0;
+            updatesToApply.push({
+              ref: snap.ref,
+              data: {
+                stock_total_base: currentRecipStock - qtyToDeduct
+              }
+            });
+          }
+        }
+
+        // ============================================
+        // FASE 3: ESCRITURAS (todas juntas al final)
+        // ============================================
+
+        // 1. Aplicar actualizaciones de stock
+        for (const update of updatesToApply) {
+          transaction.update(update.ref, update.data);
+        }
+
+        // 2. Crear Lotes de Medios Preparados y Auditorías
         const experimentId = isExperimental ? `EXP-${Date.now()}` : null;
         
         for (let i = 0; i < itemsToCreate; i++) {
           const newMedioRef = doc(collection(db, 'medios_preparados'));
           const variableValue = isExperimental ? variableValoresArr[i % variableValoresArr.length] : null;
-          const alias = isExperimental 
-            ? `${formData.prefix_alias}-P${i + 1}` 
-            : `MP-${receta.nombre.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
+          const alias = isExperimental
+            ? `${formData.prefix_alias}-P${i + 1}`
+            : `${receta.nombre} Lote ${i + 1}`;
 
           const totalSubFracUnits = envasesList.reduce((acc, env) => 
             acc + env.sub_fraccionamientos.reduce((sum, sf) => sum + sf.cantidad, 0)
@@ -407,11 +553,15 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             tipo: receta.categoria,
             peso_seco_por_unidad_g: receta.peso_seco_por_unidad_g || 0,
             ph_esperado: receta.ph_esperado || null,
-            estado: 'Personalizado', // Flow dinámico en etapas
+            estado: 'Personalizado',
+            categoria: formData.categoria,
+            ubicacion: envasesList[0]?.ubicacion || '',
+            operario: formData.operario || 'Sistema',
             fecha_vencimiento: (() => {
-              if (receta.tiempo_max_heladera_dias && formData.fecha_preparacion) {
+              const days = formData.vida_util_dias ? Number(formData.vida_util_dias) : (receta.tiempo_max_heladera_dias ? Number(receta.tiempo_max_heladera_dias) : null);
+              if (days && formData.fecha_preparacion) {
                 const prepDate = new Date(formData.fecha_preparacion + 'T12:00:00');
-                prepDate.setDate(prepDate.getDate() + Number(receta.tiempo_max_heladera_dias));
+                prepDate.setDate(prepDate.getDate() + days);
                 return prepDate.toISOString().split('T')[0];
               }
               return null;
@@ -419,8 +569,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
 
             stock_bulk: {
               cantidad_inicial: Number(formData.cantidad_preparada),
-              cantidad_actual: envasesList.reduce((acc, env) => acc + env.volumen_actual, 0),
-              unidad: receta.rendimiento_teorico.unidad || 'ml'
+              cantidad_actual: Math.max(0, Number(formData.cantidad_preparada) - envasesList.reduce((acc, env) => acc + (env.volumen_inicial || 0), 0)),
+              unidad: receta.rendimiento_teorico?.unidad || 'ml'
             },
             stock_fraccionado: {
               cantidad_inicial: totalSubFracUnits,
@@ -436,6 +586,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               recipienteNombre: env.recipienteNombre,
               volumen_inicial: env.volumen_inicial,
               volumen_actual: env.volumen_actual,
+              ubicacion: env.ubicacion || '',
+              ubicacion_detalle: env.ubicacion_detalle || '',
               sub_fraccionamientos: env.sub_fraccionamientos.map(sf => ({
                 id: sf.id,
                 cantidad: sf.cantidad,
@@ -445,14 +597,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               }))
             })),
             trazabilidad: {
-              insumos_consumidos: ingredientesValidos.map(ing => ({
-                insumoId: ing.insumoId,
-                loteId: selectedLotes[ing.insumoId] || null,
-                cantidad: (formData.cantidad_preparada / receta.rendimiento_teorico.cantidad) * ing.cantidad
-              })),
+              insumos_consumidos: insumosConsumidosPorMedio,
               fecha_preparacion: formData.fecha_preparacion,
               operador: formData.operario || 'Sistema',
-              observaciones: formData.observaciones || ''
+              observaciones: formData.observaciones || '',
+              categoria: formData.categoria,
+              ubicacion: formData.ubicacion,
+              ubicacion_detalle: formData.ubicacion_detalle,
+              vida_util_dias: formData.vida_util_dias ? Number(formData.vida_util_dias) : null
             },
             control_calidad: {
               ph_observado: formData.ph_observado ? Number(formData.ph_observado) : null,
@@ -460,7 +612,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               osmolaridad_observada: formData.osmolaridad_observada ? Number(formData.osmolaridad_observada) : null,
               peso_muestra_humeda_g: formData.peso_muestra_humeda_g ? Number(formData.peso_muestra_humeda_g) : null,
             },
+            advertencias_stock: advertenciasStock,
             observaciones: formData.observaciones || '',
+            total_subfracciones: envasesList.length,
+            subfracciones_disponibles: envasesList.length,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           };
@@ -471,10 +626,62 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           }
 
           transaction.set(newMedioRef, data);
-          batchesData.push(data);
+          
+          if (envasesList.length === 0) {
+            batchesData.push(data);
+          } else {
+            const codigoMedio = extraerCodigoMedio(alias);
+            envasesList.forEach((env, index) => {
+              const sfRef = doc(collection(db, `medios_preparados/${newMedioRef.id}/subfracciones`));
+              const bagId = buildBagId(codigoMedio, index);
+              const bagData = {
+                id_bolsa: bagId,
+                tipo_envase: 'Envase Principal',
+                tipo_unidad: env.recipienteNombre || 'Desconocido',
+                cantidad: 1,
+                disponible: 1,
+                volumen_por_unidad_ml: env.volumen_inicial,
+                ubicacion: env.ubicacion || formData.ubicacion || '',
+                ubicacion_detalle: env.ubicacion_detalle || formData.ubicacion_detalle || '',
+                fecha: formData.fecha_preparacion,
+                operario: formData.operario || 'Sistema',
+                estado: 'Disponible',
+                novedades: [],
+                createdAt: serverTimestamp()
+              };
+              transaction.set(sfRef, bagData);
+              
+              batchesData.push({
+                id: bagData.id_bolsa,
+                alias: bagData.id_bolsa,
+                nombre_receta: receta.nombre,
+                nombre_insumo: `${bagData.tipo_envase} de ${receta.nombre}`,
+                tipo_envase: bagData.tipo_envase,
+                tipo_unidad: bagData.tipo_unidad,
+                fecha: bagData.fecha,
+                lote: data.alias,
+                ubicacion: bagData.ubicacion,
+                operador: bagData.operario,
+                especie: bagData.tipo_unidad
+              });
+            });
+          }
+
+          // Registrar auditorías automáticas
+          for (const insumoId in totalConsumoCheck) {
+            const auditRef = doc(collection(db, `insumos_base/${insumoId}/auditorias`));
+            transaction.set(auditRef, {
+              tipo: "Consumo Automático",
+              cantidad: totalConsumoCheck[insumoId] / itemsToCreate,
+              medioId: newMedioRef.id,
+              fecha: serverTimestamp(),
+              operario: formData.operario || 'Sistema'
+            });
+          }
         }
       });
 
+      // Transaction completed successfully
       setCreatedBatches(batchesData);
       setSuccess(true);
     } catch (error) {
@@ -492,8 +699,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const currentReceta = recetas.find(r => r.id === formData.recetaId);
 
   // --- Dynamic materials checklist and capacity calculation ---
-  const baseVol = currentReceta?.rendimiento_teorico?.cantidad || 1000;
-  const targetVol = formData.cantidad_preparada || 1000;
+  const baseVol = typeof currentReceta?.rendimiento_teorico === 'object' 
+    ? Number(currentReceta?.rendimiento_teorico?.cantidad ?? 1000) 
+    : Number(currentReceta?.rendimiento_teorico || 1000);
+  const targetVol = Number(formData.cantidad_preparada) || 1000;
 
   const scaleMaterial = (mat) => {
     const factor = targetVol / baseVol;
@@ -682,18 +891,79 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           
           {/* SECCIÓN 1: RECETA Y PARÁMETROS */}
           <div className="section-divider">
-            <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.1rem' }}>1. Receta y Volumen General</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ position: 'relative', zIndex: 50 }}>
+            <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.1rem' }}>1. Receta y Ubicación</h4>
+
+            <div className="grid-2" style={{ marginBottom: '1.25rem', gap: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Categoría <span style={{ color: 'red' }}>*</span></label>
+                <select className="form-control" required value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value, recetaId: ''})}>
+                  <option value="">-- Seleccionar --</option>
+                  {[...new Set(recetas.map(r => r.categoria).filter(Boolean))].sort().map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 2000 }}>
+                <label className="form-label">Receta base <span style={{ color: 'red' }}>*</span></label>
                 <SearchableSelect
-                  options={recetas.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.categoria})` }))}
+                  options={recetas.filter(r => !formData.categoria || r.categoria === formData.categoria).map(r => ({ id: r.id, nombre: `${r.nombre} (${r.categoria})` }))}
                   value={formData.recetaId}
                   onChange={(val) => { setFormData({...formData, recetaId: val}); setCheckedMaterials({}); setCheckedEquipments({}); setCheckedWeighing({}); setSelectedLotes({}); }}
                   placeholder="-- Seleccioná Receta --"
                 />
               </div>
+            </div>
 
-              {currentReceta && (
+            {currentReceta && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div 
+                  className="recipe-preview animate-fade-in" 
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    fontSize: '0.9rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                    📋 Vista Previa de Receta: {currentReceta.nombre}
+                  </div>
+                  {(currentReceta.descripcion_corta || currentReceta.descripcion) && (
+                    <div>
+                      <strong>Descripción:</strong> {currentReceta.descripcion_corta || currentReceta.descripcion}
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div>
+                      <strong>🧪 pH esperado:</strong> {currentReceta.ph_esperado ?? 'N/A'}
+                    </div>
+                    <div>
+                      <strong>⚖️ Peso seco/u:</strong> {currentReceta.peso_seco_por_unidad_g ? `${currentReceta.peso_seco_por_unidad_g} g` : 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>🌾 Ingredientes:</strong>
+                    <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
+                      {(currentReceta.ingredientes || []).map((ing, idx) => (
+                        <li key={idx}>
+                          {ing.nombre_insumo || ing.nombre || 'Insumo'}: {ing.cantidad} {ing.unidad || 'g'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {currentReceta.protocolo_url && (
+                    <div>
+                      <strong>🔗 Enlace al Protocolo:</strong>{' '}
+                      <a href={currentReceta.protocolo_url} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>
+                        {currentReceta.protocolo_url}
+                      </a>
+                    </div>
+                  )}
+                </div>
                 <button 
                   type="button" 
                   className="btn btn-outline" 
@@ -707,15 +977,34 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                   }} 
                   onClick={() => setShowProtocolModal(true)}
                 >
-                  📄 Ver Protocolo Asociado
+                  📄 Ver Protocolo Completo
                 </button>
-              )}
+              </div>
+            )}
+
+            {/* Vida Útil */}
+            <div className="grid-2" style={{ gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Vida Útil (días)</label>
+                <input type="number" className="form-control" min="0" value={formData.vida_util_dias} onChange={e => setFormData({...formData, vida_util_dias: e.target.value})} placeholder="Ej: 30" />
+              </div>
             </div>
 
             <div className="grid-2" style={{ marginTop: '1.25rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Volumen Total a Preparar (ml/g)</label>
-                <input type="number" className="form-control" style={{ height: '48px', fontSize: '1.1rem' }} required value={formData.cantidad_preparada} onChange={e => setFormData({...formData, cantidad_preparada: Number(e.target.value)})} />
+                <input 
+                  type="text" 
+                  inputMode="decimal"
+                  className="form-control" 
+                  style={{ height: '48px', fontSize: '1.1rem' }} 
+                  required 
+                  value={formData.cantidad_preparada} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                    setFormData({...formData, cantidad_preparada: val});
+                  }} 
+                />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Fecha de Preparación</label>
@@ -727,10 +1016,19 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           {/* ASISTENTE DE PESADO / CANTIDADES CALCULADAS */}
           {currentReceta && (
             <div className="section-divider animate-fade-in" style={{ background: 'rgba(59, 130, 246, 0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
-              <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.85rem', fontSize: '1rem' }}>⚖️ Cantidades Calculadas (Regla de Tres)</h4>
+              <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.85rem', fontSize: '1rem' }}>
+                ⚖️ Cantidades Calculadas 
+                <span style={{ fontSize: '0.75rem', marginLeft: '10px', color: '#666' }}>
+                  (Dbg: Base={typeof currentReceta.rendimiento_teorico === 'object' ? Number(currentReceta.rendimiento_teorico?.cantidad ?? 1000) : Number(currentReceta.rendimiento_teorico || 1000)}, Target={Number(formData.cantidad_preparada) || 0})
+                </span>
+              </h4>
               <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                 {(currentReceta.ingredientes || []).map(ing => {
-                  const factor = formData.cantidad_preparada / (currentReceta.rendimiento_teorico?.cantidad || 1000);
+                  const theoreticalYield = typeof currentReceta.rendimiento_teorico === 'object' 
+                    ? Number(currentReceta.rendimiento_teorico?.cantidad ?? 1000) 
+                    : Number(currentReceta.rendimiento_teorico || 1000);
+                  const parsedTarget = Number(formData.cantidad_preparada) || 0;
+                  const factor = parsedTarget / theoreticalYield;
                   const scaledQty = ing.cantidad * factor;
                   
                   const isChecked = !!checkedWeighing[ing.insumoId];
@@ -969,7 +1267,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                     <SearchableSelect
                       options={[
                         { id: 'generico', nombre: 'Otro / Genérico (No descuenta stock)' },
-                        ...recipientes.map(r => ({ id: r.id, nombre: `${r.nombre} (${r.stock_total_base}u disp.)` }))
+                        ...recipientes.filter(r => r.es_envase === true).map(r => ({ id: r.id, nombre: `${r.nombre} (${r.stock_total_base}u disp.)` }))
                       ]}
                       value={addEnvaseForm.recipienteId}
                       onChange={(val) => setAddEnvaseForm({...addEnvaseForm, recipienteId: val})}
@@ -1013,7 +1311,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 <div style={{ display: 'grid', gap: '1.25rem' }}>
                   <h5 style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Distribución en Mesa:</h5>
                   
-                  {envasesList.map((env) => (
+                  {envasesList.map((env, envIdx) => (
                     <div key={env.id} style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', padding: '1.25rem', borderRadius: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
                         <div>
@@ -1030,6 +1328,30 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                         }}>
                           Restante: {env.volumen_actual} ml
                         </span>
+                      </div>
+
+                      {/* Ubicación por envase */}
+                      <div className="grid-2" style={{ gap: '0.75rem', marginBottom: '0.75rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label" style={{ fontSize: '0.8rem' }}>📍 Ubicación</label>
+                          <select className="form-control" value={env.ubicacion || ''} onChange={e => {
+                            setEnvasesList(prev => prev.map(en => en.id === env.id ? { ...en, ubicacion: e.target.value } : en));
+                          }}>
+                            <option value="">-- Seleccionar --</option>
+                            <option value="Heladera Lab">Heladera Lab</option>
+                            <option value="Heladera Facultad">Heladera Facultad</option>
+                            <option value="Freezer -20°C">Freezer -20°C</option>
+                            <option value="Freezer -80°C">Freezer -80°C</option>
+                            <option value="Temperatura ambiente">Temperatura ambiente</option>
+                            <option value="Otra">Otra</option>
+                          </select>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label" style={{ fontSize: '0.8rem' }}>Detalle</label>
+                          <input type="text" className="form-control" placeholder="Estante, Caja..." value={env.ubicacion_detalle || ''} onChange={e => {
+                            setEnvasesList(prev => prev.map(en => en.id === env.id ? { ...en, ubicacion_detalle: e.target.value } : en));
+                          }} />
+                        </div>
                       </div>
 
                       {/* Lista de Sub-fraccionamiento actual en el envase */}
@@ -1190,10 +1512,10 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             <button 
               type="submit" 
               className="btn btn-primary" 
-              disabled={loading || envasesList.length === 0} 
+              disabled={loading} 
               style={{ 
                 flex: 1.5, 
-                opacity: (!formData.recetaId || envasesList.length === 0) ? 0.5 : 1,
+                opacity: (!formData.recetaId) ? 0.5 : 1,
                 height: '52px',
                 fontSize: '1.1rem',
                 fontWeight: 'bold'

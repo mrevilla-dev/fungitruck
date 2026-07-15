@@ -1,21 +1,34 @@
 import { useState, useEffect } from 'react';
-import { db, storage } from '../firebase';
-import { collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { db, storage, auth } from '../firebase';
+import SearchableSelect from '../components/SearchableSelect';
+import { collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, setDoc, doc, deleteDoc, updateDoc, runTransaction, arrayUnion, getDocs } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
 import { uploadFileToDrive } from '../services/driveService';
+import DerivacionEsporomaModal from '../components/DerivacionEsporomaModal';
 
 export default function EsporomasPage() {
   const [esporomas, setEsporomas] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [derivacionEsporoma, setDerivacionEsporoma] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editingEsporoma, setEditingEsporoma] = useState(null);
   const [formData, setFormData] = useState({
     genero: '',
     especie: '',
+    codigo_cepa: '',
+    nombre_comun: '',
+    origen: '',
+    latitud: '',
+    longitud: '',
+    batch_origen_id: '',
+    productor_nombre: '',
+    estado_biologico: 'Esporoma',
+    otro_estado_biologico: '',
     descripcion: '',
     lugarRecoleccion: '',
     fechaRecoleccion: new Date().toISOString().split('T')[0],
+    // Genetic fields kept for Firestore but hidden in UI
     ploidia: 'Diploide',
     tipo_micelio: 'Dicarión',
     mat: 'N/A',
@@ -93,10 +106,42 @@ export default function EsporomasPage() {
       let fotoUrl = editingEsporoma ? editingEsporoma.fotoUrl : null;
 
       if (!editingEsporoma) {
-        // Generate NEW ID like ESP-20260424-01
-        const datePart = formData.fechaRecoleccion.replace(/-/g, '');
-        const count = esporomas.filter(esp => esp.fechaRecoleccion === formData.fechaRecoleccion).length + 1;
-        esporomaId = `ESP-${datePart}-${String(count).padStart(2, '0')}`;
+        // Generate semantic ID according to spec
+        const generoCode = formData.genero.slice(0,3).toUpperCase();
+        const especieCode = formData.especie.slice(0,3).toUpperCase();
+        const codigoCepa = formData.codigo_cepa?.trim();
+        const origenMap = {
+          'Silvestre': 'SIL',
+          'Cultivo interno': 'INT',
+          'Compra a productor': 'PRO',
+          'Comercial': 'COM',
+          'Desconocido': 'DES'
+        };
+        const origenCode = origenMap[formData.origen] || '';
+        const datePart = formData.fechaRecoleccion.replace(/-/g, '').slice(2); // YYMMDD
+        const seqKey = `ESP_${datePart}`;
+        const counterRef = doc(db, 'metadata', 'counters');
+
+        const newId = await runTransaction(db, async (transaction) => {
+          const counterSnap = await transaction.get(counterRef);
+          const data = counterSnap.exists() ? counterSnap.data() : {};
+          const seq = (data[seqKey] || 0) + 1;
+          transaction.set(counterRef, { [seqKey]: seq }, { merge: true });
+
+          const nn = origenCode !== 'COM' && origenCode !== 'DES' && codigoCepa ? `${origenCode}${String(seq).padStart(2,'0')}` : origenCode;
+          const nnn = String(seq).padStart(3,'0');
+          const parts = [
+            'ESP',
+            `${generoCode}${especieCode}`,
+            codigoCepa ? codigoCepa : null,
+            nn,
+            datePart,
+            nnn
+          ].filter(Boolean);
+          return parts.join('-');
+        });
+        esporomaId = newId;
+
       }
 
       if (photo) {
@@ -121,12 +166,18 @@ export default function EsporomasPage() {
         }
       }
 
-      const docData = {
-        ...formData,
-        id: esporomaId,
-        fotoUrl,
-        updatedAt: serverTimestamp()
-      };
+        const docData = {
+          ...formData,
+          id: esporomaId,
+          fotoUrl,
+          // Ensure genetic fields are stored even if hidden
+          ploidia: formData.ploidia,
+          tipo_micelio: formData.tipo_micelio,
+          mat: formData.mat,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
 
 
       if (editingEsporoma) {
@@ -144,6 +195,15 @@ export default function EsporomasPage() {
       setEditingEsporoma(null);
       setUploadProgress(0);
       alert("✅ Guardado con éxito");
+        // If custom "Otro" state, update config collection
+        if (formData.estado_biologico === 'Otro' && formData.otro_estado_biologico.trim()) {
+          await setDoc(doc(db, 'config', 'estados_biologicos'), {
+            estados: arrayUnion(formData.otro_estado_biologico.trim())
+          }, { merge: true });
+        }
+
+      setLoading(false);
+      setUploadProgress(0);
     } catch (err) {
       console.error(err);
       alert(`⚠️ Error al guardar: ${err.message || "Error desconocido"}`);
@@ -157,7 +217,7 @@ export default function EsporomasPage() {
     <div className="animate-fade-in">
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2>Ejemplares DRIVETEST</h2>
-        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => openModal()}>➕ Nuevo Ejemplar</button>
+        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => openModal()}>➕ Nuevo Esporoma</button>
       </div>
 
       <p className="no-print">Registro de ejemplares silvestres recolectados para aislamiento y estudio.</p>
@@ -171,6 +231,7 @@ export default function EsporomasPage() {
             <div className="sala-header">
               <div className="label-id" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '0.5rem' }}>{esp.id}</div>
               <div className="flex-gap no-print">
+                <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', marginRight: '0.5rem' }} onClick={() => setDerivacionEsporoma(esp)}>+ Nueva Derivación</button>
                 <button className="edit-icon-btn" title="Editar" onClick={() => openModal(esp)}>✏️</button>
                 <button className="edit-icon-btn" title="Imprimir" onClick={() => window.print()}>🖨️</button>
                 <button className="edit-icon-btn" title="Eliminar" style={{ color: 'var(--danger-color)' }} onClick={() => handleDelete(esp)}>🗑️</button>
@@ -199,20 +260,89 @@ export default function EsporomasPage() {
         <div className="modal-overlay">
           <div className="modal-box">
             <div className="modal-header">
-              <h3>{editingEsporoma ? 'Editar Ejemplar' : 'Registrar Ejemplar Silvestre'}</h3>
+              <h3>{editingEsporoma ? 'Editar Esporoma' : 'Registrar Esporoma'}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="grid-2">
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Género</label>
+                      <input type="text" className="form-control" placeholder="Ej: Ganoderma" required value={formData.genero} onChange={e => setFormData({ ...formData, genero: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Especie</label>
+                      <input type="text" className="form-control" placeholder="Ej: lucidum" required value={formData.especie} onChange={e => setFormData({ ...formData, especie: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Código de cepa (opcional)</label>
+                    <input type="text" className="form-control" placeholder="Ej: A01" value={formData.codigo_cepa} onChange={e => setFormData({ ...formData, codigo_cepa: e.target.value })} />
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>⚠️ Evitar puntos (.) y guiones (-) en el código de cepa</p>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Nombre común (opcional)</label>
+                    <input type="text" className="form-control" placeholder="Ej: Girgola" value={formData.nombre_comun} onChange={e => setFormData({ ...formData, nombre_comun: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Origen del material</label>
+                    <select className="form-control" required value={formData.origen} onChange={e => setFormData({ ...formData, origen: e.target.value })}>
+                      <option value="">Seleccionar...</option>
+                      <option value="Silvestre">Silvestre</option>
+                      <option value="Cultivo interno">Cultivo interno</option>
+                      <option value="Compra a productor">Compra a productor</option>
+                      <option value="Comercial">Comercial</option>
+                      <option value="Desconocido">Desconocido</option>
+                    </select>
+{/* Conditional fields based on origen */}
+{formData.origen === 'Silvestre' && (
+  <div className="grid-2">
+    <div className="form-group">
+      <label className="form-label">Latitud</label>
+      <input type="number" className="form-control" placeholder="Ej: -33.45" value={formData.latitud} onChange={e => setFormData({ ...formData, latitud: e.target.value })} />
+    </div>
+    <div className="form-group">
+      <label className="form-label">Longitud</label>
+      <input type="number" className="form-control" placeholder="Ej: -70.66" value={formData.longitud} onChange={e => setFormData({ ...formData, longitud: e.target.value })} />
+    </div>
+  </div>
+)}
                 <div className="form-group">
-                  <label className="form-label">Género</label>
-                  <input type="text" className="form-control" placeholder="Ej: Ganoderma" required value={formData.genero} onChange={e => setFormData({ ...formData, genero: e.target.value })} />
+                  <label className="form-label">Estado biológico del material</label>
+                  <select className="form-control" required value={formData.estado_biologico} onChange={e => setFormData({ ...formData, estado_biologico: e.target.value })}>
+                    <option value="">Seleccionar...</option>
+                    <option value="Esporoma">Esporoma</option>
+                    <option value="Moho">Moho</option>
+                    <option value="Levadura">Levadura</option>
+                    <option value="Micelio vegetativo">Micelio vegetativo</option>
+                    <option value="Esclerocio">Esclerocio</option>
+                    <option value="Desconocido">Desconocido</option>
+                    <option value="Otro">Otro</option>
+                  </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Especie</label>
-                  <input type="text" className="form-control" placeholder="Ej: lucidum" required value={formData.especie} onChange={e => setFormData({ ...formData, especie: e.target.value })} />
-                </div>
-              </div>
+                {formData.estado_biologico === 'Otro' && (
+                  <div className="form-group">
+                    <label className="form-label">Especificar estado biológico</label>
+                    <input type="text" className="form-control" placeholder="Ej: Costra, Biopelícula..." value={formData.otro_estado_biologico} onChange={e => setFormData({ ...formData, otro_estado_biologico: e.target.value })} />
+                  </div>
+                )}
+{formData.origen === 'Cultivo interno' && (
+  <div className="form-group">
+    <label className="form-label">Batch de origen</label>
+    <SearchableSelect
+      placeholder="Seleccionar batch"
+      options={[]}
+      value={formData.batch_origen_id}
+      onChange={val => setFormData({ ...formData, batch_origen_id: val })}
+    />
+  </div>
+)}
+{formData.origen === 'Compra a productor' && (
+  <div className="form-group">
+    <label className="form-label">Nombre del productor / proveedor</label>
+    <input type="text" className="form-control" placeholder="Ej: Terrestrial Fungi" value={formData.productor_nombre} onChange={e => setFormData({ ...formData, productor_nombre: e.target.value })} />
+  </div>
+)}
+                  </div>
 
               <div className="form-group">
                 <label className="form-label">Lugar de Recolección</label>
@@ -226,33 +356,8 @@ export default function EsporomasPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">🧬 Estado Genético</label>
-                <div className="grid-2" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.72rem' }}>Ploidía</label>
-                    <select className="form-control" value={formData.ploidia} onChange={e => setFormData({ ...formData, ploidia: e.target.value })}>
-                      <option value="Diploide">Diploide</option>
-                      <option value="Haploide">Haploide</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.72rem' }}>Tipo de Micelio</label>
-                    <select className="form-control" value={formData.tipo_micelio} onChange={e => setFormData({ ...formData, tipo_micelio: e.target.value })}>
-                      <option value="Dicarión">Dicarión</option>
-                      <option value="Monocarión">Monocarión</option>
-                      <option value="Vegetativo">Vegetativo</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.72rem' }}>MAT (Apareamiento)</label>
-                  <select className="form-control" value={formData.mat} onChange={e => setFormData({ ...formData, mat: e.target.value })}>
-                    <option value="N/A">N/A</option>
-                    <option value="mat-A">mat-A</option>
-                    <option value="mat-B">mat-B</option>
-                    <option value="Desconocido">Desconocido</option>
-                  </select>
-                </div>
+                <label className="form-label">Responsable</label>
+                <input type="text" className="form-control" value={auth.currentUser?.displayName || auth.currentUser?.email || 'Desconocido'} disabled />
               </div>
 
               <div className="form-group">
@@ -282,12 +387,19 @@ export default function EsporomasPage() {
                 </div>
               )}
 
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? (uploadProgress > 0 ? "Subiendo..." : "Guardando...") : (editingEsporoma ? "💾 Guardar Cambios" : "💾 Registrar Ejemplar")}
-              </button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? (uploadProgress > 0 ? "Subiendo..." : "Guardando...") : (editingEsporoma ? "💾 Guardar Cambios" : "💾 Registrar Esporoma")}
+                </button>
             </form>
           </div>
         </div>
+      )}
+
+      {derivacionEsporoma && (
+        <DerivacionEsporomaModal 
+          esporoma={derivacionEsporoma} 
+          onClose={() => setDerivacionEsporoma(null)} 
+        />
       )}
     </div>
   );

@@ -1,0 +1,13 @@
+Para Antigravity:
+
+Maxi reimprimió etiquetas de PORTAOBJETOS desde la cola de impresión y el QR sigue sin leerse. El cambio que hiciste en zplProfiles.js no se está aplicando al reimprimir.
+
+Corrección requerida:
+
+Leé PrintQueue.jsx y PrintLabelsModal.jsx completos.
+
+Verificar que al reimprimir desde la cola, el ZPL se genere usando zplProfiles.js actualizado (con nivel M).
+
+Si el ZPL se genera desde otro lado (ej: directamente desde cola_impresion.datos_etiquetas), verificar que el QR use nivel M.
+
+Probar que una reimpresión genere un QR legible por el escáner interno.

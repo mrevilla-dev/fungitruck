@@ -1,13 +1,20 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PROFILES, generateZPL } from '../utils/zplProfiles';
+import { PROFILES, generateZPL, sendToPrinter } from '../utils/zplProfiles';
+import { db } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-export default function PrintLabelsModal({ batches, onClose }) {
+export default function PrintLabelsModal({ batches, onClose, usuarioActivo, initialProfile }) {
   const [mode, setMode] = useState('thermal'); // 'thermal' or 'a4'
-  const [activeProfile, setActiveProfile] = useState('PORTAOBJETOS');
+  const [activeProfile, setActiveProfile] = useState(initialProfile || 'PORTAOBJETOS');
   const [copies, setCopies] = useState(1);
   const [profile, setProfile] = useState('standard'); // for PDF backup
+
+  const uniqueContainers = Array.from(new Set(batches.map(b => b.contenedorId).filter(Boolean)));
+  const hasContainers = uniqueContainers.length > 0;
+  const [imprimirContenedor, setImprimirContenedor] = useState(false);
+  const [activeContainerProfile, setActiveContainerProfile] = useState('MAXI_BOLSA');
 
   const handlePrint = () => {
     // Apply class to HTML for browser-based print size
@@ -27,7 +34,18 @@ export default function PrintLabelsModal({ batches, onClose }) {
   const activeProf = PROFILES.find(p => p.id === activeProfile) || PROFILES[0];
 
   const handleDownloadZPL = () => {
-    const zpl = generateZPL(activeProfile, batches, copies);
+    let zpl = generateZPL(activeProfile, batches, copies);
+    if (imprimirContenedor && hasContainers) {
+       const containerBatches = uniqueContainers.map(cId => ({
+         id: cId,
+         alias: `CONTENEDOR ${cId}`,
+         nombre_receta: 'Agrupación Física',
+         fecha: new Date().toISOString().split('T')[0],
+         operador: usuarioActivo || 'Sistema',
+         tipo_uso: 'Contenedor',
+       }));
+       zpl += "\n\n" + generateZPL(activeContainerProfile, containerBatches, 1);
+    }
     const blob = new Blob([zpl], { type: 'text/plain;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -37,6 +55,76 @@ export default function PrintLabelsModal({ batches, onClose }) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  };
+
+  const handlePrintDirect = async () => {
+    let zpl = generateZPL(activeProfile, batches, copies);
+    if (imprimirContenedor && hasContainers) {
+       const containerBatches = uniqueContainers.map(cId => ({
+         id: cId,
+         alias: `CONTENEDOR ${cId}`,
+         nombre_receta: 'Agrupación Física',
+         fecha: new Date().toISOString().split('T')[0],
+         operador: usuarioActivo || 'Sistema',
+         tipo_uso: 'Contenedor',
+       }));
+       zpl += "\n\n" + generateZPL(activeContainerProfile, containerBatches, 1);
+    }
+    await sendToPrinter(zpl);
+  };
+
+  const handleEnviarACola = async () => {
+    try {
+      const datosEtiquetas = batches.map(batch => ({
+        id: batch.id || '',
+        alias: batch.alias || batch.cepa || batch.especie || '',
+        nombre_receta: batch.nombre_receta || batch.substrate || batch.nombre_insumo || '',
+        fecha: batch.fecha || batch.trazabilidad?.fecha_preparacion || batch.fecha_inoculacion || '',
+        ubicacion: batch.ubicacion || '',
+        operador: batch.operador || batch.operario || '',
+        medio_origen_alias: batch.medio_origen_alias || '',
+        tipo_uso: batch.tipo_uso || '',
+        fecha_vencimiento: batch.fecha_vencimiento || '',
+        generacion: batch.generacion || '',
+      }));
+
+      await addDoc(collection(db, 'cola_impresion'), {
+        modulo: 'medios',
+        batch_ids: batches.map(b => b.id || '').filter(Boolean),
+        tipo_etiqueta: activeProfile,
+        datos_etiquetas: datosEtiquetas,
+        copias: copies,
+        estado: 'Pendiente',
+        fecha_generacion: serverTimestamp(),
+        operario: usuarioActivo || 'Sistema',
+      });
+
+      if (imprimirContenedor && hasContainers) {
+         await addDoc(collection(db, 'cola_impresion'), {
+           modulo: 'contenedores',
+           batch_ids: uniqueContainers,
+           tipo_etiqueta: activeContainerProfile,
+           datos_etiquetas: uniqueContainers.map(cId => ({
+              id: cId,
+              alias: `CONTENEDOR ${cId}`,
+              nombre_receta: 'Agrupación Física',
+              fecha: new Date().toISOString().split('T')[0],
+              operador: usuarioActivo || 'Sistema',
+              tipo_uso: 'Contenedor'
+           })),
+           copias: 1,
+           estado: 'Pendiente',
+           fecha_generacion: serverTimestamp(),
+           operario: usuarioActivo || 'Sistema',
+         });
+      }
+
+      alert('✅ Etiqueta(s) enviadas a la cola de impresión');
+      onClose();
+    } catch (err) {
+      console.error('Error al enviar a cola:', err);
+      alert('❌ Error al enviar a la cola: ' + err.message);
+    }
   };
 
   // Flattened array of items to render in the preview (handling copies)
@@ -103,13 +191,29 @@ export default function PrintLabelsModal({ batches, onClose }) {
                     </div>
                   </div>
 
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={handleDownloadZPL} 
-                    style={{ marginTop: '1rem', backgroundColor: '#10b981', fontWeight: 'bold', fontSize: '1.05rem', minHeight: '48px' }}
-                  >
-                    ⬇️ DESCARGAR ARCHIVO ZPL PARA LA ZEBRA
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleDownloadZPL} 
+                      style={{ flex: 2, backgroundColor: '#10b981', fontWeight: 'bold', fontSize: '1.05rem', minHeight: '48px' }}
+                    >
+                      ⬇️ DESCARGAR ZPL PARA ZEBRA
+                    </button>
+                    <button 
+                      className="btn btn-success" 
+                      onClick={handlePrintDirect} 
+                      style={{ flex: 1, backgroundColor: '#3b82f6', fontWeight: 'bold', fontSize: '1.05rem', minHeight: '48px', marginLeft: '0.5rem' }}
+                    >
+                      🖨️ Imprimir directo (Zebra)
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={handleEnviarACola} 
+                      style={{ flex: 1, fontWeight: 'bold', fontSize: '1rem', minHeight: '48px', borderColor: '#6366f1', color: '#6366f1' }}
+                    >
+                      📥 Enviar a cola
+                    </button>
+                  </div>
                 </div>
 
                 {/* PROFILE SELECTOR (CARDS MOBILE-FIRST) */}
@@ -149,6 +253,25 @@ export default function PrintLabelsModal({ batches, onClose }) {
                     })}
                   </div>
                 </div>
+
+                {hasContainers && (
+                  <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                      <input type="checkbox" checked={imprimirContenedor} onChange={e => setImprimirContenedor(e.target.checked)} style={{ transform: 'scale(1.2)' }} />
+                      Imprimir también etiqueta para contenedores físicos ({uniqueContainers.length})
+                    </label>
+                    {imprimirContenedor && (
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Perfil ZPL para Contenedor:</label>
+                        <select className="form-control" value={activeContainerProfile} onChange={e => setActiveContainerProfile(e.target.value)} style={{ marginTop: '0.5rem', width: '100%', maxWidth: '300px' }}>
+                          {PROFILES.map(p => (
+                            <option key={`cont_${p.id}`} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
 
               </div>
             )}
@@ -247,7 +370,10 @@ export default function PrintLabelsModal({ batches, onClose }) {
                         const alias = batch.alias || batch.cepa || batch.especie || 'S/C';
                         const nombre = (batch.nombre_receta || batch.substrate || batch.nombre_insumo || '').substring(0, 20);
                         const fecha = formatDate(batch.fecha || batch.trazabilidad?.fecha_preparacion || batch.fecha_inoculacion || '');
-                        const meta = batch.medio_origen_alias || (batch.id ? batch.id.slice(-4) : '');
+                        const meta = batch.id || '';
+                        const transferencia = batch.numero_transferencia ? `T${batch.numero_transferencia}` : '';
+                        const ubicacion = batch.ubicacion || '';
+                        const operador = batch.operador || batch.operario || '';
 
                         // HTML Mockups matching ZPL layouts
                         return (
@@ -276,7 +402,7 @@ export default function PrintLabelsModal({ batches, onClose }) {
                                 <div style={{ fontSize: '6px', textAlign: 'left', lineHeight: '1.1', flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                   <div style={{ fontWeight: 'bold' }}>{alias}</div>
                                   <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{nombre}</div>
-                                  <div>{fecha}</div>
+                                  <div>{fecha} {transferencia}</div>
                                   <div>{meta}</div>
                                 </div>
                               </div>
@@ -289,8 +415,8 @@ export default function PrintLabelsModal({ batches, onClose }) {
                                 </div>
                                 <div style={{ fontSize: '7px', textAlign: 'left', lineHeight: '1.2', flex: 1, minWidth: 0 }}>
                                   <div style={{ fontWeight: 'bold' }}>{alias}</div>
-                                  <div>{fecha}</div>
-                                  <div>Lote: {meta}</div>
+                                  <div>{fecha} {transferencia}</div>
+                                  <div>Ref: {meta}</div>
                                 </div>
                               </div>
                             )}
@@ -302,7 +428,7 @@ export default function PrintLabelsModal({ batches, onClose }) {
                                 </div>
                                 <div style={{ fontSize: '11px', textAlign: 'left', flex: 1 }}>
                                   <strong>{alias}</strong> | <span style={{ fontSize: '9px' }}>{nombre}</span>
-                                  <div style={{ fontSize: '8px', color: '#475569' }}>Fecha: {fecha} | Ref: {meta}</div>
+                                  <div style={{ fontSize: '8px', color: '#475569' }}>Fecha: {fecha} | Ref: {meta} {transferencia && `| ${transferencia}`}</div>
                                 </div>
                               </div>
                             )}
@@ -321,8 +447,10 @@ export default function PrintLabelsModal({ batches, onClose }) {
                                 <div style={{ fontSize: '11px', textAlign: 'left', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
                                   <strong style={{ fontSize: '12px' }}>{nombre}</strong>
                                   <div style={{ color: '#475569', fontSize: '9px', marginTop: '2px' }}>
-                                    Preparado: {fecha} <br />
-                                    Lote: {meta} {batch.fecha_vencimiento && `| Vence: ${formatDate(batch.fecha_vencimiento)}`}
+                                    Preparado: {fecha} {transferencia && `| ${transferencia}`} <br />
+                                    Ref: {meta} {batch.fecha_vencimiento && `| Vence: ${formatDate(batch.fecha_vencimiento)}`}
+                                    {ubicacion && <><br />📍 {ubicacion}</>}
+                                    {operador && <><br />👤 {operador}</>}
                                   </div>
                                 </div>
                               </div>
@@ -338,8 +466,10 @@ export default function PrintLabelsModal({ batches, onClose }) {
                                   <div style={{ fontSize: '22px', fontWeight: 'bold', borderBottom: '2px solid #000' }}>ID: {alias}</div>
                                   <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{nombre}</div>
                                   <div style={{ fontSize: '13px', color: '#334155' }}>
-                                    Fecha: {fecha} | Lote: {meta} <br />
-                                    Generación: {batch.generacion || 'Sc1'} | Origen: {batch.medio_origen_alias || 'N/A'}
+                                    Fecha: {fecha} | Ref: {meta} <br />
+                                    {transferencia && `${transferencia} | `}Generación: {batch.generacion || 'Sc1'} | Origen: {batch.medio_origen_alias || 'N/A'}
+                                    {ubicacion && <><br />📍 {ubicacion}</>}
+                                    {operador && <><br />👤 {operador}</>}
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '1rem' }}>

@@ -1,0 +1,29 @@
+necesito entender la arquitectura actual antes de diseñar el módulo de equipos:
+
+¿Cuál es la estructura exacta de las colecciones salas (o destinos) e inventario en Firestore? Mostrame los campos reales de un documento de cada una.
+¿Existe algún vínculo actual entre un ítem de inventario categoría "Equipamiento" y una sala/destino?
+¿La colección mantenimiento solo registra condiciones ambientales (temperatura/humedad) o también registra eventos como reparaciones o calibraciones?
+¿Qué archivos del frontend manejan salas/destinos? (nombre de los componentes y páginas)
+¿Qué archivos manejan el inventario de equipamiento?
+
+¿Cuáles son todas las colecciones que existen actualmente en Firestore? Listame el nombre de cada una.
+¿Cuáles son todas las rutas actuales del router (App.jsx)? Listame path y componente de cada una.
+¿Qué módulos del prompt deep32 (Experimentos) ya fueron implementados y cuáles quedaron pendientes?
+¿El módulo de Criobanco (/crio) está completamente implementado o parcial? ¿Qué colecciones creó en Firestore?
+¿El árbol genealógico (/arbol) usa React Flow? ¿Cuál es el nombre del componente principal y qué archivos lo componen?
+¿Existe algún sistema de autenticación de usuarios implementado? ¿Se usa el usuario autenticado en algún campo de Firestore o está hardcodeado?
+¿Hay algún archivo de configuración global de estilos o design system? ¿Qué librería de UI usa el proyecto (Tailwind, Material UI, CSS puro, otra)?
+
+
+
+Con eso tengo el contexto real para diseñar sin asumir cosas que pueden estar hechas o no.
+
+Preguntas adicionales para Antigravity
+8. ¿Cuál es el campo exacto en mantenimiento que registra el equipo/sala?
+Necesito saber si es destinoId, sala_id, equipo_id u otro, y si tiene referencia a una colección de equipos o solo a salas.
+
+9. ¿Existe alguna colección equipos o similar?
+Si no existe, ¿los equipos están registrados como ítems de inventario con categoria: "Equipamiento"?
+
+10. ¿El módulo de mantenimiento permite registrar eventos de reparación/calibración además de temperatura/humedad?
+Quiero saber si el campo tipo solo acepta "Temperatura", "Limpieza", "Plagas", "Infraestructura" o si ya contempla "Reparación" y "Calibración".

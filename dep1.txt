@@ -1,0 +1,11 @@
+
+---
+
+## REPORTE POR BLOQUE
+
+Al finalizar cada bloque, generar un mini-reporte que contenga:
+
+1. Archivos modificados.
+2. Cambios en Firestore (índices, campos, documentos).
+3. Comportamiento verificado.
+4. **Preguntas para Maxi** que permitan confirmar que lo implementado coincide con lo esperado (mínimo 2 preguntas).

@@ -1,0 +1,13 @@
+Este plan es incorrecto. No voy a revisarlo. Implementá exactamente esto:
+
+1. Crear src/pages/ExperimentosListPage.jsx con:
+- Filtros por estado, especie y responsable.
+- Lista de experimentos en cards.
+- Botón 'Nuevo experimento' que navega a /experimentos/nuevo.
+- Botón 'Ver detalle' en cada card que navega a /experimentos/:id.
+
+2. Agregar ruta <Route path='/experimentos' element={<ExperimentosListPage />} /> en App.jsx.
+
+3. Agregar entrada 'Experimentos' en NavBar.jsx.
+
+No hagas nada más. Solo estas 3 tareas. Build y confirmame.

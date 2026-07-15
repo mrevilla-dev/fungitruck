@@ -43,11 +43,15 @@ export default function SearchableSelect({
 
   // Reactive filtering
   const filteredOptions = React.useMemo(() => {
-    const query = search.toLowerCase().trim();
+    const normalize = (str) => (str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const query = normalize(search).trim();
     if (!query) return sortedOptions;
-    return sortedOptions.filter(opt => 
-      (opt.nombre || '').toLowerCase().includes(query)
-    );
+    
+    const terms = query.split(/\s+/);
+    return sortedOptions.filter(opt => {
+      const target = normalize(opt.nombre);
+      return terms.every(term => target.includes(term));
+    });
   }, [sortedOptions, search]);
 
   const selectedOption = options.find(opt => opt.id === value);
@@ -142,7 +146,10 @@ export default function SearchableSelect({
                 key={opt.id}
                 onClick={() => handleSelect(opt.id)}
                 style={{
-                  height: '48px',
+                  height: 'auto',
+                  minHeight: '48px',
+                  whiteSpace: 'normal',
+                  lineHeight: 1.4,
                   display: 'flex',
                   alignItems: 'center',
                   padding: '0 1rem',

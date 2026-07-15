@@ -1,0 +1,27 @@
+Para Antigravity:
+
+Esta es la primera vez que entrás al proyecto FungiTrack. Leé el archivo deep32.md que te adjunto abajo. Es el Módulo de Diseño Experimental completo.
+
+Contexto mínimo del proyecto:
+
+FungiTrack es un LIMS de trazabilidad micológica.
+
+Stack: React 19 + Vite + Firebase Firestore + Firebase Auth + Google Drive + Zebra ZD220.
+
+Web: https://fungitrack-9b463.web.app
+
+Repositorio local: c:/Users/Usuario/Documents/maxi
+
+Implementá los cambios en 9 bloques separados, en orden. Empezá por el Bloque 1.
+
+Reglas:
+
+Un bloque a la vez.
+
+Antes de escribir código, mostrame un plan de implementación y esperá mi confirmación.
+
+Al finalizar cada bloque, ejecutá npm run build y confirmá que no haya errores.
+
+No rompas nada de lo que ya funciona.
+
+Todos los cambios son aditivos.

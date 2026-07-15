@@ -1,0 +1,11 @@
+Para Antigravity:
+
+Primero corregí la Ruta B para que cumpla con deep26.md:
+
+Ruta B NO debe crear documento en esporomas. Solo en ejemplares con esporoma_origen_id: null.
+
+Agregar los campos comerciales faltantes: precio, lote_proveedor, fecha_compra, y subida de certificadoUrl a Google Drive.
+
+Después, mostrame el plan corregido para el Bloque 4 (DerivacionEsporomaModal.jsx).
+
+Build, deploy y confirmá cada paso.

@@ -1,0 +1,39 @@
+Bug 2: Imágenes en el Árbol Genealógico
+Para Antigravity:
+
+Esta es la primera vez que entrás al proyecto FungiTrack. Necesito que corrijas un bug puntual.
+
+Contexto mínimo:
+
+FungiTrack es un LIMS de trazabilidad micológica.
+
+Stack: React 19 + Vite + Firebase Firestore + Firebase Auth + Google Drive + Zebra ZD220.
+
+Web: https://fungitrack-9b463.web.app
+
+Repositorio local: c:/Users/Usuario/Documents/maxi
+
+Bug a corregir:
+Las imágenes de Google Drive no se muestran en los nodos del Árbol Genealógico ni en el panel lateral. Las fotos están guardadas en Firestore en el campo fotoUrl de esporomas y ejemplares.
+
+Corrección requerida:
+
+Leé construirArbolGenealogico.js y FichaNodoArbol.jsx completos.
+
+Verificar que el campo fotoUrl se esté pasando en data de los nodos de tipo Esporoma y Ejemplar.
+
+Si no se está pasando, agregarlo.
+
+Verificar que FichaNodoArbol.jsx renderice la imagen cuando fotoUrl existe.
+
+Las imágenes son URLs de Google Drive. Asegurarse de que se usen con loading="lazy" y tamaño controlado.
+
+Reglas:
+
+Leé cada archivo completo antes de tocarlo.
+
+No rompas nada de lo que ya funciona.
+
+Al finalizar, ejecutá npm run build, deployá a Firebase Hosting y confirmame.
+
+Solo corregí este bug.

@@ -1,0 +1,101 @@
+# FungiTrack — Mejora del módulo de recetas: categorías dinámicas
+## Módulo: Recetas
+> Junio 2026
+
+## CONTEXTO
+El módulo de recetas tiene dos problemas de consistencia:
+
+1. **Formulario (RecipeFormModal.jsx)**: el campo "Categoría" solo permite elegir entre opciones fijas (Agar, Semilla, Líquido). No se pueden agregar nuevas categorías.
+2. **Filtro en el maestro (InventoryPage.jsx)**: el selector de categorías es estático y no muestra todas las opciones reales (ej: "Líquido" no aparece, pero hay medios líquidos).
+
+Se debe implementar la misma solución que se usó para los tipos de envase en `SubfraccionamientoAccordion.jsx`: un documento de configuración en Firestore que mantenga una lista dinámica de categorías, accesible tanto para el formulario como para el filtro.
+
+**REGLA DE ORO**: Un solo cambio a la vez. No romper nada de lo que ya funciona. Leer cada archivo antes de tocarlo. Cambios aditivos. Deployar y confirmar con Maxi antes de pasar al siguiente bloque.
+
+**Reglas técnicas**:
+- `writeBatch` para operaciones multi-documento.
+- `campo?.subcampo ?? fallback` siempre.
+- Imágenes: Google Drive vía Apps Script. **Nunca Firebase Storage**.
+- Deploy: Firebase Hosting.
+
+## COMPORTAMIENTO ESPERADO
+
+### 1. Firestore — Documento de configuración
+- Utilizar (o crear si no existe) el documento `config/categorias_recetas`.
+- Estructura: `{ categorias: ["Agar", "Semilla", "Líquido", ...] }`.
+- Si el documento no existe, crearlo con las categorías por defecto que ya se usan en el formulario.
+
+### 2. Formulario de receta (RecipeFormModal.jsx)
+- Cargar las opciones del campo "Categoría" desde el array `categorias` del documento `config/categorias_recetas`.
+- Incluir una opción "Otro" al final de la lista.
+- Al seleccionar "Otro", mostrar un campo de texto adicional para ingresar la nueva categoría.
+- Al guardar la receta con una categoría nueva, agregarla al array `categorias` en Firestore (si no existe ya) dentro del mismo `writeBatch` que guarda la receta.
+- Validar que no se guarden categorías duplicadas.
+
+### 3. Filtro en el maestro (InventoryPage.jsx)
+- Reemplazar el array fijo de categorías del filtro de medios por una carga dinámica desde `config/categorias_recetas`.
+- La lista de opciones del `<select>` debe ser exactamente la misma que en el formulario de recetas (sin la opción "Otro", pero con las personalizadas).
+- Mantener las opciones actuales como fallback mientras se cargan las dinámicas.
+
+## IMPLEMENTACIÓN TÉCNICA
+
+### 1. Carga del documento de configuración
+```javascript
+import { doc, getDoc } from 'firebase/firestore';
+
+const categoriasRef = doc(db, 'config', 'categorias_recetas');
+const categoriasSnap = await getDoc(categoriasRef);
+const categorias = categoriasSnap.exists() ? categoriasSnap.data().categorias : ['Agar', 'Semilla', 'Líquido'];
+2. Selector de categorías con "Otro"
+Usar un <select> con las opciones dinámicas más una opción fija "Otro".
+
+Al seleccionar "Otro", mostrar un <input type="text"> debajo para escribir la nueva categoría.
+
+Al cambiar a otra opción, ocultar el input y limpiar su valor.
+
+3. Guardado de nueva categoría
+En el handleSubmit del formulario, si la categoría seleccionada es "Otro" y el input no está vacío, agregar la nueva categoría al array.
+
+Usar updateDoc con arrayUnion para evitar duplicados:
+
+javascript
+await updateDoc(categoriasRef, { categorias: arrayUnion(nuevaCategoria) });
+Esto debe hacerse en el mismo writeBatch o transacción que guarda la receta.
+
+4. Actualización del filtro
+En el useEffect que carga los medios, agregar una lectura similar del documento config/categorias_recetas.
+
+Construir el array de opciones del <select> dinámicamente.
+
+Asegurarse de que el filtro funcione correctamente con las nuevas categorías.
+
+RESTRICCIONES
+No modificar la estructura de las colecciones existentes (recetas, medios_preparados, etc.).
+
+No modificar la lógica de guardado de recetas, solo agregar la actualización de categorías.
+
+No modificar el componente de impresión ni ningún otro módulo.
+
+No romper el filtro existente. Las opciones dinámicas deben reemplazar al array fijo sin eliminar funcionalidad.
+
+VERIFICACIONES
+El formulario de nueva receta muestra las categorías desde Firestore.
+
+Al seleccionar "Otro", aparece un campo de texto para la nueva categoría.
+
+Al guardar una receta con una categoría nueva, esta aparece en futuras aperturas del formulario.
+
+El filtro de categorías en el maestro de medios muestra las mismas opciones que el formulario.
+
+El filtro funciona correctamente con las categorías personalizadas.
+
+No se rompen las recetas existentes ni los medios ya creados.
+
+REPORTE AL TERMINAR
+Archivos modificados.
+
+Nuevos documentos en Firestore (si los hay).
+
+Captura o descripción del nuevo flujo de agregar categorías.
+
+Confirmación de que el filtro y el formulario usan las mismas opciones.
