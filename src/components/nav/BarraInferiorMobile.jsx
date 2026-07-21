@@ -38,13 +38,13 @@ export default function BarraInferiorMobile() {
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: 'white',
-        borderTop: '1px solid #E0E0E0',
+        backgroundColor: 'var(--bg-color)',
+        borderTop: '1px solid var(--border-color)',
         display: 'flex',
         zIndex: 100,
         // Soporte para notch de iPhone
         paddingBottom: 'env(safe-area-inset-bottom)',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
+        boxShadow: 'none',
       }}>
 
         {/* Inicio */}

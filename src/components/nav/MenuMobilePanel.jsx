@@ -32,7 +32,7 @@ export default function MenuMobilePanel({ abierto, onCerrar }) {
           bottom: 0,
           left: 0,
           right: 0,
-          backgroundColor: 'white',
+          backgroundColor: 'var(--bg-color)',
           borderRadius: '20px 20px 0 0',
           padding: '16px',
           zIndex: 201,
@@ -40,7 +40,6 @@ export default function MenuMobilePanel({ abierto, onCerrar }) {
           overflowY: 'auto',
         }}
       >
-        {/* Header del panel */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -88,8 +87,8 @@ export default function MenuMobilePanel({ abierto, onCerrar }) {
                   justifyContent: 'center',
                   padding: '16px 8px',
                   borderRadius: '12px',
-                  border: esActivo ? '2px solid #4CAF50' : '1px solid #E0E0E0',
-                  backgroundColor: esActivo ? '#F1F8E9' : 'white',
+                  border: esActivo ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+                  backgroundColor: esActivo ? 'var(--surface-color)' : 'var(--bg-color)',
                   cursor: 'pointer',
                   // Área táctil mínima 48px
                   minHeight: '80px',

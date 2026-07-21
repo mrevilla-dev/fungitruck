@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db, storage } from '../firebase';
+import { db, storage, auth } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import DestinoSelector from '../components/DestinoSelector';
@@ -41,7 +41,7 @@ function Maintenance() {
     temperatura: '',
     humedad: '',
     observaciones: '',
-    operator: 'Maxi',
+    operator: auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema',
   });
   const [checkedItems, setCheckedItems] = useState({});
   const [loading, setLoading] = useState(false);
