@@ -5,6 +5,7 @@ import '@xyflow/react/dist/style.css';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Html5Qrcode } from 'html5-qrcode';
+import toast from 'react-hot-toast';
 
 // Nodos custom
 import NodoBatch from '../components/arbol/nodos/NodoBatch';
@@ -199,11 +200,11 @@ export default function ArbolGenealogicoPage({ tipo }) {
         return;
       }
 
-      alert("El código escaneado no corresponde a un batch o ejemplar.");
+      toast("El código escaneado no corresponde a un batch o ejemplar.");
       setMsgErrorBusqueda("El código escaneado no corresponde a un batch o ejemplar.");
     } catch (err) {
       console.error(err);
-      alert("Error al procesar el código escaneado.");
+      toast.error("Error al procesar el código escaneado.");
     } finally {
       setCargandoBusqueda(false);
     }

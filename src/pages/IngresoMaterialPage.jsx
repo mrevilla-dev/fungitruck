@@ -7,6 +7,7 @@ import { uploadFileToDrive } from '../services/driveService';
 import { generarIdEsporoma, generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
 import SearchableSelect from '../components/SearchableSelect';
 import { compressImage } from '../utils/imageUtils';
+import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
   if (!alias) return 'MED';
@@ -165,9 +166,9 @@ export default function IngresoMaterialPage() {
     e.preventDefault();
     const formValues = rutaActiva === 'A' ? formA : formB;
     
-    if (!formValues.genero || !formValues.especie) return alert("Faltan datos básicos del género/especie.");
-    if (rutaActiva === 'A' && !formValues.origen) return alert("Falta definir el origen.");
-    if (rutaActiva === 'B' && !formValues.formato_recepcion) return alert("Falta el formato de recepción.");
+    if (!formValues.genero || !formValues.especie) return toast.error("Faltan datos básicos del género/especie.");
+    if (rutaActiva === 'A' && !formValues.origen) return toast.error("Falta definir el origen.");
+    if (rutaActiva === 'B' && !formValues.formato_recepcion) return toast.error("Falta el formato de recepción.");
     
     setLoading(true);
     try {
@@ -316,7 +317,7 @@ export default function IngresoMaterialPage() {
         });
 
         await wb.commit();
-        alert(resText);
+        toast(resText);
       } else {
         // LÓGICA RUTA B (SOLO EJEMPLAR)
         const datePart = formValues.fecha.replace(/-/g, '').slice(2);
@@ -381,14 +382,14 @@ export default function IngresoMaterialPage() {
         });
 
         await wb.commit();
-        alert(`📦 Ejemplar externo registrado con éxito: ${ejemplarId} (${formValues.formato_recepcion})`);
+        toast.success(`Ejemplar externo registrado con éxito: ${ejemplarId} (${formValues.formato_recepcion})`);
       }
       
       resetForm();
       setRuta(null); // volver al selector
     } catch (error) {
       console.error(error);
-      alert(`❌ Error al guardar: ${error.message}. Tus datos NO se borraron, podés reintentar.`);
+      toast.error(`Error al guardar: ${error.message}. Tus datos NO se borraron, podés reintentar.`);
     } finally {
       setLoading(false);
       setUploadProgress(0);

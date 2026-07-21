@@ -3,6 +3,7 @@ import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } fr
 import { db } from '../firebase';
 import { getAuth } from 'firebase/auth';
 import { generateZPL, sendToPrinter, generateMixedZPL, PROFILES } from '../utils/zplProfiles';
+import toast from 'react-hot-toast';
 
 export default function PrintQueue() {
   const [queue, setQueue] = useState([]);
@@ -83,7 +84,7 @@ export default function PrintQueue() {
       fetchQueue();
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Error al marcar como impreso');
+      toast.error('Error al marcar como impreso');
     }
   };
 
@@ -93,11 +94,11 @@ export default function PrintQueue() {
       await updateDoc(colaRef, {
         tipo_etiqueta: newProfileId
       });
-      alert(`Formato actualizado a ${newProfileId}`);
+      toast.success(`Formato actualizado a ${newProfileId}`);
       fetchQueue();
     } catch (error) {
       console.error('Error al cambiar formato:', error);
-      alert('Error al actualizar el formato.');
+      toast.error('Error al actualizar el formato.');
     }
   };
 
@@ -284,7 +285,7 @@ export default function PrintQueue() {
                   {numLabels} etiquetas · {previewText}
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button className="btn btn-outline" onClick={() => alert(JSON.stringify(item.datos_etiquetas, null, 2))}>
+                  <button className="btn btn-outline" onClick={() => toast(JSON.stringify(item.datos_etiquetas, null, 2))}>
                     Ver detalle
                   </button>
                   <button className="btn btn-primary" onClick={() => handleImprimirLote(item)}>

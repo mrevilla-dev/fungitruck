@@ -8,6 +8,7 @@ import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
 import PrintLabelsModal from './PrintLabelsModal';
 import { generarIdBatch } from '../utils/idGenerator';
+import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
   if (!alias) return 'MED';
@@ -153,7 +154,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
       handleChange('contenedor_id', id);
     } catch (err) {
       console.error(err);
-      alert("Error creando contenedor");
+      toast.error("Error creando contenedor");
     }
   };
 
@@ -208,7 +209,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
   const handleSubmit = async (ev) => {
     ev.preventDefault();
     if (!formData.ejemplar_origen_id) {
-      alert('⚠️ Seleccioná un Ejemplar de origen.');
+      toast.error('Seleccioná un Ejemplar de origen.');
       return;
     }
     setLoading(true);
@@ -345,12 +346,12 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
         setCreatedBatches(createdBatchIds);
         setShowPrint(true);
       } else {
-        alert('✅ Evento de aislamiento registrado con ID: ' + newId);
+        toast.success('Evento de aislamiento registrado con ID: ' + newId);
         onClose();
       }
     } catch (err) {
       console.error(err);
-      alert('⚠️ Error: ' + (err.message || 'Error desconocido'));
+      toast.error('Error: ' + (err.message || 'Error desconocido'));
     } finally {
       setLoading(false);
     }

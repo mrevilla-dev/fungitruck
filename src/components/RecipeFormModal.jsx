@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, doc, setDoc, serverTimestamp, query, onSnapshot, writeBatch, arrayUnion } from 'firebase/firestore';
 import { getFallbackCN } from '../utils/cnDatabase';
 import SearchableSelect from './SearchableSelect';
+import toast from 'react-hot-toast';
 
 const cleanFirestoreId = (str) => {
   return (str || '')
@@ -191,10 +192,10 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
       newMat[index] = { ...newMat[index], insumoId: id, nombre: nombre.trim() };
       setForm(prev => ({ ...prev, materiales_requeridos: newMat }));
       
-      alert(`✅ Material "${nombre}" creado y seleccionado automáticamente.`);
+      toast.success(`Material "${nombre}" creado y seleccionado automáticamente.`);
     } catch (err) {
       console.error(err);
-      alert("Error al crear el material.");
+      toast.error("Error al crear el material.");
     } finally {
       setLoading(false);
     }
@@ -239,10 +240,10 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
       newEquip[index] = { ...newEquip[index], insumoId: id, nombre: nombre.trim() };
       setForm(prev => ({ ...prev, equipamiento_requerido: newEquip }));
       
-      alert(`✅ Equipamiento "${nombre}" creado y seleccionado automáticamente.`);
+      toast.success(`Equipamiento "${nombre}" creado y seleccionado automáticamente.`);
     } catch (err) {
       console.error(err);
-      alert("Error al crear el equipamiento.");
+      toast.error("Error al crear el equipamiento.");
     } finally {
       setLoading(false);
     }
@@ -273,10 +274,10 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
       };
       
       await setDoc(insumoRef, insumoData);
-      alert(`✅ Insumo "${nombreInsumo}" creado. Ahora puedes seleccionarlo en la lista.`);
+      toast.success(`Insumo "${nombreInsumo}" creado. Ahora puedes seleccionarlo en la lista.`);
     } catch (err) {
       console.error(err);
-      alert("Error al crear el insumo.");
+      toast.error("Error al crear el insumo.");
     } finally {
       setLoading(false);
     }
@@ -288,7 +289,7 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
     try {
       const finalCategory = showOtroInput ? otraCategoria.trim() : form.categoria;
       if (showOtroInput && !finalCategory) {
-        alert("⚠️ Por favor, ingrese el nombre de la nueva categoría.");
+        toast("Por favor, ingrese el nombre de la nueva categoría.");
         setLoading(false);
         return;
       }
@@ -321,12 +322,12 @@ export default function RecipeFormModal({ recipeToClone, isEdit, onClose, onSave
       }
 
       await batch.commit();
-      alert("✅ Receta guardada correctamente.");
+      toast.success("Receta guardada correctamente.");
       onSaved();
       onClose();
     } catch (err) {
       console.error(err);
-      alert("Error al guardar la receta.");
+      toast.error("Error al guardar la receta.");
     } finally {
       setLoading(false);
     }

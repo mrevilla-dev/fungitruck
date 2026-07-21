@@ -4,6 +4,7 @@ import { collection, query, getDocs, doc, writeBatch, serverTimestamp, runTransa
 import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdNoConformidad } from '../utils/idGenerator';
+import toast from 'react-hot-toast';
 
 export default function NoConformidadBatchModal({ batch, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -46,9 +47,9 @@ export default function NoConformidadBatchModal({ batch, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.descripcion.trim()) return alert('Ingrese una descripción.');
+    if (!formData.descripcion.trim()) return toast.error('Ingrese una descripción.');
     if (formData.accion_tomada === 'Cuarentena' && !formData.nueva_sala_id) {
-      return alert('Debe seleccionar la sala destino para la cuarentena.');
+      return toast.error('Debe seleccionar la sala destino para la cuarentena.');
     }
 
     setLoading(true);
@@ -105,12 +106,12 @@ export default function NoConformidadBatchModal({ batch, onClose, onSaved }) {
       }
 
       await wb.commit();
-      alert(`✅ No Conformidad registrada exitosamente.\nID: ${ncId}`);
+      toast.success(`No Conformidad registrada exitosamente.\nID: ${ncId}`);
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
       console.error(err);
-      alert(`❌ Error al registrar no conformidad: ${err.message}`);
+      toast.error(`Error al registrar no conformidad: ${err.message}`);
     } finally {
       setLoading(false);
     }

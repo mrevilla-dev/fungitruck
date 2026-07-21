@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 const TIPOS_AMBIENTE = [
   { value: 'incubacion',    label: '🌡️ Incubación' },
@@ -102,7 +103,7 @@ export default function SalaFormModal({ sala, onClose, onSaved }) {
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Error al guardar la sala. Revisá la consola.');
+      toast.error('Error al guardar la sala. Revisá la consola.');
     } finally {
       setLoading(false);
     }

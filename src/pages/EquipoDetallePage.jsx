@@ -8,6 +8,7 @@ import {
   actualizarEquipo
 } from '../services/equipoService';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 import { db } from '../firebase';
 import EquipoFormModal from '../components/EquipoFormModal';
 import ReparacionFormModal from '../components/ReparacionFormModal';
@@ -35,7 +36,7 @@ export default function EquipoDetallePage({ user }) {
     try {
       const eq = await getEquipo(id);
       if (!eq) {
-        alert('Equipo no encontrado');
+        toast.error('Equipo no encontrado');
         navigate('/equipos');
         return;
       }
@@ -59,7 +60,7 @@ export default function EquipoDetallePage({ user }) {
       await actualizarEstadoOperativo(id, nuevoEstado);
       setEquipo(prev => ({ ...prev, estado_operativo: nuevoEstado }));
     } catch (err) {
-      alert('Error al cambiar el estado');
+      toast.error('Error al cambiar el estado');
     }
   }
 
@@ -69,7 +70,7 @@ export default function EquipoDetallePage({ user }) {
       await moverEquipoASala(id, nuevaSala);
       setEquipo(prev => ({ ...prev, sala_actual_id: nuevaSala }));
     } catch (err) {
-      alert('Error al mover de sala');
+      toast.error('Error al mover de sala');
     }
   }
 
@@ -79,7 +80,7 @@ export default function EquipoDetallePage({ user }) {
       setModalEditar(false);
       cargarDatos();
     } catch (err) {
-      alert('Error al editar');
+      toast.error('Error al editar');
     }
   }
 

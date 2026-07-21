@@ -2,6 +2,7 @@
  * FungiTrack - ZPL Layout Profiles for Zebra ZD220 (203 dpi)
  * Physical Roll Size: 100mm x 150mm (800 x 1200 dots)
  */
+import toast from 'react-hot-toast';
 
 export const PROFILES = [
   {
@@ -407,12 +408,12 @@ export async function sendToPrinter(zpl) {
     });
     if (!response.ok) {
       console.error('Failed to send ZPL to printer', response.statusText);
-      alert('Error al enviar a la impresora (Zebra). Verifique la consola.');
+      toast.error('Error al enviar a la impresora (Zebra). Verifique la consola.');
     } else {
       console.log('✅ ZPL enviado correctamente a la impresora local.');
     }
   } catch (err) {
     console.error('Error sending ZPL to printer', err);
-    alert('Fallo de conexión con la impresora. ¿Está encendida y configurada?');
+    toast.error('Fallo de conexión con la impresora. ¿Está encendida y configurada?');
   }
 }

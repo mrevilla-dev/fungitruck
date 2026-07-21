@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { registrarReparacion } from '../services/equipoService';
+import toast from 'react-hot-toast';
 
 export default function ReparacionFormModal({ equipoId, onClose, onSave, user }) {
   const [cargando, setCargando] = useState(false);
@@ -18,7 +19,7 @@ export default function ReparacionFormModal({ equipoId, onClose, onSave, user })
   async function handleSubmit(e) {
     e.preventDefault();
     if (!formData.fecha || !formData.descripcion) {
-      return alert('Fecha y descripción son obligatorias.');
+      return toast('Fecha y descripción son obligatorias.');
     }
     
     setCargando(true);
@@ -31,7 +32,7 @@ export default function ReparacionFormModal({ equipoId, onClose, onSave, user })
       await onSave();
     } catch (err) {
       console.error(err);
-      alert('Error al registrar la reparación.');
+      toast.error('Error al registrar la reparación.');
     } finally {
       setCargando(false);
     }

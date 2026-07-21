@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function InsumoFormModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -105,7 +106,7 @@ export default function InsumoFormModal({ onClose, onSaved }) {
       onSaved();
     } catch (error) {
       console.error("Error adding insumo:", error);
-      alert("Error al guardar el insumo");
+      toast.error("Error al guardar el insumo");
     } finally {
       setLoading(false);
     }

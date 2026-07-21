@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { PROFILES, generateZPL, sendToPrinter } from '../utils/zplProfiles';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function PrintLabelsModal({ batches, onClose, usuarioActivo, initialProfile }) {
   const [mode, setMode] = useState('thermal'); // 'thermal' or 'a4'
@@ -119,11 +120,11 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
          });
       }
 
-      alert('✅ Etiqueta(s) enviadas a la cola de impresión');
+      toast.success('Etiqueta(s) enviadas a la cola de impresión');
       onClose();
     } catch (err) {
       console.error('Error al enviar a cola:', err);
-      alert('❌ Error al enviar a la cola: ' + err.message);
+      toast.error('Error al enviar a la cola: ' + err.message);
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, setDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function RegistroCosechaModal({ batch, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -88,12 +89,12 @@ export default function RegistroCosechaModal({ batch, onClose, onSaved }) {
       await updateDoc(doc(db, 'batches', batch.id), batchUpdate);
 
 
-      alert(`✅ Cosecha registrada. ${formData.generar_aislamiento ? 'Cepario actualizado.' : ''} EB: ${eb}%`);
+      toast.success(`Cosecha registrada. ${formData.generar_aislamiento ? 'Cepario actualizado.' : ''} EB: ${eb}%`);
       onSaved();
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Error al registrar cosecha: ' + err.message);
+      toast.error('Error al registrar cosecha: ' + err.message);
     } finally {
       setLoading(false);
     }

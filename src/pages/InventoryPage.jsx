@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, collectionGroup, query, onSnapshot, orderBy, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import toast from 'react-hot-toast';
 
 import BatchEditModal from '../components/BatchEditModal';
 import RegistroInsumoModal from '../components/RegistroInsumoModal';
@@ -438,11 +439,11 @@ function InventoryPage() {
       setCultivos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, err => console.error("Error batches:", err));
-    const unsubInsumos = onSnapshot(query(collection(db, "insumos_base"), orderBy("nombre", "asc")), snap => setInsumos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Insumos: " + err.message));
-    const unsubLotes = onSnapshot(query(collection(db, "insumos_lotes"), orderBy("createdAt", "desc")), snap => setInsumosLotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Lotes: " + err.message));
-    const unsubMedios = onSnapshot(query(collection(db, "medios_preparados"), orderBy("createdAt", "desc")), snap => setMedios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Medios: " + err.message));
-    const unsubRecetas = onSnapshot(query(collection(db, "recetas"), orderBy("nombre", "asc")), snap => setRecetas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Recetas: " + err.message));
-    const unsubSalas = onSnapshot(collection(db, "salas"), snap => setSalas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => alert("Error Salas: " + err.message));
+    const unsubInsumos = onSnapshot(query(collection(db, "insumos_base"), orderBy("nombre", "asc")), snap => setInsumos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => toast.error("Error Insumos: " + err.message));
+    const unsubLotes = onSnapshot(query(collection(db, "insumos_lotes"), orderBy("createdAt", "desc")), snap => setInsumosLotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => toast.error("Error Lotes: " + err.message));
+    const unsubMedios = onSnapshot(query(collection(db, "medios_preparados"), orderBy("createdAt", "desc")), snap => setMedios(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => toast.error("Error Medios: " + err.message));
+    const unsubRecetas = onSnapshot(query(collection(db, "recetas"), orderBy("nombre", "asc")), snap => setRecetas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => toast.error("Error Recetas: " + err.message));
+    const unsubSalas = onSnapshot(collection(db, "salas"), snap => setSalas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), err => toast.error("Error Salas: " + err.message));
     const unsubSubfrac = onSnapshot(collectionGroup(db, 'subfracciones'), snap => {
       setAllSubfracciones(snap.docs.map(d => ({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() })));
     }, err => console.warn('Subfracciones collectionGroup:', err.message));
@@ -513,10 +514,10 @@ function InventoryPage() {
       }
 
       await deleteDoc(doc(db, "insumos_lotes", lote.id));
-      alert("✅ Lote eliminado y stock maestro actualizado.");
+      toast.success("Lote eliminado y stock maestro actualizado.");
     } catch (err) {
       console.error(err);
-      alert("Error al eliminar lote");
+      toast.error("Error al eliminar lote");
     }
   };
 
@@ -532,10 +533,10 @@ function InventoryPage() {
         await deleteDoc(doc(db, "insumos_lotes", lote.id));
       }
       
-      alert("✅ Insumo y lotes asociados eliminados correctamente.");
+      toast.success("Insumo y lotes asociados eliminados correctamente.");
     } catch (err) {
       console.error(err);
-      alert("Error al eliminar insumo completo");
+      toast.error("Error al eliminar insumo completo");
     } finally {
       setLoading(false);
     }
@@ -544,11 +545,11 @@ function InventoryPage() {
   const handleDeleteRecipe = async (recipe) => {
     try {
       await deleteDoc(doc(db, "recetas", recipe.id));
-      alert("✅ Receta eliminada correctamente.");
+      toast.success("Receta eliminada correctamente.");
       setConfirmAction(null);
     } catch (err) {
       console.error(err);
-      alert("Error al eliminar receta");
+      toast.error("Error al eliminar receta");
     }
   };
 
@@ -558,7 +559,7 @@ function InventoryPage() {
       await updateDoc(doc(db, "recetas", recipe.id), { estado: newStatus });
     } catch (err) {
       console.error(err);
-      alert("Error al cambiar estado de la receta");
+      toast.error("Error al cambiar estado de la receta");
     }
   };
 
@@ -724,7 +725,7 @@ function InventoryPage() {
           });
         } catch(e) {
           console.error("Error eliminando:", e);
-          alert("Error al eliminar el medio: " + e.message);
+          toast.error("Error al eliminar el medio: " + e.message);
         }
         setConfirmAction(null);
       }

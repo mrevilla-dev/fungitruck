@@ -5,6 +5,7 @@ import { uploadFileToDrive } from '../services/driveService';
 import NuevaCosechaModal from './NuevaCosechaModal';
 import RegistroMasivoAislamientosModal from './RegistroMasivoAislamientosModal';
 import NoConformidadBatchModal from './NoConformidadBatchModal';
+import toast from 'react-hot-toast';
 
 const STATUS_OPTIONS = [
   { label: 'Planificado', emoji: '📅', color: '#94a3b8' },
@@ -140,9 +141,9 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
         photos: [...photos, { url: result?.url ?? result?.imageUrl, date: new Date().toISOString() }],
         updatedAt: serverTimestamp(),
       });
-      alert('✅ Foto subida a Drive y vinculada.');
+      toast.success('Foto subida a Drive y vinculada.');
     } catch (err) {
-      alert('Error al subir foto: ' + err.message);
+      toast.error('Error al subir foto: ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -157,14 +158,14 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
       });
       onClose();
     } catch (err) {
-      alert('Error al actualizar: ' + err.message);
+      toast.error('Error al actualizar: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuardarCierre = async () => {
-    if (!cierreData.destino_sustrato) return alert('Seleccioná el destino del sustrato.');
+    if (!cierreData.destino_sustrato) return toast.error('Seleccioná el destino del sustrato.');
     setSavingCierre(true);
     try {
       await updateDoc(doc(db, 'batches', batch.id), {
@@ -174,9 +175,9 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
         contenedor_devuelto: cierreData.contenedor_devuelto,
         updatedAt: serverTimestamp(),
       });
-      alert('✅ Cierre de batch registrado correctamente.');
+      toast.success('Cierre de batch registrado correctamente.');
     } catch (err) {
-      alert('❌ Error al guardar cierre: ' + err.message);
+      toast.error('Error al guardar cierre: ' + err.message);
     } finally {
       setSavingCierre(false);
     }

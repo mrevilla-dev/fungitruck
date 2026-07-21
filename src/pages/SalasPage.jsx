@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, updateDoc, serverTimestamp, addDoc, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import SalaFormModal from '../components/SalaFormModal';
+import toast from 'react-hot-toast';
 
 function SalaCard({ sala, onDesinfectar, onEdit }) {
   const [batches, setBatches] = useState([]);
@@ -142,7 +143,7 @@ export default function SalasPage() {
         createdAt: now.toISOString(),
         operator: 'Maxi'
       });
-      alert('✅ Desinfección registrada');
+      toast.success('Desinfección registrada');
     } catch (err) { console.error(err); }
   };
 

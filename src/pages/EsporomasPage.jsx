@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
 import { uploadFileToDrive } from '../services/driveService';
 import DerivacionEsporomaModal from '../components/DerivacionEsporomaModal';
+import toast from 'react-hot-toast';
 
 export default function EsporomasPage() {
   const [esporomas, setEsporomas] = useState([]);
@@ -89,10 +90,10 @@ export default function EsporomasPage() {
       }
       // 2. Delete doc from Firestore
       await deleteDoc(doc(db, "esporomas", esp.id));
-      alert("✅ Ejemplar eliminado correctamente.");
+      toast.success("Ejemplar eliminado correctamente.");
     } catch (err) {
       console.error(err);
-      alert("Error al eliminar el ejemplar.");
+      toast.error("Error al eliminar el ejemplar.");
     } finally {
       setLoading(false);
     }
@@ -194,7 +195,7 @@ export default function EsporomasPage() {
       setShowModal(false);
       setEditingEsporoma(null);
       setUploadProgress(0);
-      alert("✅ Guardado con éxito");
+      toast.success("Guardado con éxito");
         // If custom "Otro" state, update config collection
         if (formData.estado_biologico === 'Otro' && formData.otro_estado_biologico.trim()) {
           await setDoc(doc(db, 'config', 'estados_biologicos'), {
@@ -206,7 +207,7 @@ export default function EsporomasPage() {
       setUploadProgress(0);
     } catch (err) {
       console.error(err);
-      alert(`⚠️ Error al guardar: ${err.message || "Error desconocido"}`);
+      toast.error(`Error al guardar: ${err.message || "Error desconocido"}`);
     } finally {
       setLoading(false);
       setUploadProgress(0);

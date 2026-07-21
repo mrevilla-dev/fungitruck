@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import DestinoSelector from '../components/DestinoSelector';
 import { generateSemanticId, getSubstrateCode } from '../utils/idGenerator';
+import toast from 'react-hot-toast';
 
 const MEDIOS_SUGERIDOS = [
   "Agar Papa Dextrosa (APD)",
@@ -123,12 +124,12 @@ function NewBatch() {
           }));
           setIsHeredado(true);
         } else {
-          alert("❌ No se encontró ningún Lote o Ejemplar con ese QR.");
+          toast.error("No se encontró ningún Lote o Ejemplar con ese QR.");
         }
       }
     } catch (err) {
       console.error(err);
-      alert("Error al escanear el padre.");
+      toast.error("Error al escanear el padre.");
     } finally {
       setLoading(false);
       setShowOrigenScanner(false);
@@ -194,7 +195,7 @@ function NewBatch() {
            const mpData = mpDoc.data();
            const disp = mpData?.stock_bulk?.cantidad_actual ?? mpData?.cantidad_actual ?? 0;
            if (!mpDoc.exists() || disp < clonesCount) {
-              alert(`❌ Stock insuficiente para el lote de medio seleccionado. Hay ${disp} disponibles, solicitaste ${clonesCount}.`);
+               toast.error(`Stock insuficiente para el lote de medio seleccionado. Hay ${disp} disponibles, solicitaste ${clonesCount}.`);
               setLoading(false);
               return;
            }
@@ -274,7 +275,7 @@ function NewBatch() {
       setGeneratedBatches(results);
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al guardar. Revisa la consola.");
+      toast.error("Error al guardar. Revisa la consola.");
     } finally {
       setLoading(false);
     }
@@ -383,7 +384,7 @@ function NewBatch() {
                       }));
                       setIsHeredado(true);
                     } else {
-                      alert("No se encontró el ID padre.");
+                      toast.error("No se encontró el ID padre.");
                     }
                   } catch (err) { console.error(err); }
                   setLoading(false);

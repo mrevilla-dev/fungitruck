@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 
 export default function AuditInsumoModal({ lote, onClose }) {
@@ -71,9 +72,9 @@ export default function AuditInsumoModal({ lote, onClose }) {
       });
 
       setLoteStatus(newStatus);
-      alert("✅ Estado del lote actualizado.");
+      toast.success("Estado del lote actualizado.");
     } catch (err) {
-      alert("Error al actualizar estado.");
+      toast.error("Error al actualizar estado.");
     }
   };
 
@@ -104,10 +105,10 @@ export default function AuditInsumoModal({ lote, onClose }) {
       });
 
       setEstadoActual(newStatus);
-      alert("✅ Estado reutilizable actualizado.");
+      toast.success("Estado reutilizable actualizado.");
     } catch (err) {
       console.error(err);
-      alert("Error al actualizar estado.");
+      toast.error("Error al actualizar estado.");
     }
   };
 
@@ -120,10 +121,10 @@ export default function AuditInsumoModal({ lote, onClose }) {
         proximo_mantenimiento: proximoMantenimiento,
         updatedAt: serverTimestamp()
       });
-      alert("✅ Datos guardados correctamente.");
+      toast.success("Datos guardados correctamente.");
     } catch (err) {
       console.error(err);
-      alert("Error al guardar observaciones.");
+      toast.error("Error al guardar observaciones.");
     } finally {
       setIsSavingObs(false);
     }

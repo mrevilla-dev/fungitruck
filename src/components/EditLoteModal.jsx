@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { doc, getDoc, updateDoc, serverTimestamp, collection, query, onSnapshot, runTransaction } from 'firebase/firestore';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
+import toast from 'react-hot-toast';
 
 
 export default function EditLoteModal({ lote, onClose, onSaved }) {
@@ -61,10 +62,10 @@ export default function EditLoteModal({ lote, onClose, onSaved }) {
       
       await setDoc(newSalaRef, salaData);
       setFormData(prev => ({ ...prev, salaId: newSalaRef.id }));
-      alert(`✅ Sala "${nombreSala}" creada y seleccionada.`);
+      toast.success(`Sala "${nombreSala}" creada y seleccionada.`);
     } catch (err) {
       console.error(err);
-      alert("Error al crear la sala.");
+      toast.error("Error al crear la sala.");
     } finally {
       setLoading(false);
     }
@@ -112,11 +113,11 @@ export default function EditLoteModal({ lote, onClose, onSaved }) {
         }
       });
 
-      alert("✅ Lote actualizado correctamente.");
+      toast.success("Lote actualizado correctamente.");
       onSaved();
     } catch (error) {
       console.error("Error al actualizar lote:", error);
-      alert("Error al guardar cambios");
+      toast.error("Error al guardar cambios");
     } finally {
       setLoading(false);
     }

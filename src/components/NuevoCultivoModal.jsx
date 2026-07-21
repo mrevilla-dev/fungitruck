@@ -8,6 +8,7 @@ import { PROFILES } from '../utils/zplProfiles';
 import PrintLabelsModal from './PrintLabelsModal';
 import HibridacionEjemplarModal from './HibridacionEjemplarModal';
 import NuevoEventoAislamientoModal from './NuevoEventoAislamientoModal';
+import toast from 'react-hot-toast';
 import { generarIdBatch, incrementarSecuenciaHibridacion } from '../utils/idGenerator';
 import AltaRapidaEjemplarExterno from './AltaRapidaEjemplarExterno';
 
@@ -132,7 +133,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       handleChange('contenedorId', id);
     } catch (err) {
       console.error(err);
-      alert("Error creando contenedor");
+      toast.error("Error creando contenedor");
     }
   };
 
@@ -399,22 +400,22 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const handleNext = () => {
     if (step === 2 && ['hacia_grano', 'hacia_sustrato'].includes(formData.tipo_inoculacion)) {
       if (formData.origen_grano_tipo_material === 'interno') {
-        if (!formData.ejemplar_fuente) return alert("Seleccioná un ejemplar.");
-        if (formData.origen_grano_tipo_batch === 'placa' && !formData.placa_origen) return alert("Seleccioná la placa origen.");
-        if (formData.origen_grano_tipo_batch === 'liquido' && !formData.batch_liquido) return alert("Seleccioná el batch líquido origen.");
-        if (formData.origen_grano_tipo_batch === 'grano' && !formData.batch_grano) return alert("Seleccioná el grano origen.");
+        if (!formData.ejemplar_fuente) return toast.error("Seleccioná un ejemplar.");
+        if (formData.origen_grano_tipo_batch === 'placa' && !formData.placa_origen) return toast.error("Seleccioná la placa origen.");
+        if (formData.origen_grano_tipo_batch === 'liquido' && !formData.batch_liquido) return toast.error("Seleccioná el batch líquido origen.");
+        if (formData.origen_grano_tipo_batch === 'grano' && !formData.batch_grano) return toast.error("Seleccioná el grano origen.");
       } else {
-        if (!formData.ejemplar_fuente) return alert("Debes crear el material externo primero.");
+        if (!formData.ejemplar_fuente) return toast.error("Debes crear el material externo primero.");
       }
     } else {
-      if (step === 2 && !formData.ejemplar_fuente) return alert("Seleccioná un ejemplar.");
+      if (step === 2 && !formData.ejemplar_fuente) return toast.error("Seleccioná un ejemplar.");
     }
     
-    if (step === 2 && formData.es_hibridacion && !formData.ejemplar_fuente_2) return alert("Seleccioná el segundo ejemplar para la hibridación.");
-    if (step === 2 && formData.tipo_inoculacion === 'placa_a_liquido' && !formData.placa_origen) return alert("Seleccioná una placa origen.");
-    if (step === 2 && ['placa_a_liquido','placa_a_placa'].includes(formData.tipo_inoculacion) && formData.es_hibridacion && !formData.placa_origen_2) return alert("Seleccioná la segunda placa origen para la hibridación.");
-    if (step === 3 && !formData.medio_prep) return alert("Seleccioná un medio destino.");
-    if (step === 5 && !formData.sala_destino) return alert("Seleccioná una sala destino.");
+    if (step === 2 && formData.es_hibridacion && !formData.ejemplar_fuente_2) return toast.error("Seleccioná el segundo ejemplar para la hibridación.");
+    if (step === 2 && formData.tipo_inoculacion === 'placa_a_liquido' && !formData.placa_origen) return toast.error("Seleccioná una placa origen.");
+    if (step === 2 && ['placa_a_liquido','placa_a_placa'].includes(formData.tipo_inoculacion) && formData.es_hibridacion && !formData.placa_origen_2) return toast.error("Seleccioná la segunda placa origen para la hibridación.");
+    if (step === 3 && !formData.medio_prep) return toast.error("Seleccioná un medio destino.");
+    if (step === 5 && !formData.sala_destino) return toast.error("Seleccioná una sala destino.");
 
     setStep(s => s + 1);
   };
@@ -636,7 +637,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       }
     } catch (error) {
       console.error('Error al registrar la inoculación:', error);
-      alert('❌ Error al registrar la inoculación. No se guardó nada. Intentá de nuevo.');
+      toast.error('Error al registrar la inoculación. No se guardó nada. Intentá de nuevo.');
       setLoading(false);
     }
   };
@@ -762,7 +763,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                    <h5 style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--text-secondary)' }}>Ingreso de Material Externo</h5>
                    <AltaRapidaEjemplarExterno onSaved={(ejemplarId, ejemplarObj) => {
                       handleChange('ejemplar_fuente', { id: ejemplarId, data: ejemplarObj, nombre: `${ejemplarId} · ${ejemplarObj.especie}` });
-                      alert('Ejemplar externo guardado exitosamente. Podés pasar al siguiente paso.');
+                      toast.success('Ejemplar externo guardado exitosamente. Podés pasar al siguiente paso.');
                    }} />
                  </div>
               )}

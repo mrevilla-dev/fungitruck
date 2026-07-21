@@ -4,6 +4,7 @@ import { collection, query, where, onSnapshot, writeBatch, doc, serverTimestamp,
 import SearchableSelect from './SearchableSelect';
 import PrintLabelsModal from './PrintLabelsModal';
 import { generarIdBatch } from '../utils/idGenerator';
+import toast from 'react-hot-toast';
 
 const TIPO_ENVASE_OPTIONS = ['Bolsa', 'Caja', 'Cajón', 'Bandeja', 'Canasto'];
 
@@ -192,14 +193,14 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
       handleConfigChange('contenedorId', id);
     } catch (err) {
       console.error(err);
-      alert("Error creando contenedor");
+      toast.error("Error creando contenedor");
     }
   };
 
   const handleNextToStep2 = () => {
-    if (!config.cantidad || config.cantidad < 1) return alert("Cantidad inválida");
-    if (config.destinos.length === 0 || !config.salaId) return alert("Seleccioná al menos un medio y la sala destino");
-    if (!batchMadre.evento_aislamiento_id && !config.eventoManualId) return alert("Seleccioná un Evento de Aislamiento de origen");
+    if (!config.cantidad || config.cantidad < 1) return toast.error("Cantidad inválida");
+    if (config.destinos.length === 0 || !config.salaId) return toast.error("Seleccioná al menos un medio y la sala destino");
+    if (!batchMadre.evento_aislamiento_id && !config.eventoManualId) return toast.error("Seleccioná un Evento de Aislamiento de origen");
 
     const newAislamientos = [];
     const padreCode = `${(config.genero || 'XX').substring(0,3).toUpperCase()}${(config.especie || 'XX').substring(0,3).toUpperCase()}`;
@@ -226,8 +227,8 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
 
   const handleSubmit = async () => {
     const validos = aislamientos.filter(a => !a.descartar);
-    if (validos.length === 0) return alert("No hay aislamientos válidos para registrar");
-    if (config.destinos.length === 0) return alert("Debe seleccionar al menos un medio destino");
+    if (validos.length === 0) return toast.error("No hay aislamientos válidos para registrar");
+    if (config.destinos.length === 0) return toast.error("Debe seleccionar al menos un medio destino");
 
     setLoading(true);
     try {
@@ -404,7 +405,7 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
            });
         }
         
-        alert(`✅ Se registraron ${validos.length} Aislamientos.`);
+        toast.success(`Se registraron ${validos.length} Aislamientos.`);
         if (onSaved) onSaved();
         onClose();
       }
@@ -412,7 +413,7 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
       setLoading(false);
     } catch (err) {
       console.error(err);
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
       setLoading(false);
     }
   };

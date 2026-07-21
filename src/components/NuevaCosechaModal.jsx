@@ -6,6 +6,7 @@ import SearchableSelect from './SearchableSelect';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdCosecha, generarIdCosechaGrupal } from '../utils/idGenerator';
 import { resolverPesoSeco, obtenerCondicionesAmbientales } from '../utils/cosechaUtils';
+import toast from 'react-hot-toast';
 
 export default function NuevaCosechaModal({ initialBatch = null, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -250,22 +251,22 @@ export default function NuevaCosechaModal({ initialBatch = null, onClose, onSave
   // Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (modo === 'individual' && !selectedBatch) return alert("Seleccione un lote");
-    if (modo !== 'individual' && selectedMultiBatches.length === 0) return alert("Seleccione al menos un lote");
-    if (!formData.peso_fresco) return alert("Ingrese el peso fresco");
+    if (modo === 'individual' && !selectedBatch) return toast.error("Seleccione un lote");
+    if (modo !== 'individual' && selectedMultiBatches.length === 0) return toast.error("Seleccione al menos un lote");
+    if (!formData.peso_fresco) return toast.error("Ingrese el peso fresco");
 
     const totalDestinos = destinos.reduce((sum, d) => sum + (Number(d.gramos) || 0), 0);
     if (totalDestinos > Number(formData.peso_fresco)) {
-      return alert("El peso total en los destinos excede el Peso Fresco de la cosecha");
+      return toast.error("El peso total en los destinos excede el Peso Fresco de la cosecha");
     }
 
     if (modo === 'individual' && pesoSecoResuelto.fuente === 'manual' && (!pesoSecoManual || Number(pesoSecoManual) <= 0)) {
-      return alert("Debe ingresar un valor para el Peso Seco del Sustrato.");
+      return toast.error("Debe ingresar un valor para el Peso Seco del Sustrato.");
     }
     
     if (modo !== 'individual') {
       const f = metricsMulti.batchesData.find(b => b.pesoSecoResuelto.fuente === 'manual' && (!b.manualSeco || Number(b.manualSeco) <= 0));
-      if (f) return alert(`Debe ingresar un Peso Seco manual para el lote ${f.id}`);
+      if (f) return toast.error(`Debe ingresar un Peso Seco manual para el lote ${f.id}`);
     }
 
     setLoading(true);
@@ -345,7 +346,7 @@ export default function NuevaCosechaModal({ initialBatch = null, onClose, onSave
           wb.update(doc(db, 'batches', selectedBatch.id), { status: 'Cosechado' });
         }
         await wb.commit();
-        alert(`✅ Cosecha registrada exitosamente.\nID: ${cosechaId}`);
+        toast.success(`Cosecha registrada exitosamente.\nID: ${cosechaId}`);
         
       } else {
         // MULTI LOTE
@@ -397,14 +398,14 @@ export default function NuevaCosechaModal({ initialBatch = null, onClose, onSave
         });
 
         await wb.commit();
-        alert(`✅ Cosecha Grupal registrada exitosamente.\nID: ${cosechaId}`);
+        toast.success(`Cosecha Grupal registrada exitosamente.\nID: ${cosechaId}`);
       }
       
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
       console.error(err);
-      alert(`❌ Error al registrar cosecha: ${err.message}`);
+      toast.error(`Error al registrar cosecha: ${err.message}`);
     } finally {
       setLoading(false);
     }

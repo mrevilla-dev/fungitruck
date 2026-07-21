@@ -4,6 +4,7 @@ import { collection, query, orderBy, limit, onSnapshot, where, doc, updateDoc } 
 import { Link } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 import RegistroMasivoAislamientosModal from '../components/RegistroMasivoAislamientosModal';
+import toast from 'react-hot-toast';
 
 // Configuración de ciclos teóricos (en días) para el motor de alertas
 const CICLOS_TEORICOS = {
@@ -226,7 +227,7 @@ export default function Dashboard() {
   const handleUpdateEjemplarEstado = async (id, newEstado) => {
     try {
       await updateDoc(doc(db, 'ejemplares', id), { estado: newEstado, updatedAt: new Date().toISOString() });
-    } catch (err) { alert('Error: ' + err.message); }
+    } catch (err) { toast.error('Error: ' + err.message); }
   };
 
   const ejemplaresOptions = ejemplares.map(e => ({

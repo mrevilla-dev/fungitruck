@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 const METODOS = ['Esterilización', 'Pasteurización', 'Tindalización', 'Sin esterilización'];
 
@@ -37,7 +38,7 @@ export default function SanitizacionAccordion({ medio, operariosList, equiposLis
   const markDirty = () => { setDirty(true); setSaved(false); };
 
   const handleSave = async () => {
-    if (!fecha_sanitizacion) return alert('Ingresá la fecha de sanitización');
+    if (!fecha_sanitizacion) return toast('Ingresá la fecha de sanitización');
     setSaving(true);
     try {
       const medioRef = doc(db, 'medios_preparados', medioId);
@@ -56,7 +57,7 @@ export default function SanitizacionAccordion({ medio, operariosList, equiposLis
       setDirty(false);
     } catch (err) {
       console.error('Error al guardar sanitización:', err);
-      alert('Error al guardar: ' + err.message);
+      toast.error('Error al guardar: ' + err.message);
     } finally {
       setSaving(false);
     }

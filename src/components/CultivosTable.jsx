@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { db } from '../firebase';
 import { doc, deleteDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint, onCriopreservar }) => {
   const filteredCultivos = cultivos.filter(c => {
@@ -15,10 +16,10 @@ const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint,
     if (!window.confirm(`⚠️ ¿Estás seguro de eliminar el cultivo ${cultivo.id}? Esta acción es irreversible.`)) return;
     try {
       await deleteDoc(doc(db, "batches", cultivo.id));
-      alert("✅ Cultivo eliminado.");
+      toast.success('Cultivo eliminado.');
     } catch (err) {
       console.error(err);
-      alert("Error al eliminar.");
+      toast.error('Error al eliminar.');
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { db } from '../firebase';
 import { collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function CompraInsumoModal({ insumo, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -58,7 +59,7 @@ export default function CompraInsumoModal({ insumo, onClose, onSaved }) {
       onSaved();
     } catch (error) {
       console.error("Error al registrar compra:", error);
-      alert("Error al guardar la compra");
+      toast.error("Error al guardar la compra");
     } finally {
       setLoading(false);
     }

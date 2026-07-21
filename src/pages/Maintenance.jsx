@@ -4,6 +4,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import DestinoSelector from '../components/DestinoSelector';
 import { compressImage } from '../utils/imageUtils';
+import toast from 'react-hot-toast';
 
 const TIPOS = [
   { value: "Temperatura", label: "🌡️ Control de Clima" },
@@ -72,7 +73,7 @@ function Maintenance() {
       setSaved(true);
     } catch (error) {
       console.error(error);
-      alert(`Error al guardar: ${error.message}`);
+      toast.error(`Error al guardar: ${error.message}`);
     } finally {
       setLoading(false);
     }

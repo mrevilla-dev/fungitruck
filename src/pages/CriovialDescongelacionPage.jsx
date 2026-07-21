@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getCriovialById, registrarDescongelacion } from '../services/criobancService';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function CriovialDescongelacionPage() {
   const { id } = useParams();
@@ -82,13 +83,13 @@ export default function CriovialDescongelacionPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!operario) {
-      alert("Operario es obligatorio.");
+      toast.error("Operario es obligatorio.");
       return;
     }
 
     if (generarBatch) {
       if (!batchData.medio_cultivo || !batchData.sala) {
-        alert("Si generás un nuevo batch, debes indicar el medio y la sala.");
+        toast.error("Si generás un nuevo batch, debes indicar el medio y la sala.");
         return;
       }
     }
@@ -113,7 +114,7 @@ export default function CriovialDescongelacionPage() {
       navigate(`/criobanco/criovial/${id}`);
     } catch (err) {
       console.error(err);
-      alert('Error registrando descongelación: ' + err.message);
+      toast.error('Error registrando descongelación: ' + err.message);
     } finally {
       setGuardando(false);
     }

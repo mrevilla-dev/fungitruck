@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
 import { collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function HibridacionEjemplarModal({ 
   batchIds, 
@@ -97,7 +98,7 @@ export default function HibridacionEjemplarModal({
       onSaved();
     } catch (error) {
       console.error(error);
-      alert('Error al registrar la identidad genética: ' + error.message);
+      toast.error('Error al registrar la identidad genética: ' + error.message);
       setLoading(false);
     }
   };

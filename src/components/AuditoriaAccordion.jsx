@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, query, orderBy, addDoc, doc, writeBatch, serverTimestamp, updateDoc, getDoc, getDocs } from 'firebase/firestore';
 import { uploadFileToDrive } from '../services/driveService';
+import toast from 'react-hot-toast';
 
 // Simple modal component for adding an audit record
 function AddAuditModal({ medioId, onClose, onAdded }) {
@@ -104,12 +105,12 @@ function AddAuditModal({ medioId, onClose, onAdded }) {
       }
 
       await batch.commit();
-      alert('✅ Auditoría registrada');
+      toast.success('Auditoría registrada');
       onAdded();
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Error al registrar auditoría');
+      toast.error('Error al registrar auditoría');
     } finally {
       setSaving(false);
     }

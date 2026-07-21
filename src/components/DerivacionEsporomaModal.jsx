@@ -5,6 +5,7 @@ import { getAuth } from 'firebase/auth';
 import { generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
 import SearchableSelect from './SearchableSelect';
 import { uploadFileToDrive } from '../services/driveService';
+import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
   if (!alias) return 'MED';
@@ -108,8 +109,8 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (tipoDerivacion === 'humeda') {
-      if (!formData.medio_prep_id) return alert("Falta seleccionar el medio preparado.");
-      if (!formData.sala_destino_id) return alert("Falta seleccionar la sala de destino.");
+      if (!formData.medio_prep_id) return toast.error("Falta seleccionar el medio preparado.");
+      if (!formData.sala_destino_id) return toast.error("Falta seleccionar la sala de destino.");
     }
 
     setLoading(true);
@@ -236,11 +237,11 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
       }
 
       await wb.commit();
-      alert(resText);
+      toast(resText);
       onClose();
     } catch (error) {
       console.error(error);
-      alert(`❌ Error al guardar: ${error.message}. Tus datos NO se borraron, podés reintentar.`);
+      toast.error(`Error al guardar: ${error.message}. Tus datos NO se borraron, podés reintentar.`);
     } finally {
       setLoading(false);
     }

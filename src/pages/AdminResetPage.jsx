@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function AdminResetPage() {
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,7 @@ export default function AdminResetPage() {
   const handleReset = async () => {
     const selected = Object.keys(options).filter(k => options[k]);
     if (selected.length === 0) {
-      alert("Seleccioná al menos una categoría para borrar.");
+      toast.error("Seleccioná al menos una categoría para borrar.");
       return;
     }
 
@@ -28,7 +29,7 @@ export default function AdminResetPage() {
     
     const promptValue = window.prompt("⚠️ SEGUNDA CONFIRMACIÓN: Escribí 'BORRAR' en mayúsculas para confirmar:");
     if (promptValue !== 'BORRAR') {
-        alert("Borrado cancelado.");
+        toast("Borrado cancelado.");
         return;
     }
 
@@ -66,7 +67,7 @@ export default function AdminResetPage() {
         }
       }
       setStatus("✅ Borrado completo de las categorías seleccionadas.");
-      alert("Operación completada con éxito.");
+      toast.success("Operación completada con éxito.");
     } catch (error) {
       console.error(error);
       setStatus(`❌ Error durante el borrado: ${error.message}`);
@@ -144,7 +145,7 @@ export default function AdminResetPage() {
         });
       }
       setStatus("✅ Precarga de Envases completada. Ya están disponibles en Insumos Maestro.");
-      alert(`Se agregaron ${envases.length} envases a la base de datos como Descartables.`);
+      toast.success(`Se agregaron ${envases.length} envases a la base de datos como Descartables.`);
     } catch (error) {
       console.error(error);
       setStatus(`❌ Error al precargar: ${error.message}`);

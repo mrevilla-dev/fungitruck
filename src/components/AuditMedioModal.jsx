@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function AuditMedioModal({ medio, onClose }) {
   const [loading, setLoading] = useState(true);
@@ -76,10 +77,10 @@ export default function AuditMedioModal({ medio, onClose }) {
         },
         updatedAt: serverTimestamp()
       });
-      alert("✅ Observaciones guardadas correctamente.");
+      toast.success('Observaciones guardadas correctamente.');
     } catch (err) {
       console.error(err);
-      alert("Error al guardar observaciones.");
+      toast.error('Error al guardar observaciones.');
     } finally {
       setIsSavingObs(false);
     }

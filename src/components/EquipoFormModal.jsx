@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { uploadFileToDrive } from '../services/driveService';
+import toast from 'react-hot-toast';
 
 export default function EquipoFormModal({ onClose, onSave, equipoBase = null, user }) {
   const [cargando, setCargando] = useState(false);
@@ -69,7 +70,7 @@ export default function EquipoFormModal({ onClose, onSave, equipoBase = null, us
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!formData.nombre) return alert('El nombre es obligatorio');
+    if (!formData.nombre) return toast('El nombre es obligatorio');
     
     setCargando(true);
     try {
@@ -101,7 +102,7 @@ export default function EquipoFormModal({ onClose, onSave, equipoBase = null, us
       await onSave(datosAEnviar, equipoBase?._docId);
     } catch (err) {
       console.error(err);
-      alert('Ocurrió un error al guardar');
+      toast.error('Ocurrió un error al guardar');
     } finally {
       setCargando(false);
     }

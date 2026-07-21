@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function AgotarMedioModal({ medio, onClose, onSaved }) {
   const [fechaAgotamiento, setFechaAgotamiento] = useState(new Date().toISOString().split('T')[0]);
@@ -9,7 +10,7 @@ export default function AgotarMedioModal({ medio, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!motivo) return alert('Seleccione un motivo');
+    if (!motivo) return toast.error('Seleccione un motivo');
     setSaving(true);
     try {
       const medioRef = doc(db, 'medios_preparados', medio.id);
@@ -19,11 +20,11 @@ export default function AgotarMedioModal({ medio, onClose, onSaved }) {
         motivo_agotamiento: motivo,
         observaciones_agotamiento: observaciones || null, // Optional
       });
-      alert('✅ Medio marcado como Agotado');
+      toast.success('Medio marcado como Agotado');
       onSaved();
     } catch (err) {
       console.error(err);
-      alert('Error al marcar como agotado: ' + err.message);
+      toast.error('Error al marcar como agotado: ' + err.message);
     } finally {
       setSaving(false);
     }

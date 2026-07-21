@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { registrarCalibracion } from '../services/equipoService';
 import { uploadFileToDrive } from '../services/driveService';
+import toast from 'react-hot-toast';
 
 export default function CalibracionFormModal({ equipoId, onClose, onSave, user }) {
   const [cargando, setCargando] = useState(false);
@@ -21,7 +22,7 @@ export default function CalibracionFormModal({ equipoId, onClose, onSave, user }
   async function handleSubmit(e) {
     e.preventDefault();
     if (!formData.fecha) {
-      return alert('La fecha es obligatoria.');
+      return toast('La fecha es obligatoria.');
     }
     
     setCargando(true);
@@ -40,7 +41,7 @@ export default function CalibracionFormModal({ equipoId, onClose, onSave, user }
       await onSave();
     } catch (err) {
       console.error(err);
-      alert('Error al registrar la calibración.');
+      toast.error('Error al registrar la calibración.');
     } finally {
       setCargando(false);
     }

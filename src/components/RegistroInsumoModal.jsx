@@ -5,6 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import PrintLabelsModal from './PrintLabelsModal';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
+import toast from 'react-hot-toast';
 
 
 export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsumo = null, hideMasterConfig = false }) {
@@ -104,10 +105,10 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
       });
       
       setFormData(prev => ({ ...prev, salaId: newSalaRef.id }));
-      alert(`✅ Sala "${nombreSala}" creada y seleccionada.`);
+      toast.success(`Sala "${nombreSala}" creada y seleccionada.`);
     } catch (err) {
       console.error(err);
-      alert("Error al crear la sala. Intente nuevamente.");
+      toast.error("Error al crear la sala. Intente nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -307,7 +308,7 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
       onSaved();
     } catch (error) {
       console.error("Error en el registro:", error);
-      alert("Error al guardar: " + (error.message || "Error desconocido"));
+      toast.error("Error al guardar: " + (error.message || "Error desconocido"));
     } finally {
       setLoading(false);
     }
@@ -774,7 +775,7 @@ function CameraCaptureModal({ onCapture, onClose }) {
         if (videoRef.current) videoRef.current.srcObject = s;
       } catch (err) {
         console.error("Error acceso cámara:", err);
-        alert("No se pudo acceder a la cámara.");
+        toast.error("No se pudo acceder a la cámara.");
         onClose();
       }
     }

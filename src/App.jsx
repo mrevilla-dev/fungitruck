@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import './firebase'; // Inicializar firebase
 import './App.css'; // Estilos globales
 import NavBar from './components/NavBar';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useIsMobile } from './hooks/useIsMobile';
 import BarraInferiorMobile from './components/nav/BarraInferiorMobile';
 // Páginas
@@ -58,6 +60,7 @@ export default function App() {
     <div className="app-wrapper">
       {!isMobile && <NavBar />}
       <div className="content-wrapper" style={{ padding: '1rem' }}>
+        <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventario" element={<InventoryPage />} />
@@ -91,8 +94,10 @@ export default function App() {
           <Route path="/equipos" element={<EquiposPage user={user} />} />
           <Route path="/equipos/:id" element={<EquipoDetallePage user={user} />} />
         </Routes>
+        </ErrorBoundary>
       </div>
       {isMobile && <BarraInferiorMobile />}
+      <Toaster position="top-center" />
     </div>
   );
 }

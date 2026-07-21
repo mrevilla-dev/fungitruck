@@ -17,6 +17,7 @@ import {
   addDoc,
 } from 'firebase/firestore';
 import { uploadFileToDrive } from '../services/driveService';
+import toast from 'react-hot-toast';
 import PrintLabelsModal from './PrintLabelsModal';
 
 // ── Opciones fijas ─────────────────────────────────────────────────────────────
@@ -133,9 +134,9 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
     const vol = Number(volumenPorUnidad?.toString().replace(',', '.')) || 0;
     const descuento = vol > 0 ? (qty * vol) : qty;
 
-    if (!qty || qty <= 0) return alert('Ingresá una cantidad válida');
-    if (descuento > disponibleBulk) return alert(`Solo quedan ${disponibleBulk} disponibles en el bulk, y querés fraccionar ${descuento}`);
-    if (!operario.trim())    return alert('Ingresá el nombre del operario');
+    if (!qty || qty <= 0) return toast.error('Ingresá una cantidad válida');
+    if (descuento > disponibleBulk) return toast.error(`Solo quedan ${disponibleBulk} disponibles en el bulk, y querés fraccionar ${descuento}`);
+    if (!operario.trim())    return toast.error('Ingresá el nombre del operario');
 
     // Advertencia de operario distinto
     if (defaultOperario && operario.trim() !== defaultOperario) {
@@ -144,18 +145,18 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
     }
 
     let finalTipoEnvase = tipoEnvase;
-    if (!tipoEnvase) return alert('Seleccioná el formato de envasado');
+    if (!tipoEnvase) return toast.error('Seleccioná el formato de envasado');
     if (tipoEnvase === 'Otro') {
       const val = otroEnvaseNombre.trim();
-      if (!val) return alert('Especificá el tipo de envase');
+      if (!val) return toast.error('Especificá el tipo de envase');
       finalTipoEnvase = val;
     }
 
     let finalTipoUnidad = tipoUnidad;
-    if (!tipoUnidad) return alert('Seleccioná la unidad/recipiente');
+    if (!tipoUnidad) return toast.error('Seleccioná la unidad/recipiente');
     if (tipoUnidad === 'Otro') {
       const val = otroUnidadNombre?.trim();
-      if (!val) return alert('Especificá el tipo de unidad');
+      if (!val) return toast.error('Especificá el tipo de unidad');
       finalTipoUnidad = val;
     }
     setSaving(true);
@@ -167,7 +168,7 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
         const val = otroUnidadNombre.trim();
         if (!val) {
           setSaving(false);
-          return alert('Especificá el tipo de unidad');
+          return toast.error('Especificá el tipo de unidad');
         }
         const newInsumoRef = doc(collection(db, 'insumos_base'));
         batch.set(newInsumoRef, {
@@ -272,12 +273,12 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
         await updateDoc(medioRef, { estado: 'Agotado', fecha_agotamiento: serverTimestamp() });
       }
 
-      alert('✅ Bolsa creada correctamente');
+      toast.success('Bolsa creada correctamente');
       onAdded();
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Error al crear la bolsa: ' + err.message);
+      toast.error('Error al crear la bolsa: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -587,37 +588,37 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
   }, [salasList]);
 
   const handleSave = async () => {
-    if (!qty || qty <= 0) return alert('Ingresá una cantidad válida de unidades a crear');
+    if (!qty || qty <= 0) return toast.error('Ingresá una cantidad válida de unidades a crear');
 
     if (parentHasVolume) {
-      if (!vol || vol <= 0) return alert('Ingresá el volumen por unidad para calcular el descuento del padre');
+      if (!vol || vol <= 0) return toast.error('Ingresá el volumen por unidad para calcular el descuento del padre');
       if (descuentoPadreAuto > parentDisponible)
-        return alert(`El padre solo tiene ${parentDisponible} ml disponibles y querés usar ${descuentoPadreAuto} ml`);
+        return toast.error(`El padre solo tiene ${parentDisponible} ml disponibles y querés usar ${descuentoPadreAuto} ml`);
     } else {
       if (!descuentoPadreManual || descuentoPadreManual <= 0)
-        return alert('Ingresá cuántas unidades del padre se consumen');
+        return toast.error('Ingresá cuántas unidades del padre se consumen');
       if (descuentoPadreManual > parentDisponible)
-        return alert(`El padre solo tiene ${parentDisponible} ${parentUnidadLabel} disponibles`);
+        return toast.error(`El padre solo tiene ${parentDisponible} ${parentUnidadLabel} disponibles`);
     }
 
-    if (!operario.trim()) return alert('Ingresá el nombre del operario');
+    if (!operario.trim()) return toast.error('Ingresá el nombre del operario');
     if (defaultOperario && operario.trim() !== defaultOperario) {
       if (!window.confirm(`Estás por registrar a nombre de "${operario}". ¿Confirmás?`)) return;
     }
 
     let finalTipoEnvase = tipoEnvase;
-    if (!tipoEnvase) return alert('Seleccioná el formato de envasado');
+    if (!tipoEnvase) return toast.error('Seleccioná el formato de envasado');
     if (tipoEnvase === 'Otro') {
       const val = otroEnvaseNombre.trim();
-      if (!val) return alert('Especificá el tipo de envase');
+      if (!val) return toast.error('Especificá el tipo de envase');
       finalTipoEnvase = val;
     }
 
     let finalTipoUnidad = tipoUnidad;
-    if (!tipoUnidad) return alert('Seleccioná la unidad/recipiente');
+    if (!tipoUnidad) return toast.error('Seleccioná la unidad/recipiente');
     if (tipoUnidad === 'Otro') {
       const val = otraUnidadNombre?.trim();
-      if (!val) return alert('Especificá el tipo de unidad');
+      if (!val) return toast.error('Especificá el tipo de unidad');
       finalTipoUnidad = val;
     }
 
@@ -647,7 +648,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
       let finalTipoUnidad = tipoUnidad;
       if (tipoUnidad === 'Otro') {
         const val = otroUnidadNombre.trim();
-        if (!val) { setSaving(false); return alert('Especificá el tipo de unidad'); }
+        if (!val) { setSaving(false); return toast.error('Especificá el tipo de unidad'); }
         const newInsumoRef = doc(collection(db, 'insumos_base'));
         batch.set(newInsumoRef, {
           nombre: val, es_envase: true, categoria: 'Descartables',
@@ -736,12 +737,12 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
 
       await batch.commit();
 
-      alert('✅ Subfracción creada correctamente');
+      toast.success('Subfracción creada correctamente');
       onAdded();
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Error al crear subfracción: ' + err.message);
+      toast.error('Error al crear subfracción: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -955,8 +956,8 @@ function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose
 
     // Si el tipo descuenta, validar cantidad
     if (mermaInfo.descuenta) {
-      if (qty <= 0) return alert('Ingresá la cantidad afectada');
-      if (qty > disponible) return alert(`Solo hay ${disponible} unidades disponibles en esta bolsa`);
+      if (qty <= 0) return toast.error('Ingresá la cantidad afectada');
+      if (qty > disponible) return toast.error(`Solo hay ${disponible} unidades disponibles en esta bolsa`);
     }
 
     setSaving(true);
@@ -1018,12 +1019,12 @@ function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose
       const msgExtra = mermaInfo.descuenta
         ? ` — Se descontaron ${qty} ${unidadLabel}. Disponible: ${nuevoDisponible}`
         : ' — Registrado sin descuento';
-      alert('✅ Novedad añadida' + msgExtra);
+      toast.success('Novedad añadida' + msgExtra);
       onAdded();
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Error al agregar novedad: ' + err.message);
+      toast.error('Error al agregar novedad: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -1241,10 +1242,10 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
         impreso_por: null,
         fecha_impresion: null
       });
-      alert('✅ Etiqueta enviada a la cola de impresión');
+      toast.success('Etiqueta enviada a la cola de impresión');
     } catch (error) {
       console.error(error);
-      alert('Error al enviar a la cola');
+      toast.error('Error al enviar a la cola');
     }
   };
 
@@ -1286,7 +1287,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
       refresh();
     } catch (err) {
       console.error(err);
-      alert('Error eliminando bolsa: ' + err.message);
+      toast.error('Error eliminando bolsa: ' + err.message);
     }
   };
 
@@ -1465,10 +1466,6 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
           <p style={{ color: 'var(--text-secondary)' }}>No hay subfracciones registradas.</p>
         ) : (
           bags.filter(b => !b.parent_id).map(b => {
-            console.log('🧪 Bolsa padre:', b.id);
-console.log('🧪 Todos los bags:', bags.map(bag => ({ id: bag.id, parent_id: bag.parent_id })));
-console.log('🧪 Bolsa padre ID:', b.id);
-console.log('🧪 Bolsas disponibles:', bags.map(bag => ({ id: bag.id, parent_id: bag.parent_id })));
         const children = bags.filter(child => child.parent_id === (b.id_bolsa || b.id));
             return (
               <div key={b.id}>

@@ -4,6 +4,7 @@ import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import EquipoFormModal from '../components/EquipoFormModal';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function EquiposPage({ user }) {
   const [equipos, setEquipos] = useState([]);
@@ -47,7 +48,7 @@ export default function EquiposPage({ user }) {
       setEquipos(res);
     } catch (err) {
       console.error(err);
-      alert('Error cargando equipos');
+      toast.error('Error cargando equipos');
     } finally {
       setCargando(false);
     }
@@ -65,7 +66,7 @@ export default function EquiposPage({ user }) {
       cargarDatos();
     } catch (err) {
       console.error(err);
-      alert('Error al guardar');
+      toast.error('Error al guardar');
     }
   }
 

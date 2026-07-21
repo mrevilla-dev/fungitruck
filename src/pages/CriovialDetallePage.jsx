@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCriovialById, registrarMovimientoCriovial } from '../services/criobancService';
+import toast from 'react-hot-toast';
 
 const ESTADO_CONFIG = {
   'Criopreservado':     { color: '#10b981', badge: '🟢', bg: '#10b98120' },
@@ -58,7 +59,7 @@ export default function CriovialDetallePage() {
   const handleMover = async (e) => {
     e.preventDefault();
     if (!movData.equipo || !movData.contenedor) {
-      alert("Equipo y contenedor son obligatorios");
+      toast('Equipo y contenedor son obligatorios');
       return;
     }
     
@@ -80,7 +81,7 @@ export default function CriovialDetallePage() {
       await cargarDatos(); // recargar
     } catch (err) {
       console.error(err);
-      alert('Error al registrar movimiento: ' + err.message);
+      toast.error('Error al registrar movimiento: ' + err.message);
     } finally {
       setMoviendo(false);
     }

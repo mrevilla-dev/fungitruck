@@ -5,6 +5,7 @@ import { getAuth } from 'firebase/auth';
 import PrintLabelsModal from './PrintLabelsModal';
 import { Html5Qrcode } from 'html5-qrcode';
 import SearchableSelect from './SearchableSelect';
+import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
   if (!alias) return 'MED';
@@ -196,7 +197,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       
       if (matchingLote) {
         setSelectedLotes(prev => ({ ...prev, [insumoId]: matchingLote.id }));
-        alert(`✅ Lote "${matchingLote.lote_interno}" verificado y seleccionado.`);
+        toast.success(`Lote "${matchingLote.lote_interno}" verificado y seleccionado.`);
         return;
       }
       
@@ -212,19 +213,19 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
         const docData = snap.docs[0].data();
         
         if (docData.estado_apertura !== 'Abierto') {
-          alert(`⚠️ Lote "${code}" encontrado pero NO está "Abierto" (Estado: ${docData.estado_apertura}).`);
+          toast(`Lote "${code}" encontrado pero NO está "Abierto" (Estado: ${docData.estado_apertura}).`);
         } else if (docData.cantidad_base_actual <= 0) {
-          alert(`⚠️ Lote "${code}" no tiene stock disponible.`);
+          toast(`Lote "${code}" no tiene stock disponible.`);
         } else {
           setSelectedLotes(prev => ({ ...prev, [insumoId]: docId }));
-          alert(`✅ Lote "${code}" verificado y seleccionado.`);
+          toast.success(`Lote "${code}" verificado y seleccionado.`);
         }
       } else {
-        alert(`❌ No se encontró ningún lote activo con código "${code}" para este insumo.`);
+        toast.error(`No se encontró ningún lote activo con código "${code}" para este insumo.`);
       }
     } catch (err) {
       console.error(err);
-      alert("Error al verificar el lote.");
+      toast.error("Error al verificar el lote.");
     } finally {
       setLoading(false);
     }
@@ -233,15 +234,15 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   // --- Funciones Envasado ---
   const handleAddEnvasesPrincipales = () => {
     const { recipienteId, volumen, cantidad } = addEnvaseForm;
-    if (!recipienteId) return alert("Seleccioná un recipiente");
-    if (!volumen || volumen <= 0) return alert("Ingresá un volumen válido");
-    if (!cantidad || cantidad <= 0) return alert("Ingresá una cantidad válida");
+    if (!recipienteId) return toast.error("Seleccioná un recipiente");
+    if (!volumen || volumen <= 0) return toast.error("Ingresá un volumen válido");
+    if (!cantidad || cantidad <= 0) return toast.error("Ingresá una cantidad válida");
 
     const selectedRecip = recipienteId === 'generico' 
       ? { nombre: 'Envase de Laboratorio (Genérico)' }
       : recipientes.find(r => r.id === recipienteId);
       
-    if (!selectedRecip) return alert("Recipiente no encontrado o inválido.");
+    if (!selectedRecip) return toast.error("Recipiente no encontrado o inválido.");
     const newEnvases = [];
     const baseCount = envasesList.length + 1;
     
@@ -262,21 +263,21 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
 
   const handleAddSubFractionation = (envaseId) => {
     const { recipienteId, cantidad, volumen_unidad } = subFracForm;
-    if (!recipienteId) return alert("Seleccioná un envase secundario");
-    if (!cantidad || cantidad <= 0) return alert("Ingresá una cantidad válida");
-    if (!volumen_unidad || volumen_unidad <= 0) return alert("Ingresá un volumen de unidad válido");
+    if (!recipienteId) return toast.error("Seleccioná un envase secundario");
+    if (!cantidad || cantidad <= 0) return toast.error("Ingresá una cantidad válida");
+    if (!volumen_unidad || volumen_unidad <= 0) return toast.error("Ingresá un volumen de unidad válido");
 
     const selectedRecip = recipienteId === 'generico'
       ? { nombre: 'Fraccionamiento (Genérico)' }
       : recipientes.find(r => r.id === recipienteId);
       
-    if (!selectedRecip) return alert("Envase secundario no encontrado o inválido.");
+    if (!selectedRecip) return toast.error("Envase secundario no encontrado o inválido.");
     const totalSubVol = Number(cantidad) * Number(volumen_unidad);
 
     setEnvasesList(prev => prev.map(env => {
       if (env.id === envaseId) {
         if (env.volumen_actual < totalSubVol) {
-          alert(`⚠️ Volumen insuficiente (${env.volumen_actual} ml disponibles) para extraer ${totalSubVol} ml.`);
+          toast(`Volumen insuficiente (${env.volumen_actual} ml disponibles) para extraer ${totalSubVol} ml.`);
           return env;
         }
         return {
@@ -322,7 +323,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   // --- Submit del Formulario ---
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.recetaId) return alert("Seleccioná una receta");
+    if (!formData.recetaId) return toast.error("Seleccioná una receta");
     
     const receta = recetas.find(r => r.id === formData.recetaId);
     const itemsToCreate = isExperimental ? Number(formData.repeticiones) : 1;
@@ -686,7 +687,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       setSuccess(true);
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, orderBy, setDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 const defaultForm = {
   batchOrigenId: '',
@@ -74,7 +75,7 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
   const handleSubmit = async e => {
     e.preventDefault();
     if (!formData.soporte || !formData.crioprotector || !formData.fecha_congelacion) {
-      alert('Por favor completá todos los campos requeridos.');
+      toast.error('Por favor completá todos los campos requeridos.');
       return;
     }
     setLoading(true);
@@ -92,11 +93,11 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
       };
 
       await setDoc(doc(db, 'criopreservacion', newId), docData);
-      alert(`✅ Muestra ${newId} registrada con éxito.`);
+      toast.success(`Muestra ${newId} registrada con éxito.`);
       onSaved();
     } catch (err) {
       console.error(err);
-      alert('Error al guardar: ' + err.message);
+      toast.error('Error al guardar: ' + err.message);
     } finally {
       setLoading(false);
     }

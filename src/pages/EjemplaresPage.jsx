@@ -8,6 +8,7 @@ import { getAuth } from 'firebase/auth';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 import NuevoEventoAislamientoModal from '../components/NuevoEventoAislamientoModal';
+import toast from 'react-hot-toast';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
 
@@ -207,7 +208,7 @@ export default function EjemplaresPage() {
 
       if (editingId) {
         await updateDoc(doc(db, 'ejemplares', editingId), payload);
-        alert('✅ Ejemplar actualizado');
+        toast.success('Ejemplar actualizado');
       } else {
         const fechaStr = formData.fecha_ingreso;
         const yymmdd = fechaStr.replace(/-/g, '').substring(2);
@@ -237,7 +238,7 @@ export default function EjemplaresPage() {
           });
         });
 
-        alert('✅ Ejemplar registrado con ID: ' + newId);
+        toast.success('Ejemplar registrado con ID: ' + newId);
       }
 
       setShowModal(false);
@@ -245,7 +246,7 @@ export default function EjemplaresPage() {
       setUploadProgress(0);
     } catch (err) {
       console.error(err);
-      alert('⚠️ Error: ' + (err.message || 'Error desconocido'));
+      toast.error('Error: ' + (err.message || 'Error desconocido'));
     } finally {
       setLoading(false);
       setUploadProgress(0);

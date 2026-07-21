@@ -5,6 +5,7 @@ import { doc, getDoc, collection, addDoc, query, where, getDocs, orderBy, server
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
+import toast from 'react-hot-toast';
 
 function ScannerPage() {
   const [scanResult, setScanResult] = useState(null);
@@ -107,11 +108,11 @@ function ScannerPage() {
         return;
       }
 
-      alert(`No se encontró ningún registro para: ${id}`);
+      toast.error(`No se encontró ningún registro para: ${id}`);
       setScanResult(null);
     } catch (err) {
       console.error("Error al buscar:", err);
-      alert("Error al buscar el registro.");
+      toast.error("Error al buscar el registro.");
       setScanResult(null);
     } finally {
       setLoading(false);
@@ -162,10 +163,10 @@ function ScannerPage() {
       setStatusText('');
       setPhotoFile(null);
       setPhotoUrl(null);
-      alert("✅ Seguimiento guardado");
+      toast.success("Seguimiento guardado");
     } catch (error) {
       console.error(error);
-      alert(`⚠️ Error al guardar: ${error.message || "Error desconocido"}`);
+      toast.error(`Error al guardar: ${error.message || "Error desconocido"}`);
     } finally {
       setLoading(false);
     }
@@ -188,7 +189,7 @@ function ScannerPage() {
       }
     } catch (err) {
       console.error(err);
-      alert("Error al actualizar estado");
+      toast.error("Error al actualizar estado");
     } finally {
       setLoading(false);
     }
