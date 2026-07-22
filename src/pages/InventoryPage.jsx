@@ -434,6 +434,26 @@ function InventoryPage() {
     }
   }, [location.state]);
 
+  // Detect 'editBatch' action from Dashboard (Tareas de Hoy)
+  useEffect(() => {
+    if (location.state?.action === 'editBatch' && location.state?.batchId) {
+      const targetId = location.state.batchId;
+      const tryOpen = (attempts = 0) => {
+        setCultivos(current => {
+          const found = current.find(b => b.id === targetId);
+          if (found) {
+            setEditingBatch(found);
+          } else if (attempts < 10) {
+            setTimeout(() => tryOpen(attempts + 1), 300);
+          }
+          return current;
+        });
+      };
+      tryOpen();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]);
+
   useEffect(() => {
     const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), snap => {
       setCultivos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
