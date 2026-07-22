@@ -274,6 +274,7 @@ export default function IngresoMaterialPage() {
             const medioOpt = mediosDisponibles.find(m => m.id === deriv.medio_prep_id);
             const salaOpt = salas.find(s => s.id === deriv.sala_destino_id);
             const codMedio = extraerCodigoMedio(medioOpt?.medio?.alias || medioOpt?.medio?.codigo);
+            const soporteFinal = medioOpt?.type === 'sub' ? medioOpt.sub.tipo_unidad : medioOpt?.medio?.tipo_soporte || medioOpt?.medio?.soporte || 'No definido';
 
             const batchId = generarIdBatch({
               genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
@@ -298,6 +299,7 @@ export default function IngresoMaterialPage() {
               es_aislamiento_primario: true,
               destino_criopreservacion: false,
               batch_origen_id: null,
+              soporte: soporteFinal,
               createdAt: serverTimestamp()
             });
 

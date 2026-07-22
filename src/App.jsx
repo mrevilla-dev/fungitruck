@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -8,29 +8,30 @@ import NavBar from './components/NavBar';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useIsMobile } from './hooks/useIsMobile';
 import BarraInferiorMobile from './components/nav/BarraInferiorMobile';
-// Páginas
-import Dashboard from './pages/Dashboard';
-import InventoryPage from './pages/InventoryPage';
-import ScannerPage from './pages/ScannerPage';
-import SalasPage from './pages/SalasPage';
-import EsporomasPage from './pages/EsporomasPage';
-import EjemplaresPage from './pages/EjemplaresPage';
-import CrioPage from './pages/CrioPage';
-import CosechasPage from './pages/CosechasPage';
-import Maintenance from './pages/Maintenance';
-import PrintQueue from './pages/PrintQueue';
-import ArbolGenealogicoPage from './pages/ArbolGenealogicoPage';
-import IngresoMaterialPage from './pages/IngresoMaterialPage';
-import Login from './components/Login';
-import CriopreservacionNuevaPage from './pages/CriopreservacionNuevaPage';
-import CriobancoListPage from './pages/CriobancoListPage';
-import CriovialDetallePage from './pages/CriovialDetallePage';
-import CriovialDescongelacionPage from './pages/CriovialDescongelacionPage';
-import ExperimentoNuevoPage from './pages/ExperimentoNuevoPage';
-import ExperimentosListPage from './pages/ExperimentosListPage';
-import MigracionEquiposPage from './pages/MigracionEquiposPage';
-import EquiposPage from './pages/EquiposPage';
-import EquipoDetallePage from './pages/EquipoDetallePage';
+import LoadingPlaceholder from './components/LoadingPlaceholder';
+// Páginas (lazy-loaded)
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const InventoryPage = React.lazy(() => import('./pages/InventoryPage'));
+const ScannerPage = React.lazy(() => import('./pages/ScannerPage'));
+const SalasPage = React.lazy(() => import('./pages/SalasPage'));
+const EsporomasPage = React.lazy(() => import('./pages/EsporomasPage'));
+const EjemplaresPage = React.lazy(() => import('./pages/EjemplaresPage'));
+const CrioPage = React.lazy(() => import('./pages/CrioPage'));
+const CosechasPage = React.lazy(() => import('./pages/CosechasPage'));
+const Maintenance = React.lazy(() => import('./pages/Maintenance'));
+const PrintQueue = React.lazy(() => import('./pages/PrintQueue'));
+const ArbolGenealogicoPage = React.lazy(() => import('./pages/ArbolGenealogicoPage'));
+const IngresoMaterialPage = React.lazy(() => import('./pages/IngresoMaterialPage'));
+const Login = React.lazy(() => import('./components/Login'));
+const CriopreservacionNuevaPage = React.lazy(() => import('./pages/CriopreservacionNuevaPage'));
+const CriobancoListPage = React.lazy(() => import('./pages/CriobancoListPage'));
+const CriovialDetallePage = React.lazy(() => import('./pages/CriovialDetallePage'));
+const CriovialDescongelacionPage = React.lazy(() => import('./pages/CriovialDescongelacionPage'));
+const ExperimentoNuevoPage = React.lazy(() => import('./pages/ExperimentoNuevoPage'));
+const ExperimentosListPage = React.lazy(() => import('./pages/ExperimentosListPage'));
+const MigracionEquiposPage = React.lazy(() => import('./pages/MigracionEquiposPage'));
+const EquiposPage = React.lazy(() => import('./pages/EquiposPage'));
+const EquipoDetallePage = React.lazy(() => import('./pages/EquipoDetallePage'));
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -61,6 +62,7 @@ export default function App() {
       {!isMobile && <NavBar />}
       <div className="content-wrapper" style={{ padding: '1rem' }}>
         <ErrorBoundary>
+        <Suspense fallback={<LoadingPlaceholder />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventario" element={<InventoryPage />} />
@@ -94,6 +96,7 @@ export default function App() {
           <Route path="/equipos" element={<EquiposPage user={user} />} />
           <Route path="/equipos/:id" element={<EquipoDetallePage user={user} />} />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
       </div>
       {isMobile && <BarraInferiorMobile />}
