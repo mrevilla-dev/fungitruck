@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 export default function PermissionGuard({ children }) {
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -101,3 +102,7 @@ export default function PermissionGuard({ children }) {
     </div>
   );
 }
+
+PermissionGuard.propTypes = {
+  children: PropTypes.node.isRequired,
+};

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import SalaFormModal from './SalaFormModal';
+import PropTypes from 'prop-types';
 
 export default function DestinoSelector({ value, onChange, label = "Destino Físico", required = true }) {
   const [salas, setSalas] = useState([]);
@@ -209,3 +210,10 @@ export default function DestinoSelector({ value, onChange, label = "Destino Fís
     </div>
   );
 }
+
+DestinoSelector.propTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  label: PropTypes.string,
+  required: PropTypes.bool,
+};

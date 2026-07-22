@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MENU_ITEMS } from '../../config/menuItems';
+import PropTypes from 'prop-types';
 
 export default function MenuMobilePanel({ abierto, onCerrar }) {
   const navigate = useNavigate();
@@ -118,3 +119,8 @@ export default function MenuMobilePanel({ abierto, onCerrar }) {
     </>
   );
 }
+
+MenuMobilePanel.propTypes = {
+  abierto: PropTypes.bool.isRequired,
+  onCerrar: PropTypes.func.isRequired,
+};
