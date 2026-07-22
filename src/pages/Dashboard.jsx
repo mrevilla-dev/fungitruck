@@ -293,7 +293,7 @@ export default function Dashboard() {
                     <strong style={{ display: 'block', fontSize: '1rem' }}>{task.id}</strong>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{task.especie} · Ciclo cumplido</span>
                   </div>
-                  <Link to="/inventory" className="btn btn-sm btn-primary" style={{ fontSize: '0.7rem', padding: '4px 8px' }}>Revisar</Link>
+                  <Link to="/inventario" className="btn btn-sm btn-primary" style={{ fontSize: '0.7rem', padding: '4px 8px' }}>Revisar</Link>
                 </div>
                 <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--danger-color)', fontWeight: '600' }}>
                   ⚠️ Acción sugerida: Evaluar pase a Fructificación
