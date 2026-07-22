@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, orderBy, setDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 const defaultForm = {
   batchOrigenId: '',
@@ -291,3 +292,8 @@ export default function NuevaCrioModal({ onClose, onSaved }) {
     </div>
   );
 }
+
+NuevaCrioModal.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};

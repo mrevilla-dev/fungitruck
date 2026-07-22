@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function RegistroCosechaModal({ batch, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -203,3 +204,9 @@ export default function RegistroCosechaModal({ batch, onClose, onSaved }) {
     </div>
   );
 }
+
+RegistroCosechaModal.propTypes = {
+  batch: PropTypes.object.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};

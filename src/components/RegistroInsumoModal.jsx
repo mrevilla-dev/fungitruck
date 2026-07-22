@@ -6,6 +6,7 @@ import PrintLabelsModal from './PrintLabelsModal';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 
 export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsumo = null, hideMasterConfig = false }) {
@@ -345,8 +346,13 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
           onClose();
         }}
       />
-    );
-  }
+  );
+}
+
+ScannerModal.propTypes = {
+  onScan: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 
   return (
     <div className="modal-overlay">
@@ -761,6 +767,13 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
   );
 }
 
+RegistroInsumoModal.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+  preselectedInsumo: PropTypes.object,
+  hideMasterConfig: PropTypes.bool,
+};
+
 // Modal para capturar foto con la cámara (webcam)
 function CameraCaptureModal({ onCapture, onClose }) {
   const videoRef = React.useRef(null);
@@ -811,6 +824,11 @@ function CameraCaptureModal({ onCapture, onClose }) {
   );
 }
 
+CameraCaptureModal.propTypes = {
+  onCapture: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
 
 // Modal secundario para el scanner
 function ScannerModal({ onScan, onClose }) {
@@ -852,4 +870,9 @@ function ScannerModal({ onScan, onClose }) {
     </div>
   );
 }
+
+ScannerModal.propTypes = {
+  onScan: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 

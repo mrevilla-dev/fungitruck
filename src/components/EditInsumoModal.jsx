@@ -5,6 +5,7 @@ import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
 import RegistroInsumoModal from './RegistroInsumoModal';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 
 export default function EditInsumoModal({ insumo, onClose, onSaved }) {
@@ -534,6 +535,17 @@ export default function EditInsumoModal({ insumo, onClose, onSaved }) {
     </div>
   );
 }
+
+EditInsumoModal.propTypes = {
+  insumo: PropTypes.object.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};
+
+CameraCaptureModal.propTypes = {
+  onCapture: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 
 // Modal para capturar foto con la cámara (webcam)
 function CameraCaptureModal({ onCapture, onClose }) {

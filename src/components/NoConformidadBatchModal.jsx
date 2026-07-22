@@ -5,6 +5,7 @@ import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdNoConformidad } from '../utils/idGenerator';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function NoConformidadBatchModal({ batch, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -198,3 +199,9 @@ export default function NoConformidadBatchModal({ batch, onClose, onSaved }) {
     </div>
   );
 }
+
+NoConformidadBatchModal.propTypes = {
+  batch: PropTypes.object.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func,
+};

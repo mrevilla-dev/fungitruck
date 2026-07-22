@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc, serverTimestamp, collection, query, onSnapshot,
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 
 export default function EditLoteModal({ lote, onClose, onSaved }) {
@@ -270,3 +271,9 @@ export default function EditLoteModal({ lote, onClose, onSaved }) {
     </div>
   );
 }
+
+EditLoteModal.propTypes = {
+  lote: PropTypes.object.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};

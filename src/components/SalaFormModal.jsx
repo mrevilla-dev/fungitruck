@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 const TIPOS_AMBIENTE = [
   { value: 'incubacion',    label: '🌡️ Incubación' },
@@ -266,3 +267,9 @@ export default function SalaFormModal({ sala, onClose, onSaved }) {
     </div>
   );
 }
+
+SalaFormModal.propTypes = {
+  sala: PropTypes.object,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};

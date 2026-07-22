@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function InsumoFormModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -304,3 +305,8 @@ export default function InsumoFormModal({ onClose, onSaved }) {
     </div>
   );
 }
+
+InsumoFormModal.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};
