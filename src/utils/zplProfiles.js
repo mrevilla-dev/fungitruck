@@ -409,8 +409,6 @@ export async function sendToPrinter(zpl) {
     if (!response.ok) {
       console.error('Failed to send ZPL to printer', response.statusText);
       toast.error('Error al enviar a la impresora (Zebra). Verifique la consola.');
-    } else {
-      console.log('✅ ZPL enviado correctamente a la impresora local.');
     }
   } catch (err) {
     console.error('Error sending ZPL to printer', err);

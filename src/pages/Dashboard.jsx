@@ -149,7 +149,7 @@ export default function Dashboard() {
         .slice(0, 5)
         .map(i => ({
           id: i.id,
-          text: `🌱 ${i.especie} (${i.id})`,
+          text: `🌱 ${i.especie} (${i.id_semantico || 'Sin ID'})`,
           status: i.status,
           date: i.createdAt?.toDate?.() || new Date(i.createdAt) || new Date(),
         }));
@@ -290,7 +290,7 @@ export default function Dashboard() {
               <div key={task.id} className="card animate-pulse" style={{ padding: '1rem', borderLeft: '4px solid var(--danger-color)', background: 'rgba(239, 68, 68, 0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <strong style={{ display: 'block', fontSize: '1rem' }}>{task.id}</strong>
+                    <strong style={{ display: 'block', fontSize: '1rem' }}>{task.id_semantico || 'Sin ID'}</strong>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{task.especie} · Ciclo cumplido</span>
                   </div>
                   <Link to="/inventario" state={{ action: 'editBatch', batchId: task.id }} className="btn btn-sm btn-primary" style={{ fontSize: '0.7rem', padding: '4px 8px' }}>Revisar</Link>
@@ -364,7 +364,7 @@ export default function Dashboard() {
               <div key={b.id} className="card" style={{ padding: '1rem', borderLeft: '4px solid #10b981', background: 'rgba(16, 185, 129, 0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <strong style={{ display: 'block', fontSize: '1rem' }}>{b.id}</strong>
+                    <strong style={{ display: 'block', fontSize: '1rem' }}>{b.id_semantico || 'Sin ID'}</strong>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{b.especie}</span>
                   </div>
                   <button className="btn btn-sm" style={{ background: '#10b981', color: 'white' }} onClick={() => setBatchToRegister(b)}>

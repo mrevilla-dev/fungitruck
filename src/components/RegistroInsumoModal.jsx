@@ -319,7 +319,6 @@ export default function RegistroInsumoModal({ onClose, onSaved, preselectedInsum
 
     if (e.key === 'Enter') {
       e.preventDefault(); // Evitar que el 'Enter' del escáner mande el form
-      console.log("Código escaneado (pistola):", formData.codigo_barras_comercial);
     }
   };
 
