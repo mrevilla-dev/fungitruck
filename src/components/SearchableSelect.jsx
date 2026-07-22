@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 
 /**
  * SearchableSelect - A premium, mobile-first, gloved-operator friendly autocomplete dropdown.
@@ -218,3 +219,17 @@ export default function SearchableSelect({
     </div>
   );
 }
+
+SearchableSelect.propTypes = {
+  options: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    nombre: PropTypes.string.isRequired,
+  })),
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+  onCreateNew: PropTypes.func,
+  createNewText: PropTypes.string,
+  hasWarning: PropTypes.bool,
+  style: PropTypes.object,
+};
