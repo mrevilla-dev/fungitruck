@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function AuditMedioModal({ medio, onClose }) {
   const [loading, setLoading] = useState(true);
@@ -219,3 +220,22 @@ export default function AuditMedioModal({ medio, onClose }) {
     </div>
   );
 }
+
+AuditMedioModal.propTypes = {
+  medio: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    alias: PropTypes.string,
+    nombre_receta: PropTypes.string,
+    tipo: PropTypes.string,
+    estado: PropTypes.string,
+    observaciones: PropTypes.string,
+    control_calidad: PropTypes.object,
+    trazabilidad: PropTypes.shape({
+      fecha_preparacion: PropTypes.string,
+      operador: PropTypes.string,
+      justificacion_stock: PropTypes.string,
+      insumos_consumidos: PropTypes.array,
+    }),
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+};

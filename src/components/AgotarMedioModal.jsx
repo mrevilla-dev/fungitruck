@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function AgotarMedioModal({ medio, onClose, onSaved }) {
   const [fechaAgotamiento, setFechaAgotamiento] = useState(new Date().toISOString().split('T')[0]);
@@ -78,3 +79,12 @@ export default function AgotarMedioModal({ medio, onClose, onSaved }) {
     </div>
   );
 }
+
+AgotarMedioModal.propTypes = {
+  medio: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    alias: PropTypes.string,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};

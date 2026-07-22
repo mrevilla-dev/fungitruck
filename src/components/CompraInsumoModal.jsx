@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { db } from '../firebase';
 import { collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function CompraInsumoModal({ insumo, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -155,3 +156,15 @@ export default function CompraInsumoModal({ insumo, onClose, onSaved }) {
     </div>
   );
 }
+
+CompraInsumoModal.propTypes = {
+  insumo: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    nombre: PropTypes.string,
+    unidad_compra: PropTypes.string,
+    unidad_base: PropTypes.string,
+    factor_conversion: PropTypes.number,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,
+};

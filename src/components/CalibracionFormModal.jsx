@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { registrarCalibracion } from '../services/equipoService';
 import { uploadFileToDrive } from '../services/driveService';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function CalibracionFormModal({ equipoId, onClose, onSave, user }) {
   const [cargando, setCargando] = useState(false);
@@ -102,3 +103,12 @@ export default function CalibracionFormModal({ equipoId, onClose, onSave, user }
     </div>
   );
 }
+
+CalibracionFormModal.propTypes = {
+  equipoId: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+  user: PropTypes.shape({
+    email: PropTypes.string,
+  }),
+};

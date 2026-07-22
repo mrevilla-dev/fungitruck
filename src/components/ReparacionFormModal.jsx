@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { registrarReparacion } from '../services/equipoService';
 import toast from 'react-hot-toast';
+import PropTypes from 'prop-types';
 
 export default function ReparacionFormModal({ equipoId, onClose, onSave, user }) {
   const [cargando, setCargando] = useState(false);
@@ -80,3 +81,12 @@ export default function ReparacionFormModal({ equipoId, onClose, onSave, user })
     </div>
   );
 }
+
+ReparacionFormModal.propTypes = {
+  equipoId: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+  user: PropTypes.shape({
+    email: PropTypes.string,
+  }),
+};
