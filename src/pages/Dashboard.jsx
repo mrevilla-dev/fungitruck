@@ -25,6 +25,21 @@ const StatBar = ({ value, max, color }) => {
   );
 };
 
+const summaryStyle = {
+  cursor: 'pointer',
+  minHeight: '48px',
+  display: 'flex',
+  alignItems: 'center',
+  padding: '0.75rem 1rem',
+  borderRadius: '8px',
+  background: 'var(--surface-color)',
+  color: 'var(--text-primary)',
+  fontWeight: '600',
+  fontSize: '1rem',
+  listStyle: 'none',
+  gap: '0.5rem',
+};
+
 export default function Dashboard() {
   const [insumosAlerts, setInsumosAlerts] = useState([]);
   const [labStats, setLabStats] = useState({ planificado: 0, inoculado: 0, incubacion: 0, fructificacion: 0, contaminados: 0, cosechados: 0, total: 0 });
@@ -264,14 +279,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ─── Tareas de Hoy (Alertas Predictivas) ─── */}
       {todayTasks.length > 0 && (
-        <section style={{ marginBottom: '2rem' }}>
-          <h3 style={{ color: 'var(--danger-color)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+        <details open style={{ marginBottom: '2rem' }}>
+          <summary style={{ ...summaryStyle, color: 'var(--danger-color)' }}>
             🔔 Tareas de Hoy / Alertas de Revisión
             <span style={{ fontSize: '0.7rem', background: 'var(--danger-color)', color: 'white', padding: '2px 8px', borderRadius: '12px' }}>{todayTasks.length}</span>
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+          </summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
             {todayTasks.map(task => (
               <div key={task.id} className="card animate-pulse" style={{ padding: '1rem', borderLeft: '4px solid var(--danger-color)', background: 'rgba(239, 68, 68, 0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -287,7 +301,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
       )}
 
       {/* ─── Etiquetas Pendientes ─── */}
@@ -305,14 +319,13 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* ─── Pendientes de confirmación (Bloque 2) ─── */}
       {pendientesConfirmacion.length > 0 && (
-        <section style={{ marginBottom: '2rem' }}>
-          <h3 style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+        <details open style={{ marginBottom: '2rem' }}>
+          <summary style={{ ...summaryStyle, color: '#f59e0b' }}>
             🟡 Cruces en evaluación (Pendientes de confirmación)
             <span style={{ fontSize: '0.7rem', background: '#f59e0b', color: 'black', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{pendientesConfirmacion.length}</span>
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          </summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
             {pendientesConfirmacion.map(ej => {
               const dias = Math.floor((new Date() - new Date(ej.fecha_ingreso)) / (1000 * 60 * 60 * 24)) || 0;
               return (
@@ -337,17 +350,16 @@ export default function Dashboard() {
               );
             })}
           </div>
-        </section>
+        </details>
       )}
 
-      {/* ─── Placas con colonias visibles sin registrar ─── */}
       {coloniasVisibles.length > 0 && (
-        <section style={{ marginBottom: '2rem' }}>
-          <h3 style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+        <details open style={{ marginBottom: '2rem' }}>
+          <summary style={{ ...summaryStyle, color: '#10b981' }}>
             🧫 Placas con colonias visibles sin registrar
             <span style={{ fontSize: '0.7rem', background: '#10b981', color: 'white', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{coloniasVisibles.length}</span>
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          </summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
             {coloniasVisibles.map(b => (
               <div key={b.id} className="card" style={{ padding: '1rem', borderLeft: '4px solid #10b981', background: 'rgba(16, 185, 129, 0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -362,17 +374,16 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
       )}
 
-      {/* ─── Ejemplares sin MAT determinado ─── */}
       {sinMatAlerts.length > 0 && (
-        <section style={{ marginBottom: '2rem' }}>
-          <h3 style={{ color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+        <details style={{ marginBottom: '2rem' }}>
+          <summary style={{ ...summaryStyle, color: '#8b5cf6' }}>
             🔍 Ejemplares sin MAT determinado
             <span style={{ fontSize: '0.7rem', background: '#8b5cf6', color: 'white', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{sinMatAlerts.length}</span>
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          </summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
             {sinMatAlerts.map(e => (
               <div key={e.id} className="card" style={{ padding: '1rem', borderLeft: '4px solid #8b5cf6', background: 'rgba(139, 92, 246, 0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -388,136 +399,141 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
       )}
 
-      {/* ─── CRIOBANCO (Bloque 8) ─── */}
-      <section style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            🧊 Criobanco
-          </h3>
-          <Link to="/criobanco" className="btn btn-outline btn-sm">Ver Criobanco</Link>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          <div className="card" style={{ padding: '1.2rem', borderTop: '3px solid #3b82f6' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Crioviales Activos</div>
-            <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0' }}>{criobancoStats.activos}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>En estado "Criopreservado"</div>
+      <details style={{ marginBottom: '2rem' }}>
+        <summary style={summaryStyle}>
+          🧊 Criobanco
+        </summary>
+        <div style={{ marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <Link to="/criobanco" className="btn btn-outline btn-sm">Ver Criobanco</Link>
           </div>
-          <div className="card" style={{ padding: '1.2rem', borderTop: '3px solid #10b981' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Ejemplares Destinados</div>
-            <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0' }}>{criobancoStats.destinados}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Aprobados para guardar</div>
-          </div>
-          <div className="card" style={{ padding: '1.2rem', borderTop: criobancoStats.sinUbicacion > 0 ? '3px solid #ef4444' : '3px solid #94a3b8' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Sin Ubicación ⚠️</div>
-            <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0', color: criobancoStats.sinUbicacion > 0 ? '#ef4444' : 'inherit' }}>{criobancoStats.sinUbicacion}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Requieren asignación física</div>
-          </div>
-          <div className="card" style={{ padding: '1.2rem', borderTop: '3px solid #8b5cf6' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Por Temperatura</div>
-            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              {Object.keys(criobancoStats.temps).length === 0 ? <li>Sin datos</li> : 
-                Object.entries(criobancoStats.temps).map(([t, count]) => (
-                  <li key={t}><strong>{t}</strong>: {count} viales</li>
-                ))
-              }
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── EQUIPOS Y MANTENIMIENTO (Bloque 5) ─── */}
-      <section style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, color: '#607d8b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            ⚙️ Estado de Equipamiento
-          </h3>
-          <Link to="/equipos" className="btn btn-outline btn-sm">Ver Equipos</Link>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          
-          <div className="card" style={{ padding: '1.2rem', borderTop: equiposStats.fueraDeServicio > 0 ? '3px solid #f44336' : '3px solid #4CAF50' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Fuera de Servicio</div>
-            <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0', color: equiposStats.fueraDeServicio > 0 ? '#f44336' : '#4CAF50' }}>
-              {equiposStats.fueraDeServicio}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div className="card" style={{ padding: '1.2rem', borderTop: '3px solid #3b82f6' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Crioviales Activos</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0' }}>{criobancoStats.activos}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>En estado "Criopreservado"</div>
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Equipos inoperativos</div>
-          </div>
-
-          <div className="card" style={{ padding: '1.2rem', borderTop: equiposStats.sinSala > 0 ? '3px solid #FFC107' : '3px solid #4CAF50' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Sin Sala Asignada</div>
-            <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0', color: equiposStats.sinSala > 0 ? '#FFC107' : 'inherit' }}>
-              {equiposStats.sinSala}
+            <div className="card" style={{ padding: '1.2rem', borderTop: '3px solid #10b981' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Ejemplares Destinados</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0' }}>{criobancoStats.destinados}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Aprobados para guardar</div>
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Equipos sin ubicación</div>
-          </div>
-
-          <div className="card" style={{ padding: '1.2rem', borderTop: calibracionesProximas.length > 0 ? '3px solid #f59e0b' : '3px solid #4CAF50', gridColumn: 'span 2' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              Calibraciones críticas (30 días)
+            <div className="card" style={{ padding: '1.2rem', borderTop: criobancoStats.sinUbicacion > 0 ? '3px solid #ef4444' : '3px solid #94a3b8' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Sin Ubicación ⚠️</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0', color: criobancoStats.sinUbicacion > 0 ? '#ef4444' : 'inherit' }}>{criobancoStats.sinUbicacion}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Requieren asignación física</div>
             </div>
-            {calibracionesProximas.length === 0 ? (
-              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Todo al día.</p>
-            ) : (
+            <div className="card" style={{ padding: '1.2rem', borderTop: '3px solid #8b5cf6' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Por Temperatura</div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                {calibracionesProximas.map(cal => (
-                  <li key={cal.id} style={{ color: cal.vencida ? '#f44336' : '#f59e0b' }}>
-                    <strong>{cal.vencida ? 'VENCIDA: ' : 'Próxima: '}</strong>
-                    Vence {cal.proximo_vencimiento} (Eq: {cal.equipo_id})
-                  </li>
-                ))}
+                {Object.keys(criobancoStats.temps).length === 0 ? <li>Sin datos</li> : 
+                  Object.entries(criobancoStats.temps).map(([t, count]) => (
+                    <li key={t}><strong>{t}</strong>: {count} viales</li>
+                  ))
+                }
               </ul>
-            )}
+            </div>
           </div>
-          
         </div>
-      </section>
+      </details>
 
-      {/* ─── KPIs Reactivos / Cultivos activos ─── */}
-      <section style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h3 style={{ margin: 0 }}>🧫 Cultivos activos</h3>
-          
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ width: '300px', maxWidth: '100%', zIndex: 10 }}>
-              <SearchableSelect
-                options={ejemplaresOptions}
-                value={filterEjemplar}
-                onChange={val => setFilterEjemplar(val || '')}
-                placeholder="🔍 Filtrar por Ejemplar"
-              />
+      <details style={{ marginBottom: '2rem' }}>
+        <summary style={summaryStyle}>
+          ⚙️ Estado de Equipamiento
+        </summary>
+        <div style={{ marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <Link to="/equipos" className="btn btn-outline btn-sm">Ver Equipos</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            
+            <div className="card" style={{ padding: '1.2rem', borderTop: equiposStats.fueraDeServicio > 0 ? '3px solid #f44336' : '3px solid #4CAF50' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Fuera de Servicio</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0', color: equiposStats.fueraDeServicio > 0 ? '#f44336' : '#4CAF50' }}>
+                {equiposStats.fueraDeServicio}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Equipos inoperativos</div>
             </div>
-            {filterEjemplar && (
-               <button className="btn btn-outline btn-sm" style={{ padding: '0 0.5rem', height: '48px' }} onClick={() => setFilterEjemplar('')}>✕</button>
-            )}
-            <Link to="/inventario" className="btn btn-outline btn-sm" style={{ height: '48px', display: 'flex', alignItems: 'center' }}>Ver todos</Link>
+
+            <div className="card" style={{ padding: '1.2rem', borderTop: equiposStats.sinSala > 0 ? '3px solid #FFC107' : '3px solid #4CAF50' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Sin Sala Asignada</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', margin: '0.5rem 0', color: equiposStats.sinSala > 0 ? '#FFC107' : 'inherit' }}>
+                {equiposStats.sinSala}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Equipos sin ubicación</div>
+            </div>
+
+            <div className="card" style={{ padding: '1.2rem', borderTop: calibracionesProximas.length > 0 ? '3px solid #f59e0b' : '3px solid #4CAF50', gridColumn: 'span 2' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                Calibraciones críticas (30 días)
+              </div>
+              {calibracionesProximas.length === 0 ? (
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Todo al día.</p>
+              ) : (
+                <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  {calibracionesProximas.map(cal => (
+                    <li key={cal.id} style={{ color: cal.vencida ? '#f44336' : '#f59e0b' }}>
+                      <strong>{cal.vencida ? 'VENCIDA: ' : 'Próxima: '}</strong>
+                      Vence {cal.proximo_vencimiento} (Eq: {cal.equipo_id})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.25rem' }}>
-          {[
-            { label: 'Planificado', value: labStats.planificado, color: '#94a3b8' },
-            { label: 'Inoculado', value: labStats.inoculado, color: '#3b82f6' },
-            { label: 'Incubando', value: labStats.incubacion, color: '#10b981' },
-            { label: 'Fructificando', value: labStats.fructificacion, color: '#8b5cf6' },
-            { label: 'Cosechados', value: labStats.cosechados, color: '#f59e0b' },
-            { label: 'Contaminados', value: labStats.contaminados, color: '#ef4444' }
-          ].map(stat => (
-            <div key={stat.label} className="card" style={{ padding: '1.2rem', borderTop: `3px solid ${stat.color}` }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{stat.label}</div>
-              <div style={{ fontSize: '2.2rem', fontWeight: '800', margin: '0.5rem 0' }}>{stat.value}</div>
-              <StatBar value={stat.value} max={labStats.total} color={stat.color} />
+      </details>
+
+      <details open style={{ marginBottom: '2rem' }}>
+        <summary style={summaryStyle}>
+          🧫 Cultivos activos
+        </summary>
+        <div style={{ padding: '0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', marginTop: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ width: '300px', maxWidth: '100%', zIndex: 10 }}>
+                <SearchableSelect
+                  options={ejemplaresOptions}
+                  value={filterEjemplar}
+                  onChange={val => setFilterEjemplar(val || '')}
+                  placeholder="🔍 Filtrar por Ejemplar"
+                />
+              </div>
+              {filterEjemplar && (
+                 <button className="btn btn-outline btn-sm" style={{ padding: '0 0.5rem', height: '48px' }} onClick={() => setFilterEjemplar('')}>✕</button>
+              )}
+              <Link to="/inventario" className="btn btn-outline btn-sm" style={{ height: '48px', display: 'flex', alignItems: 'center' }}>Ver todos</Link>
             </div>
-          ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.25rem' }}>
+            {[
+              { label: 'Planificado', value: labStats.planificado, color: '#94a3b8' },
+              { label: 'Inoculado', value: labStats.inoculado, color: '#3b82f6' },
+              { label: 'Incubando', value: labStats.incubacion, color: '#10b981' },
+              { label: 'Fructificando', value: labStats.fructificacion, color: '#8b5cf6' },
+              { label: 'Cosechados', value: labStats.cosechados, color: '#f59e0b' },
+              { label: 'Contaminados', value: labStats.contaminados, color: '#ef4444' }
+            ].map(stat => (
+              <div key={stat.label} className="card" style={{ padding: '1.2rem', borderTop: `3px solid ${stat.color}` }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{stat.label}</div>
+                <div style={{ fontSize: '2.2rem', fontWeight: '800', margin: '0.5rem 0' }}>{stat.value}</div>
+                <StatBar value={stat.value} max={labStats.total} color={stat.color} />
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
+      </details>
 
       <div className="grid-2">
-        {/* Actividad Reciente */}
-        <section>
-          <h3 style={{ marginBottom: '1rem' }}>⏱️ Actividad Filtrada</h3>
-          <div className="card" style={{ padding: '0.5rem' }}>
+        <details>
+          <summary style={{ ...summaryStyle, background: 'var(--surface-color)' }}>
+            ⏱️ Actividad Filtrada
+          </summary>
+          <div className="card" style={{ padding: '0.5rem', marginTop: '0.5rem' }}>
             {recentMovements.map((move, i) => (
               <div key={move.id} style={{ padding: '1rem', borderBottom: i < 4 ? '1px solid var(--border-color)' : 'none', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-color)' }}></div>
@@ -529,12 +545,14 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
 
-        {/* Alertas de Insumos */}
-        <section>
-          <h3 style={{ marginBottom: '1rem' }}>📦 Alertas de Insumos</h3>
-          <div className="card" style={{ padding: '1rem' }}>
+        <details>
+          <summary style={{ ...summaryStyle, background: 'var(--surface-color)' }}>
+            📦 Alertas de Insumos
+            {insumosAlerts.length > 0 && <span style={{ fontSize: '0.7rem', background: 'var(--danger-color)', color: 'white', padding: '2px 8px', borderRadius: '12px' }}>{insumosAlerts.length}</span>}
+          </summary>
+          <div className="card" style={{ padding: '1rem', marginTop: '0.5rem' }}>
             {insumosAlerts.length === 0 ? (
               <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Stock óptimo</p>
             ) : (
@@ -560,7 +578,7 @@ export default function Dashboard() {
               })
             )}
           </div>
-        </section>
+        </details>
       </div>
 
       {batchToRegister && (

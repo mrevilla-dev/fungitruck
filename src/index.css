@@ -673,3 +673,21 @@ input:checked + .slider:before {
     word-break: break-word;
   }
 }
+
+/* ─── Collapsible Sections (Dashboard) ─── */
+details summary::-webkit-details-marker {
+  display: none;
+}
+details summary::marker {
+  display: none;
+  content: '';
+}
+details summary {
+  transition: background 0.2s ease;
+}
+details summary:hover {
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+details[open] summary {
+  margin-bottom: 0;
+}
