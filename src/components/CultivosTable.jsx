@@ -5,9 +5,9 @@ import toast from 'react-hot-toast';
 
 const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint, onCriopreservar }) => {
   const filteredCultivos = cultivos.filter(c => {
-    const matchesSearch = (c.id?.toLowerCase() || '').includes(filters.search.toLowerCase()) || 
-                          (c.especie?.toLowerCase() || '').includes(filters.search.toLowerCase()) ||
-                          (c.cepa?.toLowerCase() || '').includes(filters.search.toLowerCase());
+    const matchesSearch = (c.id?.toLowerCase() || '').includes((filters.search ?? '').toLowerCase()) || 
+                          (c.especie?.toLowerCase() || '').includes((filters.search ?? '').toLowerCase()) ||
+                          (c.cepa?.toLowerCase() || '').includes((filters.search ?? '').toLowerCase());
     const matchesStatus = filters.status === 'todas' || c.status === filters.status;
     return matchesSearch && matchesStatus;
   });
@@ -95,7 +95,7 @@ const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint,
           >
             <div>
               <strong style={{ display: "block", fontSize: "1rem" }}>
-                {cultivo.especie} {cultivo.cepa && `(${cultivo.cepa})`}
+                {cultivo.genero} {cultivo.especie} {cultivo.cepa && `(${cultivo.cepa})`}
               </strong>
               <span style={{ fontSize: "0.8rem", color: "var(--primary-color)", fontFamily: "monospace", display: "block" }}>
                 ID: {cultivo.id} {cultivo.experimento_id && <span title={`Exp: ${cultivo.experimento_id}`}>🧪</span>}
