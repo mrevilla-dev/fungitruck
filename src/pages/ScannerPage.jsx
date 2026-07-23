@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { db, storage } from '../firebase';
 import { doc, getDoc, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
@@ -8,6 +9,7 @@ import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 
 function ScannerPage() {
+  const navigate = useNavigate();
   const [scanResult, setScanResult] = useState(null);
   const [recordData, setRecordData] = useState(null);  // batch OR medio
   const [recordType, setRecordType] = useState(null);  // 'batch' | 'medio' | 'insumo_lote' | 'insumo_base'
@@ -56,6 +58,13 @@ function ScannerPage() {
     setRecordType(null);
     setHistory([]);
     try {
+      // 0. Criovial (CRV-) — redirigir a ficha existente
+      if (id.startsWith('CRV-')) {
+        navigate(`/criobanco/criovial/${id}`);
+        setScanResult(null);
+        return;
+      }
+
       // 1. Intentar como Medio Preparado (ID de Firestore)
       const medioDoc = await getDoc(doc(db, "medios_preparados", id));
       if (medioDoc.exists()) {
