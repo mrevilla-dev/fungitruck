@@ -108,3 +108,52 @@ export const MENU_ITEMS = [
 // Ítems que aparecen en la barra inferior fija (siempre visibles en mobile)
 export const MENU_BOTTOM_BAR = ['dashboard', 'escanear'];
 // El tercer botón es siempre "Menú" → abre el panel completo
+
+/**
+ * Configuración agrupada del menú mobile
+ * Laboratorio y Cultivo son grupos de primer nivel.
+ * Investigación es un sub-grupo dentro de Cultivo.
+ *
+ * IMPORTANTE: no incluir Hibridación (sin ruta propia — acción
+ * contextual en tabla de Cultivos), ni Medios/Recetas (viven dentro
+ * de /inventario, no tienen ruta propia).
+ *
+ * Rutas verificadas contra App.jsx real.
+ */
+export const MENU_GROUPS = [
+  {
+    id: 'laboratorio',
+    label: 'Laboratorio',
+    icono: '🧪',
+    items: [
+      { id: 'salas', label: 'Salas', icono: '🌡️', ruta: '/salas' },
+      { id: 'mantenimiento', label: 'Mantenim.', icono: '🔧', ruta: '/mantenimiento' },
+      { id: 'equipos', label: 'Equipos', icono: '⚙️', ruta: '/equipos' },
+      { id: 'inventario', label: 'Inventario', icono: '📦', ruta: '/inventario' },
+      { id: 'cola', label: 'Cola', icono: '📋', ruta: '/print-queue' },
+    ],
+  },
+  {
+    id: 'cultivo',
+    label: 'Cultivo',
+    icono: '🍄',
+    items: [
+      { id: 'ingreso', label: 'Ingreso', icono: '📥', ruta: '/ingreso-material' },
+      { id: 'ejemplares', label: 'Ejemplares', icono: '🧬', ruta: '/ejemplares' },
+      { id: 'esporomas', label: 'Esporomas', icono: '🍂', ruta: '/esporomas' },
+      { id: 'criobanco', label: 'Crío', icono: '❄️', ruta: '/criobanco' },
+      { id: 'cosechas', label: 'Cosecha', icono: '🍄', ruta: '/cosechas' },
+      { id: 'arbol', label: 'Árbol', icono: '🌳', ruta: '/arbol' },
+    ],
+    subgrupos: [
+      {
+        id: 'investigacion',
+        label: 'Investigación',
+        icono: '🔬',
+        items: [
+          { id: 'experimentos', label: 'Experim.', icono: '🔬', ruta: '/experimentos' },
+        ],
+      },
+    ],
+  },
+];
