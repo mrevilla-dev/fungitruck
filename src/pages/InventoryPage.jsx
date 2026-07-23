@@ -490,6 +490,19 @@ function InventoryPage() {
     return mapa;
   }, [medios, allSubfracciones]);
 
+  const statsPorMedio = useMemo(() => {
+    const mapa = {};
+    allSubfracciones.forEach(s => {
+      if (!s.medioId) return;
+      if (!mapa[s.medioId]) mapa[s.medioId] = { total: 0, disponibles: 0 };
+      mapa[s.medioId].total += 1;
+      if (s.estado !== 'Agotada' && (s.disponible ?? 0) > 0) {
+        mapa[s.medioId].disponibles += 1;
+      }
+    });
+    return mapa;
+  }, [allSubfracciones]);
+
   const handlePrintBatch = (batch) => { 
     const getZplProfile = (soporte) => {
       const s = (soporte || '').toLowerCase();
@@ -1013,11 +1026,17 @@ function InventoryPage() {
                       <strong>{m.alias}</strong> <span style={{ fontSize: '0.85em', color: '#666' }}>({fechaPrep})</span>
                       <div>{m.nombre_receta}</div>
                       
-                      {m.total_subfracciones > 0 && (
-                        <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#8b5cf6', fontWeight: '600' }}>
-                          🧫 {m.total_subfracciones} envase{m.total_subfracciones > 1 ? 's' : ''} ({m.subfracciones_disponibles === m.total_subfracciones ? 'todos disponibles' : `${m.subfracciones_disponibles} disponible${m.subfracciones_disponibles !== 1 ? 's' : ''}`})
-                        </div>
-                      )}
+                      {(() => {
+                        const stats = statsPorMedio[m.id];
+                        const totalEnvases = stats?.total ?? m.total_subfracciones ?? 0;
+                        if (totalEnvases <= 0) return null;
+                        const envasesDisponibles = stats?.disponibles ?? m.subfracciones_disponibles ?? 0;
+                        return (
+                          <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#8b5cf6', fontWeight: '600' }}>
+                            🧫 {totalEnvases} envase{totalEnvases > 1 ? 's' : ''} ({envasesDisponibles === totalEnvases ? 'todos disponibles' : `${envasesDisponibles} disponible${envasesDisponibles !== 1 ? 's' : ''}`})
+                          </div>
+                        );
+                      })()}
                       
                       {viewMode === 'historial' && (
                         <div style={{ marginTop: '0.5rem', color: m.eliminado ? 'var(--danger-color)' : '#64748b', fontWeight: 'bold' }}>
