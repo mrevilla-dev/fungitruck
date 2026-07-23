@@ -4,19 +4,18 @@ import './NavBar.css'; // optional styling file
 
 const links = [
   { label: 'Dashboard', path: '/' },
-  { label: '🍄 Ingreso', path: '/ingreso-material' },
-  { label: 'Inventario', path: '/inventario' },
   { label: 'Escanear', path: '/escanear' },
   { label: 'Salas', path: '/salas' },
-  { label: 'Esporomas', path: '/esporomas' },
-  { label: '🧬 Ejemplares', path: '/ejemplares' },
-  { label: 'Crio', path: '/crio' },
-  { label: '🧊 Criobanco', path: '/criobanco' },
-  { label: 'Cosechas', path: '/cosechas' },
   { label: 'Mantenimiento', path: '/mantenimiento' },
   { label: '⚙️ Equipos', path: '/equipos' },
-  { label: '🌳 Árbol', path: '/arbol' },
+  { label: 'Inventario', path: '/inventario' },
   { label: '🖨️ Cola', path: '/print-queue' },
+  { label: '🍄 Ingreso', path: '/ingreso-material' },
+  { label: '🧬 Ejemplares', path: '/ejemplares' },
+  { label: 'Esporomas', path: '/esporomas' },
+  { label: '🧊 Criobanco', path: '/criobanco' },
+  { label: 'Cosechas', path: '/cosechas' },
+  { label: '🌳 Árbol', path: '/arbol' },
   { label: 'Experimentos', path: '/experimentos' },
 ];
 
