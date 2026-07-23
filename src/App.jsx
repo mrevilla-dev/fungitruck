@@ -16,7 +16,6 @@ const ScannerPage = React.lazy(() => import('./pages/ScannerPage'));
 const SalasPage = React.lazy(() => import('./pages/SalasPage'));
 const EsporomasPage = React.lazy(() => import('./pages/EsporomasPage'));
 const EjemplaresPage = React.lazy(() => import('./pages/EjemplaresPage'));
-const CrioPage = React.lazy(() => import('./pages/CrioPage'));
 const CosechasPage = React.lazy(() => import('./pages/CosechasPage'));
 const Maintenance = React.lazy(() => import('./pages/Maintenance'));
 const PrintQueue = React.lazy(() => import('./pages/PrintQueue'));
@@ -70,7 +69,6 @@ export default function App() {
           <Route path="/salas" element={<SalasPage />} />
           <Route path="/esporomas" element={<EsporomasPage />} />
           <Route path="/ejemplares" element={<EjemplaresPage />} />
-          <Route path="/crio" element={<CrioPage />} />
           <Route path="/cosechas" element={<CosechasPage />} />
           <Route path="/mantenimiento" element={<Maintenance />} />
           <Route path="/print-queue" element={<PrintQueue />} />

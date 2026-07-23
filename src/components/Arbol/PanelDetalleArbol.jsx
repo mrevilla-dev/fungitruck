@@ -192,7 +192,7 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
       />
 
       <Section title="Acciones">
-        <button className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => navigate('/crio')}>
+        <button className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => navigate('/criobanco')}>
           ❄️ Ir al Criobanco
         </button>
       </Section>

@@ -158,7 +158,7 @@ export default function CriopreservacionNuevaPage() {
         cepa: origen.cepa,
       });
 
-      navigate('/crio');
+      navigate('/criobanco');
     } catch (e) {
       // Si el batch falla: toast de error, NO resetear el formulario
       setError('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
