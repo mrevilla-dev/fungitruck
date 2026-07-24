@@ -151,8 +151,8 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
 
       <Section title="Información">
         <Field label="Cepa" value={datos.cepa} />
-        <Field label="Origen" value={datos.origen} />
-        <Field label="Fecha Recolección" value={datos.fecha} />
+        <Field label="Origen" value={datos.origen_material || '-'} />
+        <Field label="Fecha Recolección" value={datos.fechaRecoleccion || '-'} />
       </Section>
 
       <CarruselFotos url={datos.fotoUrl} />
