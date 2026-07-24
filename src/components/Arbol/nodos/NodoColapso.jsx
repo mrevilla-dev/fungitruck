@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 
 export default function NodoColapso({ data }) {
-  const { cantidad, hijosOcultos, onExpandir } = data;
-  const [expandido, setExpandido] = useState(false);
+  const { cantidad, sourceId, onRecentrar } = data;
 
-  const handleToggle = (e) => {
+  const handleClick = (e) => {
     e.stopPropagation();
-    setExpandido(!expandido);
-    if (onExpandir) {
-      onExpandir(!expandido, hijosOcultos);
+    if (onRecentrar && sourceId) {
+      onRecentrar(sourceId, 'batch');
     }
   };
 
@@ -26,12 +24,12 @@ export default function NodoColapso({ data }) {
         textAlign: 'center',
         boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
       }}
-      onClick={handleToggle}
+      onClick={handleClick}
     >
       <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none' }} />
       
       <div style={{ fontWeight: 'bold' }}>
-        {expandido ? '[ colapsar ↑ ]' : `[ +${cantidad} más → ]`}
+        [ Ver grupo ({cantidad}) → ]
       </div>
     </div>
   );
