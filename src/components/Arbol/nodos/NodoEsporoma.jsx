@@ -23,7 +23,7 @@ export default function NodoEsporoma({ data }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
         <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{icono} ESPOROMA</span>
-        <span style={{ cursor: 'pointer', fontSize: '14px' }} onClick={(e) => { e.stopPropagation(); onRecentrar?.(id, 'ejemplar'); }} title="Recentrar árbol">🎯</span>
+        <span style={{ cursor: 'default', fontSize: '14px', opacity: 0.3 }} title="Recentrado desde esporoma (próximamente)">🎯</span>
       </div>
       
       <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
