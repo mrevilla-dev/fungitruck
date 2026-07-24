@@ -160,9 +160,8 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
       </Section>
 
       <Section title="Línea">
-        <Field label="Generación" value={datos.generacion ? `G${datos.generacion}` : 'N/A'} />
-        <Field label="Esporoma Origen" value={datos.esporomaOrigen} />
-        <Field label="Batches" value={datos.batches?.length ?? 0} />
+        <Field label="Generación" value={datos.generacion != null ? `G${datos.generacion}` : 'N/A'} />
+        <Field label="Esporoma Origen" value={datos.esporomaOrigen || '-'} />
       </Section>
 
       <CarruselFotos url={datos.fotoUrl} />

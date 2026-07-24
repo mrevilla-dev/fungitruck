@@ -368,6 +368,7 @@ async function getCosechasDelBatch(batchId) {
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ ...d.data(), id: d.id }));
   } catch (e) {
+    console.warn('getCosechasDelBatch:', e.message);
     return [];
   }
 }
@@ -381,6 +382,7 @@ async function getCriovialesDelBatch(batchId) {
     const criovialesSnap = await getDocs(criovialesQ);
     return criovialesSnap.docs.map(d => ({ ...d.data(), id: d.id }));
   } catch (e) {
+    console.warn('getCriovialesDelBatch:', e.message);
     return [];
   }
 }

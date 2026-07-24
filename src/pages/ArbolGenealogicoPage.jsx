@@ -133,7 +133,6 @@ export default function ArbolGenealogicoPage({ tipo }) {
         if (!snapEsp.empty) esporomaSnap = snapEsp.docs[0];
       }
       if (esporomaSnap) {
-        const esporomaData = esporomaSnap.data();
         const esporomaId = esporomaSnap.id;
         // Buscar el ejemplar que tiene este esporoma como origen
         const qEje = query(collection(db, 'ejemplares'), where('esporoma_origen_id', '==', esporomaId));
