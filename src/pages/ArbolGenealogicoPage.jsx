@@ -121,7 +121,34 @@ export default function ArbolGenealogicoPage({ tipo }) {
         return;
       }
 
-      setMsgErrorBusqueda('No se encontró ningún batch o ejemplar con ese ID.');
+      // 5. Buscar en 'esporomas' por doc ID o id_semantico
+      let esporomaSnap = null;
+      const esporomaDocRef = doc(db, 'esporomas', term);
+      const esporomaDocSnap = await getDoc(esporomaDocRef);
+      if (esporomaDocSnap.exists()) {
+        esporomaSnap = esporomaDocSnap;
+      } else {
+        const qEsporomaSemantico = query(collection(db, 'esporomas'), where('id_semantico', '==', term));
+        const snapEsp = await getDocs(qEsporomaSemantico);
+        if (!snapEsp.empty) esporomaSnap = snapEsp.docs[0];
+      }
+      if (esporomaSnap) {
+        const esporomaData = esporomaSnap.data();
+        const esporomaId = esporomaSnap.id;
+        // Buscar el ejemplar que tiene este esporoma como origen
+        const qEje = query(collection(db, 'ejemplares'), where('esporoma_origen_id', '==', esporomaId));
+        const snapEje = await getDocs(qEje);
+        if (!snapEje.empty) {
+          navigate(`/arbol/ejemplar/${snapEje.docs[0].id}`);
+          return;
+        }
+        // Si no tiene ejemplar derivado, mostrar el esporoma como nodo aislado
+        toast('Esporoma encontrado sin ejemplar derivado. Mostrando esporoma.');
+        setMsgErrorBusqueda('Este esporoma no tiene ejemplares derivados aún.');
+        return;
+      }
+
+      setMsgErrorBusqueda('No se encontró ningún batch, ejemplar o esporoma con ese ID.');
     } catch (err) {
       console.error('Error al buscar:', err);
       setMsgErrorBusqueda('Ocurrió un error al realizar la búsqueda.');
@@ -200,8 +227,32 @@ export default function ArbolGenealogicoPage({ tipo }) {
         return;
       }
 
-      toast("El código escaneado no corresponde a un batch o ejemplar.");
-      setMsgErrorBusqueda("El código escaneado no corresponde a un batch o ejemplar.");
+      // 5. Buscar en 'esporomas' por doc ID o id_semantico
+      let esporomaSnap = null;
+      const esporomaDocRef = doc(db, 'esporomas', term);
+      const esporomaDocSnap = await getDoc(esporomaDocRef);
+      if (esporomaDocSnap.exists()) {
+        esporomaSnap = esporomaDocSnap;
+      } else {
+        const qEsporomaSemantico = query(collection(db, 'esporomas'), where('id_semantico', '==', term));
+        const snapEsp = await getDocs(qEsporomaSemantico);
+        if (!snapEsp.empty) esporomaSnap = snapEsp.docs[0];
+      }
+      if (esporomaSnap) {
+        const esporomaId = esporomaSnap.id;
+        const qEje = query(collection(db, 'ejemplares'), where('esporoma_origen_id', '==', esporomaId));
+        const snapEje = await getDocs(qEje);
+        if (!snapEje.empty) {
+          navigate(`/arbol/ejemplar/${snapEje.docs[0].id}`);
+          return;
+        }
+        toast('Esporoma encontrado sin ejemplar derivado.');
+        setMsgErrorBusqueda('Este esporoma no tiene ejemplares derivados aún.');
+        return;
+      }
+
+      toast("El código escaneado no corresponde a un batch, ejemplar o esporoma.");
+      setMsgErrorBusqueda("El código escaneado no corresponde a un batch, ejemplar o esporoma.");
     } catch (err) {
       console.error(err);
       toast.error("Error al procesar el código escaneado.");
