@@ -97,12 +97,11 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
       <CarruselFotos url={datos.fotoUrl} />
 
       <Section title="Acciones">
-        {/* Placeholder para futuras integraciones */}
-        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }}>
-          📋 Añadir Observación / Auditoría
+        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/escanear')}>
+          🔍 Observar / Auditar
         </button>
-        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }}>
-          🖨️ Reimprimir Etiqueta ZPL
+        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/print-queue')}>
+          🖨️ Cola de Impresión
         </button>
         <button className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => navigate(`/`)}>
           👁️ Ir al inicio
