@@ -273,17 +273,29 @@ async function getBatch(id) {
 
     // Resolver medio_prep
     if (data.medioPrepId) {
-      const medioSnap = await getDoc(doc(db, 'medios_preparados', data.medioPrepId));
-      if (medioSnap.exists()) {
-        data.medio_prep = medioSnap.data();
+      try {
+        const medioSnap = await getDoc(doc(db, 'medios_preparados', data.medioPrepId));
+        if (medioSnap.exists()) {
+          data.medio_prep = medioSnap.data();
+        } else {
+          console.warn(`getBatch: medio_preparado "${data.medioPrepId}" no encontrado para batch "${id}"`);
+        }
+      } catch (e) {
+        console.warn(`getBatch: error resolviendo medio_preparado "${data.medioPrepId}":`, e.message);
       }
     }
 
     // Resolver sala destino
     if (data.destinoId) {
-      const salaSnap = await getDoc(doc(db, 'salas', data.destinoId));
-      if (salaSnap.exists()) {
-        data.sala_destino = salaSnap.data();
+      try {
+        const salaSnap = await getDoc(doc(db, 'salas', data.destinoId));
+        if (salaSnap.exists()) {
+          data.sala_destino = salaSnap.data();
+        } else {
+          console.warn(`getBatch: sala "${data.destinoId}" no encontrada para batch "${id}"`);
+        }
+      } catch (e) {
+        console.warn(`getBatch: error resolviendo sala "${data.destinoId}":`, e.message);
       }
     }
 
@@ -327,8 +339,16 @@ async function getBatchesDeEjemplar(ejemplarId) {
     for (const d of snap.docs) {
       const data = { ...d.data(), id: d.id };
       if (data.medioPrepId) {
-        const medioSnap = await getDoc(doc(db, 'medios_preparados', data.medioPrepId));
-        if (medioSnap.exists()) data.medio_prep = medioSnap.data();
+        try {
+          const medioSnap = await getDoc(doc(db, 'medios_preparados', data.medioPrepId));
+          if (medioSnap.exists()) {
+            data.medio_prep = medioSnap.data();
+          } else {
+            console.warn(`getBatchesDeEjemplar: medio "${data.medioPrepId}" no encontrado para batch "${d.id}"`);
+          }
+        } catch (e) {
+          console.warn(`getBatchesDeEjemplar: error resolviendo medio "${data.medioPrepId}":`, e.message);
+        }
       }
       batches.push(data);
     }
