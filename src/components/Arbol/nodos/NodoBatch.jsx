@@ -5,7 +5,7 @@ import { ICONOS_NODO, COLORES_ESTADO, getDriveEmbedUrl } from '../../../utils/ar
 export default function NodoBatch({ data }) {
   const {
     id, status, tipoContenedor, medioPrepNombre, salaDestino, numeroTransferencia,
-    fechaInoculacion, fotoUrl, esFoco, onRecentrar, onVerDetalle
+    fechaInoculacion, fotoUrl, esFoco, onRecentrar, onVerDetalle, genero, especie
   } = data;
 
   const colorEstado = COLORES_ESTADO[status] || '#9E9E9E';
@@ -51,6 +51,7 @@ export default function NodoBatch({ data }) {
       
       {!expandido ? (
         <div style={{ color: '#cbd5e1' }}>
+          <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '2px' }}>{genero} {especie}</div>
           T{numeroTransferencia} · {medioPrepNombre} <br/>
           📍 {salaDestino}
         </div>
