@@ -128,7 +128,7 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
       <CarruselFotos url={datos.fotoUrl} />
 
       <Section title="Acciones">
-        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/escanear')}>
+        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/inventario', { state: { action: 'editBatch', batchId: datos.id } })}>
           🔍 Observar / Auditar
         </button>
         <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => handleEnviarACola()}>
