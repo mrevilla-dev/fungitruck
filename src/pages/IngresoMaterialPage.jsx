@@ -50,13 +50,14 @@ export default function IngresoMaterialPage() {
     fecha_compra: "",
     precio: "",
     lote_proveedor: "",
-    tipo_micelio: "Dicarión",
-    ploidia: "Diploide"
+    tipo_micelio: "",
+    ploidia: ""
   });
 
   const [foto, setFoto] = useState(null);
   const [certificado, setCertificado] = useState(null);
   const [derivaciones, setDerivaciones] = useState([]); // Solo para Ruta A
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     const auth = getAuth();
@@ -144,7 +145,7 @@ export default function IngresoMaterialPage() {
       proveedor: "", pais: "", formato_recepcion: "",
       observaciones: "", fecha: new Date().toISOString().split('T')[0],
       fecha_compra: "", precio: "", lote_proveedor: "",
-      tipo_micelio: "Dicarión", ploidia: "Diploide"
+      tipo_micelio: "", ploidia: ""
     });
     setDerivaciones([]);
     setFoto(null);
@@ -153,11 +154,14 @@ export default function IngresoMaterialPage() {
   };
 
   const handleFormatoRecepcionChange = (formato) => {
-    let tipo_m = 'Dicarión';
-    let ploid = 'Diploide';
+    let tipo_m = '';
+    let ploid = '';
     if (formato === 'Sello de esporas' || formato === 'Jeringa de esporas') {
       tipo_m = 'Polispórico';
-      ploid = 'Haploide'; // o diploide poli
+      ploid = 'Haploide';
+    } else if (formato) {
+      tipo_m = 'Dicarión';
+      ploid = 'Diploide';
     }
     setFormB({ ...formB, formato_recepcion: formato, tipo_micelio: tipo_m, ploidia: ploid });
   };
@@ -166,10 +170,18 @@ export default function IngresoMaterialPage() {
     e.preventDefault();
     const formValues = rutaActiva === 'A' ? formA : formB;
     
-    if (!formValues.genero || !formValues.especie) return toast.error("Faltan datos básicos del género/especie.");
-    if (rutaActiva === 'A' && !formValues.origen) return toast.error("Falta definir el origen.");
-    if (rutaActiva === 'B' && !formValues.formato_recepcion) return toast.error("Falta el formato de recepción.");
+    const newErrors = {};
+    if (!formValues.genero) newErrors.genero = true;
+    if (!formValues.especie) newErrors.especie = true;
+    if (rutaActiva === 'A' && !formValues.origen) newErrors.origen = true;
+    if (rutaActiva === 'B' && !formValues.formato_recepcion) newErrors.formato_recepcion = true;
     
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return toast.error("Completá los campos obligatorios.");
+    }
+    
+    setErrors({});
     setLoading(true);
     try {
       if (rutaActiva === 'A') {
@@ -409,10 +421,11 @@ export default function IngresoMaterialPage() {
         <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button 
             onClick={() => setRuta('A')}
+            className="selector-card"
             style={{ 
               flex: '1 1 300px', padding: '2rem', borderRadius: '16px', 
               border: '2px solid var(--primary-color)', background: 'var(--surface-color)',
-              color: 'var(--text-color)', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center'
+              color: 'var(--text-color)', cursor: 'pointer', textAlign: 'center'
             }}
           >
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🍄</div>
@@ -424,10 +437,11 @@ export default function IngresoMaterialPage() {
 
           <button 
             onClick={() => setRuta('B')}
+            className="selector-card"
             style={{ 
               flex: '1 1 300px', padding: '2rem', borderRadius: '16px', 
               border: '2px solid #8b5cf6', background: 'var(--surface-color)',
-              color: 'var(--text-color)', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center'
+              color: 'var(--text-color)', cursor: 'pointer', textAlign: 'center'
             }}
           >
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📦</div>
@@ -455,11 +469,13 @@ export default function IngresoMaterialPage() {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Género *</label>
-              <input type="text" className="form-control" required value={formA.genero} onChange={e => setFormA({...formA, genero: e.target.value})} placeholder="Ej: Ganoderma" />
+              <input type="text" className={`form-control ${errors.genero ? 'is-invalid' : ''}`} required value={formA.genero} onChange={e => { setFormA({...formA, genero: e.target.value}); setErrors(prev => ({...prev, genero: false})); }} placeholder="Ej: Ganoderma" />
+              {errors.genero && <div className="form-error">Ingresá el género.</div>}
             </div>
             <div className="form-group">
               <label className="form-label">Especie *</label>
-              <input type="text" className="form-control" required value={formA.especie} onChange={e => setFormA({...formA, especie: e.target.value})} placeholder="Ej: lucidum" />
+              <input type="text" className={`form-control ${errors.especie ? 'is-invalid' : ''}`} required value={formA.especie} onChange={e => { setFormA({...formA, especie: e.target.value}); setErrors(prev => ({...prev, especie: false})); }} placeholder="Ej: lucidum" />
+              {errors.especie && <div className="form-error">Ingresá la especie.</div>}
             </div>
           </div>
           <div className="grid-2">
@@ -469,11 +485,15 @@ export default function IngresoMaterialPage() {
             </div>
             <div className="form-group">
               <label className="form-label">Origen *</label>
-              <select className="form-control" required value={formA.origen} onChange={e => setFormA({...formA, origen: e.target.value})}>
+              <select className={`form-control ${errors.origen ? 'is-invalid' : ''}`} required value={formA.origen} onChange={e => { setFormA({...formA, origen: e.target.value}); setErrors(prev => ({...prev, origen: false})); }}>
                 <option value="">-- Seleccionar --</option>
                 <option value="Silvestre">Silvestre</option>
                 <option value="Cultivo interno">Cultivo interno</option>
+                <option value="Donación">Donación</option>
+                <option value="Intercambio">Intercambio</option>
+                <option value="Compra">Compra</option>
               </select>
+              {errors.origen && <div className="form-error">Seleccioná el origen.</div>}
             </div>
           </div>
 
@@ -530,11 +550,13 @@ export default function IngresoMaterialPage() {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Género *</label>
-              <input type="text" className="form-control" required value={formB.genero} onChange={e => setFormB({...formB, genero: e.target.value})} placeholder="Ej: Pleurotus" />
+              <input type="text" className={`form-control ${errors.genero ? 'is-invalid' : ''}`} required value={formB.genero} onChange={e => { setFormB({...formB, genero: e.target.value}); setErrors(prev => ({...prev, genero: false})); }} placeholder="Ej: Pleurotus" />
+              {errors.genero && <div className="form-error">Ingresá el género.</div>}
             </div>
             <div className="form-group">
               <label className="form-label">Especie *</label>
-              <input type="text" className="form-control" required value={formB.especie} onChange={e => setFormB({...formB, especie: e.target.value})} placeholder="Ej: ostreatus" />
+              <input type="text" className={`form-control ${errors.especie ? 'is-invalid' : ''}`} required value={formB.especie} onChange={e => { setFormB({...formB, especie: e.target.value}); setErrors(prev => ({...prev, especie: false})); }} placeholder="Ej: ostreatus" />
+              {errors.especie && <div className="form-error">Ingresá la especie.</div>}
             </div>
           </div>
           <div className="grid-2">
@@ -544,14 +566,17 @@ export default function IngresoMaterialPage() {
             </div>
             <div className="form-group">
               <label className="form-label">Formato de Recepción *</label>
-              <select className="form-control" required value={formB.formato_recepcion} onChange={e => handleFormatoRecepcionChange(e.target.value)}>
+              <select className={`form-control ${errors.formato_recepcion ? 'is-invalid' : ''}`} required value={formB.formato_recepcion} onChange={e => { handleFormatoRecepcionChange(e.target.value); setErrors(prev => ({...prev, formato_recepcion: false})); }}>
                 <option value="">-- Seleccionar --</option>
                 <option value="Jeringa líquida">Jeringa de micelio líquido</option>
                 <option value="Sello de esporas">Sello de esporas</option>
                 <option value="Placa colonizada">Placa de Agar colonizada</option>
                 <option value="Tubo/Slant">Tubo / Slant</option>
                 <option value="Spawn externo">Spawn comercial</option>
+                <option value="Granos colonizados">Granos colonizados</option>
+                <option value="Cultivo líquido">Cultivo líquido</option>
               </select>
+              {errors.formato_recepcion && <div className="form-error">Seleccioná el formato de recepción.</div>}
             </div>
           </div>
 
@@ -559,6 +584,7 @@ export default function IngresoMaterialPage() {
             <div className="form-group">
               <label className="form-label">Tipo de Micelio</label>
               <select className="form-control" value={formB.tipo_micelio} onChange={e => setFormB({...formB, tipo_micelio: e.target.value})}>
+                <option value="">-- Seleccionar --</option>
                 <option value="Dicarión">Dicarión</option>
                 <option value="Monocarión">Monocarión</option>
                 <option value="Polispórico">Polispórico</option>
@@ -567,6 +593,7 @@ export default function IngresoMaterialPage() {
             <div className="form-group">
               <label className="form-label">Ploidía</label>
               <select className="form-control" value={formB.ploidia} onChange={e => setFormB({...formB, ploidia: e.target.value})}>
+                <option value="">-- Seleccionar --</option>
                 <option value="Diploide">Diploide</option>
                 <option value="Haploide">Haploide</option>
                 <option value="Desconocido">Desconocido</option>
@@ -591,7 +618,7 @@ export default function IngresoMaterialPage() {
               <input type="text" className="form-control" value={formB.pais} onChange={e => setFormB({...formB, pais: e.target.value})} placeholder="Ej: Argentina" />
             </div>
             <div className="form-group">
-              <label className="form-label">Precio</label>
+              <label className="form-label">Precio (ARS)</label>
               <input type="number" step="0.01" className="form-control" value={formB.precio} onChange={e => setFormB({...formB, precio: e.target.value})} placeholder="Ej: 5000" />
             </div>
           </div>
@@ -618,7 +645,11 @@ export default function IngresoMaterialPage() {
             <textarea className="form-control" rows="2" value={formB.observaciones} onChange={e => setFormB({...formB, observaciones: e.target.value})} />
           </div>
 
-          {/* Ruta B no tiene derivaciones (generan 1 Ejemplar y listo) */}
+          {/* Ruta B: informar que derivaciones se crean desde Inoculaciones */}
+          <div style={{ marginTop: '1.5rem', padding: '0.75rem 1rem', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '8px', fontSize: '0.85rem', color: '#c4b5fd' }}>
+            💡 Las derivaciones (Seca / Húmeda) se crean desde el módulo de <strong>Inoculaciones</strong> una vez que el ejemplar está registrado.
+          </div>
+
           {renderSubmitButton()}
         </form>
       )}
