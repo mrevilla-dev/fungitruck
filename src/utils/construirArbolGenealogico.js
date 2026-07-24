@@ -180,6 +180,8 @@ function crearNodoEjemplar(ejemplar, opciones = {}) {
       tipoMicelio: ejemplar.tipo_micelio ?? '',
       mat: ejemplar.mat ?? '',
       estado: ejemplar.estado ?? 'Activo',
+      generacion: ejemplar.generacion ?? null,
+      esporomaOrigen: ejemplar.esporoma_origen_id ?? null,
       fotoUrl: ejemplar.fotoUrl ?? ejemplar.foto_url ?? ejemplar.foto_principal ?? null,
       _ejemplarId: ejemplar.id,
     },
@@ -197,8 +199,8 @@ function crearNodoEsporoma(esporoma) {
       genero: esporoma.genero ?? '',
       especie: esporoma.especie ?? '',
       cepa: esporoma.codigo_cepa ?? '',
-      origen: esporoma.origen_material ?? '',
-      fecha: esporoma.fecha ?? '',
+      origen_material: esporoma.origen_material ?? '',
+      fechaRecoleccion: esporoma.fechaRecoleccion ?? '',
       fotoUrl: esporoma.fotoUrl ?? esporoma.foto_url ?? esporoma.foto_principal ?? null,
     },
     position: { x: 0, y: 0 },
@@ -321,7 +323,16 @@ async function getBatchesDeEjemplar(ejemplarId) {
       where('ejemplarId', '==', ejemplarId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    const batches = [];
+    for (const d of snap.docs) {
+      const data = { ...d.data(), id: d.id };
+      if (data.medioPrepId) {
+        const medioSnap = await getDoc(doc(db, 'medios_preparados', data.medioPrepId));
+        if (medioSnap.exists()) data.medio_prep = medioSnap.data();
+      }
+      batches.push(data);
+    }
+    return batches;
   } catch (e) {
     console.error('Error getBatchesDeEjemplar:', e);
     return [];
