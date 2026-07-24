@@ -125,6 +125,12 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
         <Field label="MAT" value={datos.mat} />
       </Section>
 
+      <Section title="Línea">
+        <Field label="Generación" value={datos.generacion ? `G${datos.generacion}` : 'N/A'} />
+        <Field label="Esporoma Origen" value={datos.esporomaOrigen} />
+        <Field label="Batches" value={datos.batches?.length ?? 0} />
+      </Section>
+
       <CarruselFotos url={datos.fotoUrl} />
 
       <Section title="Acciones">
