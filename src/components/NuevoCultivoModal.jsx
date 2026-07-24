@@ -731,10 +731,6 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   </button>
                 ))}
               </div>
-
-              <button className="btn btn-primary" onClick={() => setStep(2)} disabled={!formData.tipo_inoculacion} style={{ marginTop: '1rem' }}>
-                Siguiente Paso ➡️
-              </button>
             </div>
           )}
 
