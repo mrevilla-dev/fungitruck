@@ -1,6 +1,9 @@
 import React from 'react';
 import { COLORES_ESTADO, ICONOS_NODO, getDriveEmbedUrl } from '../../utils/arbolConstants';
 import { useNavigate } from 'react-router-dom';
+import { db } from '../../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 export default function PanelDetalleArbol({ datos, onCerrar }) {
   const navigate = useNavigate();
@@ -61,6 +64,34 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
     </div>
   );
 
+  const handleEnviarACola = async () => {
+    try {
+      await addDoc(collection(db, 'cola_impresion'), {
+        modulo: 'cultivos',
+        batch_ids: [datos.id],
+        tipo_etiqueta: 'PORTAOBJETOS',
+        datos_etiquetas: [{
+          id: datos.id || '',
+          alias: datos.cepa || datos.especie || '',
+          nombre_receta: datos.medioPrepNombre || '',
+          fecha: datos.fechaInoculacion || '',
+          ubicacion: datos.salaDestino || '',
+          operador: datos.operador || '',
+          genero: datos.genero || '',
+          especie: datos.especie || '',
+        }],
+        copias: 1,
+        estado: 'Pendiente',
+        fecha_generacion: serverTimestamp(),
+        operario: datos.operador || 'Sistema',
+      });
+      toast.success('Enviado a cola de impresión');
+    } catch (err) {
+      console.error('Error al enviar a cola:', err);
+      toast.error('Error al enviar a cola de impresión');
+    }
+  };
+
   const CarruselFotos = ({ url }) => {
     if (!url) return null;
     return (
@@ -100,8 +131,11 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
         <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/escanear')}>
           🔍 Observar / Auditar
         </button>
+        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => handleEnviarACola()}>
+          📥 Enviar a cola de impresión
+        </button>
         <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/print-queue')}>
-          🖨️ Cola de Impresión
+          🖨️ Ir a cola de impresión
         </button>
         <button className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => navigate('/')}>
           👁️ Ir al inicio
