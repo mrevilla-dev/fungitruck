@@ -215,31 +215,50 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
   const ejemplaresOptions = ejemplares.map(e => ({
     id: e.id,
-    nombre: `${e.id_semantico || e.id} · ${e.especie} · Gen${e.generacion ?? 0} · ${e.mat}`,
+    nombre: `${e.genero || ''} ${e.especie || ''} · Gen${e.generacion ?? 0} · ${e.id_semantico || e.id} · ${e.mat || ''}`,
     data: e
   }));
 
+  const renderEjemplarOption = (opt, isSelected) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.5rem' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+          {opt.data?.genero || ''} {opt.data?.especie || ''} · Gen{opt.data?.generacion ?? 0}
+        </div>
+        <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {opt.data?.id_semantico || opt.id} · {opt.data?.mat || ''}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(opt.data?.id_semantico || opt.id); toast.success('ID copiado'); }}
+        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '4px', padding: '4px 6px', cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0 }}
+        title="Copiar ID"
+      >📋</button>
+    </div>
+  );
+
   const placaOrigenOptions = batchesOrigen.map(b => ({
     id: b.id,
-    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
+    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion || ''} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
     data: b
   }));
 
   const placaOrigenOptions2 = batchesOrigen2.map(b => ({
     id: b.id,
-    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
+    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion || ''} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
     data: b
   }));
 
   const liquidoOrigenOptions = batchesOrigen.map(b => ({
     id: b.id,
-    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
+    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion || ''} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
     data: b
   }));
 
   const granoOrigenOptions = batchesOrigen.map(b => ({
     id: b.id,
-    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
+    nombre: `${b.id} · ${b.fecha_inoculacion || b.fechaInoculacion || ''} · 📍 ${b.destinoNombre || b.sala_actual || 'Sin sala'}`,
     data: b
   }));
 
@@ -772,6 +791,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                     value={formData.ejemplar_fuente?.id || ''} 
                     onChange={val => handleChange('ejemplar_fuente', ejemplaresOptions.find(o => o.id === val))} 
                     placeholder="-- Buscar Ejemplar Activo --" 
+                    renderOption={renderEjemplarOption}
                   />
                 </div>
               )}
@@ -820,6 +840,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                       value={formData.ejemplar_fuente_2?.id || ''} 
                       onChange={val => handleChange('ejemplar_fuente_2', ejemplaresOptions.find(o => o.id === val))} 
                       placeholder="-- Buscar Segundo Ejemplar --" 
+                      renderOption={renderEjemplarOption}
                     />
                   </div>
                   <div className="form-group" style={{ position: 'relative', zIndex: 1100, marginTop: '0.5rem' }}>

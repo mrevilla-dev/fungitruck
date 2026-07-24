@@ -16,7 +16,8 @@ export default function SearchableSelect({
   onCreateNew,
   createNewText = '➕ Crear nuevo',
   hasWarning = false,
-  style = {}
+  style = {},
+  renderOption = null
 }) {
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -175,7 +176,7 @@ export default function SearchableSelect({
                   }
                 }}
               >
-                {opt.nombre}
+                {renderOption ? renderOption(opt, opt.id === value) : opt.nombre}
               </div>
             ))
           ) : (
