@@ -97,13 +97,13 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
       <CarruselFotos url={datos.fotoUrl} />
 
       <Section title="Acciones">
-        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/escanear')}>
+        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => window.location.href = '/escanear'}>
           🔍 Observar / Auditar
         </button>
-        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/print-queue')}>
+        <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => window.location.href = '/print-queue'}>
           🖨️ Cola de Impresión
         </button>
-        <button className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => navigate(`/`)}>
+        <button className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => window.location.href = '/'}>
           👁️ Ir al inicio
         </button>
       </Section>
