@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { generarIdBatch, incrementarSecuenciaHibridacion } from '../utils/idGenerator';
 import AltaRapidaEjemplarExterno from './AltaRapidaEjemplarExterno';
 import ScanInput from './ScanInput';
+import { OPERARIOS } from '../constants/operarios';
 
 const TIPOS_INOCULACION = [
   { id: 'aislamiento_primario', label: 'Aislamiento Primario (Origen Cero)' },
@@ -141,7 +142,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   useEffect(() => {
     const auth = getAuth();
     if (auth.currentUser && !formData.operario) {
-      setFormData(prev => ({ ...prev, operario: auth.currentUser.displayName || auth.currentUser.email || 'Sistema' }));
+      const name = auth.currentUser.displayName || auth.currentUser.email || '';
+      if (OPERARIOS.includes(name)) {
+        setFormData(prev => ({ ...prev, operario: name }));
+      }
     }
 
     getDoc(doc(db, 'config', 'tipos_envase')).then(docSnap => {
@@ -1136,7 +1140,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label">Operario Responsable</label>
-                  <input type="text" className="form-control" value={formData.operario} onChange={e => handleChange('operario', e.target.value)} disabled />
+                  <select className="form-control" value={formData.operario} onChange={e => handleChange('operario', e.target.value)}>
+                    <option value="">-- Seleccionar operario --</option>
+                    {OPERARIOS.map(op => <option key={op} value={op}>{op}</option>)}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Fecha de Inoculación</label>
