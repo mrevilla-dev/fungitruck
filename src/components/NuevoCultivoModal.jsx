@@ -304,7 +304,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
         if (bulkCant > 0) {
           options.push({
             id: m.id,
-            nombre: `${m.alias || ''} · ID: ${m.id} · ${m.nombre_receta} (Bulk) — ${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles`,
+            nombre: `${m.alias || m.nombre_receta} (Bulk) — ${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles`,
             type: 'bulk',
             data: { medio: m }
           });
@@ -315,7 +315,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       subs.forEach(s => {
         options.push({
           id: s.id,
-          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || s.id} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
+          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
           data: { medio: m, sub: s }
         });
@@ -1137,7 +1137,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.5rem', borderRadius: '4px', color: 'var(--text-secondary)' }}>
-                        {formData.medio_prep.id}
+                        {formData.medio_prep.alias || formData.medio_prep.nombre_receta || 'Medio'}
                       </span>
                       <button
                         type="button"
@@ -1165,7 +1165,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                           {subs.map(s => (
                             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.85rem' }}>
                               <div>
-                                <strong>{s.id_bolsa || s.id}</strong>
+                                <strong>{s.id_bolsa || 'Soporte'}</strong>
                                 <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
                                   {s.tipo_unidad || s.tipo_envase || ''} · {s.disponible}/{s.cantidad} disp.
                                 </span>
