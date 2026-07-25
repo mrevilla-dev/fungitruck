@@ -419,6 +419,58 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
     }
   };
 
+  const handleScanMedio = async (scannedId) => {
+    const id = scannedId.trim();
+    try {
+      // Try as raw Firestore doc ID for medios_preparados
+      const medioDoc = await getDoc(doc(db, 'medios_preparados', id));
+      if (medioDoc.exists()) {
+        const opt = mediosDestinoOptions.find(o => o.type === 'bulk' && o.data.medio.id === id);
+        if (opt && !opt.disabled) {
+          handleSelectMedioDestino(opt.id);
+          toast.success(`Medio seleccionado: ${opt.data.medio.alias || opt.data.medio.nombre_receta}`);
+        } else {
+          toast.error(opt ? 'Este medio no tiene stock disponible' : 'Medio encontrado pero no disponible para esta ruta');
+        }
+        return;
+      }
+      // Try as FRAC- subfraccion ID via collectionGroup
+      if (id.startsWith('FRAC-')) {
+        const qSub = query(collectionGroup(db, 'subfracciones'), where('id_bolsa', '==', id));
+        const snapSub = await getDocs(qSub);
+        if (!snapSub.empty) {
+          const subDoc = snapSub.docs[0];
+          const subData = subDoc.data();
+          const opt = mediosDestinoOptions.find(o => o.type === 'sub' && o.id === subDoc.id);
+          if (opt && !opt.disabled) {
+            handleSelectMedioDestino(opt.id);
+            toast.success(`Subfracción seleccionada: ${subData.id_bolsa || id}`);
+          } else {
+            toast.error(opt ? 'Esta subfracción no tiene stock disponible' : 'Subfracción encontrada pero no disponible para esta ruta');
+          }
+          return;
+        }
+      }
+      // Try as id_semantico query
+      const qMed = query(collection(db, 'medios_preparados'), where('id_semantico', '==', id));
+      const snapMed = await getDocs(qMed);
+      if (!snapMed.empty) {
+        const mDoc = snapMed.docs[0];
+        const opt = mediosDestinoOptions.find(o => o.type === 'bulk' && o.data.medio.id === mDoc.id);
+        if (opt && !opt.disabled) {
+          handleSelectMedioDestino(opt.id);
+          toast.success(`Medio seleccionado: ${opt.data.medio.alias || opt.data.medio.nombre_receta}`);
+        } else {
+          toast.error('Medio encontrado pero no disponible para esta ruta');
+        }
+        return;
+      }
+      toast.error(`No se encontró medio o subfracción: ${id}`);
+    } catch (err) {
+      toast.error('Error al buscar medio escaneado');
+    }
+  };
+
   const handleSubfraccionar = async () => {
     const qty = Number(subfracCantidad) || 0;
     if (qty <= 0) return toast.error('Ingresá una cantidad válida');
@@ -1125,6 +1177,9 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   onChange={handleSelectMedioDestino} 
                   placeholder="-- Buscar Medio Disponible --" 
                 />
+                <div style={{ marginTop: '0.5rem' }}>
+                  <ScanInput onScan={handleScanMedio} label="Escanear Medio" />
+                </div>
               </div>
 
               {formData.medio_prep && (
