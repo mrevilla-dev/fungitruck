@@ -11,6 +11,7 @@ import NuevoEventoAislamientoModal from './NuevoEventoAislamientoModal';
 import toast from 'react-hot-toast';
 import { generarIdBatch, incrementarSecuenciaHibridacion } from '../utils/idGenerator';
 import AltaRapidaEjemplarExterno from './AltaRapidaEjemplarExterno';
+import ScanInput from './ScanInput';
 
 const TIPOS_INOCULACION = [
   { id: 'aislamiento_primario', label: 'Aislamiento Primario (Origen Cero)' },
@@ -377,6 +378,36 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
     }
     
     handleChange('perfil_zpl', p);
+  };
+
+  const handleScanEjemplar = async (scannedId, field = 'ejemplar_fuente') => {
+    const id = scannedId.trim();
+    try {
+      const ejeDoc = await import('firebase/firestore').then(({ doc, getDoc }) =>
+        getDoc(doc(db, 'ejemplares', id))
+      );
+      if (ejeDoc.exists()) {
+        const ejeData = { id: ejeDoc.id, ...ejeDoc.data() };
+        const opt = { id: ejeDoc.id, data: ejeData, nombre: `${ejeData.id_semantico || ejeDoc.id} · ${ejeData.especie || ''}` };
+        handleChange(field, opt);
+        toast.success(`Ejemplar seleccionado: ${ejeData.id_semantico || id}`);
+      } else {
+        const q = await import('firebase/firestore').then(({ query, collection, where, getDocs }) =>
+          getDocs(query(collection(db, 'ejemplares'), where('id_semantico', '==', id)))
+        );
+        if (!q.empty) {
+          const d = q.docs[0];
+          const ejeData = { id: d.id, ...d.data() };
+          const opt = { id: d.id, data: ejeData, nombre: `${ejeData.id_semantico || d.id} · ${ejeData.especie || ''}` };
+          handleChange(field, opt);
+          toast.success(`Ejemplar seleccionado: ${ejeData.id_semantico || id}`);
+        } else {
+          toast.error(`No se encontró ejemplar: ${id}`);
+        }
+      }
+    } catch (err) {
+      toast.error('Error al buscar ejemplar escaneado');
+    }
   };
 
   const isRutaValida = ['placa_a_liquido', 'hacia_grano', 'hacia_sustrato', 'liquido_a_liquido', 'aislamiento_primario', 'placa_a_placa'].includes(formData.tipo_inoculacion);
@@ -793,6 +824,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                     placeholder="-- Buscar Ejemplar Activo --" 
                     renderOption={renderEjemplarOption}
                   />
+                  <ScanInput onScan={(id) => handleScanEjemplar(id, 'ejemplar_fuente')} label="Escanear Ejemplar" />
                 </div>
               )}
 
@@ -842,6 +874,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                       placeholder="-- Buscar Segundo Ejemplar --" 
                       renderOption={renderEjemplarOption}
                     />
+                    <ScanInput onScan={(id) => handleScanEjemplar(id, 'ejemplar_fuente_2')} label="Escanear Padre 2" />
                   </div>
                   <div className="form-group" style={{ position: 'relative', zIndex: 1100, marginTop: '0.5rem' }}>
                     <label className="form-label">Placa Origen 2 *</label>
