@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { db, storage } from '../firebase';
-import { doc, getDoc, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, collectionGroup, addDoc, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
@@ -63,6 +63,32 @@ function ScannerPage() {
         navigate(`/criobanco/criovial/${id}`);
         setScanResult(null);
         return;
+      }
+
+      // 0b. Subfracción (FRAC-) — buscar por id_bolsa en collectionGroup
+      if (id.startsWith('FRAC-')) {
+        const qSub = query(collectionGroup(db, 'subfracciones'), where('id_bolsa', '==', id));
+        const snapSub = await getDocs(qSub);
+        if (!snapSub.empty) {
+          const subDoc = snapSub.docs[0];
+          const parentPath = subDoc.ref.parent.parent;
+          setRecordData({ dbId: subDoc.id, medioId: parentPath?.id, ...subDoc.data() });
+          setRecordType('medio');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 0c. Medio Preparado (MED-) — buscar por id_semantico o alias
+      if (id.startsWith('MED-')) {
+        const qMed = query(collection(db, 'medios_preparados'), where('id_semantico', '==', id));
+        const snapMed = await getDocs(qMed);
+        if (!snapMed.empty) {
+          setRecordData({ dbId: snapMed.docs[0].id, ...snapMed.docs[0].data() });
+          setRecordType('medio');
+          setLoading(false);
+          return;
+        }
       }
 
       // 1. Intentar como Medio Preparado (ID de Firestore)
