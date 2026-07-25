@@ -17,8 +17,8 @@ export default function HibridacionEjemplarModal({
   const [loading, setLoading] = useState(false);
   const [origenDeclaradoAgotado, setOrigenDeclaradoAgotado] = useState(false);
   const [formData, setFormData] = useState({
-    genero: ejemplarPadre?.data?.genero || ejemplarMadre?.data?.genero || '',
-    especie: ejemplarPadre?.data?.especie || ejemplarMadre?.data?.especie || '',
+    genero: '',
+    especie: '',
     codigo_cepa: '',
     ploidia: 'Diploide',
     tipo_micelio: 'Dicarión',
@@ -120,14 +120,16 @@ export default function HibridacionEjemplarModal({
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Género</label>
               <input 
-                type="text" className="form-control" required
+                type="text" className="form-control"
+                placeholder="Ej: Híbrido Berkeleya×Mabel"
                 value={formData.genero} onChange={e => setFormData({...formData, genero: e.target.value})} 
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Especie</label>
               <input 
-                type="text" className="form-control" required
+                type="text" className="form-control"
+                placeholder="Ej: Híbrido Berkeleya×Mabel"
                 value={formData.especie} onChange={e => setFormData({...formData, especie: e.target.value})} 
               />
             </div>
