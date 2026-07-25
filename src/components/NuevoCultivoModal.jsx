@@ -1060,6 +1060,52 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   placeholder="-- Buscar Medio Disponible --" 
                 />
               </div>
+
+              {formData.medio_prep && (
+                <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <div>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formData.medio_prep.alias || formData.medio_prep.nombre_receta}</strong>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {formData.medio_prep.categoria || 'Sin categoría'} · Stock bulk: {formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0} {formData.medio_prep.stock_bulk?.unidad || ''}
+                      </div>
+                    </div>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.5rem', borderRadius: '4px', color: 'var(--text-secondary)' }}>
+                      {formData.medio_prep.id}
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const subs = allSubfracciones.filter(s => s.medioId === formData.medio_prep.id && s.disponible > 0);
+                    if (subs.length === 0) {
+                      return (
+                        <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
+                          No hay subfracciones disponibles para este medio
+                        </div>
+                      );
+                    }
+                    return (
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Soportes disponibles ({subs.length}):</div>
+                        <div style={{ display: 'grid', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                          {subs.map(s => (
+                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                              <div>
+                                <strong>{s.id_bolsa || s.id}</strong>
+                                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                                  {s.tipo_unidad || s.tipo_envase || ''} · {s.disponible}/{s.cantidad} disp.
+                                </span>
+                                {s.volumen_por_unidad_ml && <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>· {s.volumen_por_unidad_ml} ml/u</span>}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{s.ubicacion || ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
