@@ -146,7 +146,7 @@ export default function SearchableSelect({
             filteredOptions.map((opt) => (
               <div
                 key={opt.id}
-                onClick={() => handleSelect(opt.id)}
+                onClick={() => !opt.disabled && handleSelect(opt.id)}
                 style={{
                   height: 'auto',
                   minHeight: '48px',
@@ -155,28 +155,36 @@ export default function SearchableSelect({
                   display: 'flex',
                   alignItems: 'center',
                   padding: '0 1rem',
-                  cursor: 'pointer',
+                  cursor: opt.disabled ? 'not-allowed' : 'pointer',
                   borderRadius: '6px',
                   fontSize: '0.95rem',
                   fontWeight: '500',
-                  color: opt.id === value ? '#10b981' : '#f3f4f6',
+                  color: opt.disabled ? '#6b7280' : (opt.id === value ? '#10b981' : '#f3f4f6'),
+                  opacity: opt.disabled ? 0.5 : 1,
                   background: opt.id === value 
                     ? 'rgba(16, 185, 129, 0.1)' 
                     : 'transparent',
                   transition: 'background 0.15s ease'
                 }}
                 onMouseEnter={(e) => {
-                  if (opt.id !== value) {
+                  if (opt.id !== value && !opt.disabled) {
                     e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (opt.id !== value) {
+                  if (opt.id !== value && !opt.disabled) {
                     e.currentTarget.style.background = 'transparent';
                   }
                 }}
               >
-                {renderOption ? renderOption(opt, opt.id === value) : opt.nombre}
+                {renderOption ? renderOption(opt, opt.id === value) : (
+                  <span style={{ flex: 1 }}>{opt.nombre}</span>
+                )}
+                {opt.disabled && (
+                  <span style={{ fontSize: '0.7rem', color: '#ef4444', marginLeft: '0.5rem', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                    Agotado
+                  </span>
+                )}
               </div>
             ))
           ) : (

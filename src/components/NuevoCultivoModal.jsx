@@ -301,22 +301,22 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
       if (m.estado === 'Activo') {
         const bulkCant = m.stock_bulk?.cantidad_actual ?? m.cantidad_actual ?? 0;
-        if (bulkCant > 0) {
-          options.push({
-            id: m.id,
-            nombre: `${m.alias || m.nombre_receta} (Bulk) — ${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles`,
-            type: 'bulk',
-            data: { medio: m }
-          });
-        }
+        options.push({
+          id: m.id,
+          nombre: `${m.alias || m.nombre_receta} (Bulk) — ${bulkCant > 0 ? `${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles` : 'Sin stock'}`,
+          type: 'bulk',
+          disabled: bulkCant <= 0,
+          data: { medio: m }
+        });
       }
 
-      const subs = allSubfracciones.filter(s => s.medioId === m.id && s.disponible > 0);
+      const subs = allSubfracciones.filter(s => s.medioId === m.id);
       subs.forEach(s => {
         options.push({
           id: s.id,
           nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
+          disabled: s.disponible <= 0,
           data: { medio: m, sub: s }
         });
       });
@@ -355,7 +355,8 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
   const handleSelectMedioDestino = (valId) => {
     const selectedOption = mediosDestinoOptions.find(o => o.id === valId);
-    if (!selectedOption) {
+    if (!selectedOption || selectedOption.disabled) {
+      if (selectedOption?.disabled) toast.error('Este medio no tiene stock disponible');
       handleChange('medio_prep', null);
       handleChange('fraccion_destino', null);
       return;
