@@ -195,24 +195,24 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                     <button 
                       className="btn btn-primary" 
-                      onClick={handleDownloadZPL} 
+                      onClick={handlePrintDirect} 
                       style={{ flex: 2, backgroundColor: '#10b981', fontWeight: 'bold', fontSize: '1.05rem', minHeight: '48px' }}
                     >
-                      ⬇️ DESCARGAR ZPL PARA ZEBRA
+                      Imprimir directo (Zebra)
                     </button>
                     <button 
-                      className="btn btn-success" 
-                      onClick={handlePrintDirect} 
-                      style={{ flex: 1, backgroundColor: '#3b82f6', fontWeight: 'bold', fontSize: '1.05rem', minHeight: '48px', marginLeft: '0.5rem' }}
+                      className="btn btn-outline" 
+                      onClick={handleDownloadZPL} 
+                      style={{ flex: 1, fontWeight: 'bold', fontSize: '1rem', minHeight: '48px' }}
                     >
-                      🖨️ Imprimir directo (Zebra)
+                      Descargar ZPL
                     </button>
                     <button 
                       className="btn btn-outline" 
                       onClick={handleEnviarACola} 
                       style={{ flex: 1, fontWeight: 'bold', fontSize: '1rem', minHeight: '48px', borderColor: '#6366f1', color: '#6366f1' }}
                     >
-                      📥 Enviar a cola
+                      Enviar a cola
                     </button>
                   </div>
                 </div>
@@ -303,7 +303,7 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
             {/* PREVIEW CONTAINER */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '1rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                {mode === 'thermal' ? '🔍 Vista Previa del Rollo 100x150mm (Corte Manual)' : '🔍 Vista Previa Plancha A4'}
+                {mode === 'thermal' ? 'Vista Previa del Rollo 100x150mm (Corte Manual)' : 'Vista Previa Plancha A4'}
               </span>
               
               <div style={{ 
@@ -312,8 +312,10 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
                 borderRadius: '16px', 
                 width: '100%', 
                 display: 'flex', 
-                justifyContent: 'center',
-                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)'
+                flexDirection: 'column',
+                alignItems: 'center',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)',
+                border: '2px solid var(--border-color)'
               }}>
                 {/* THERMAL SHEET PREVIEW (2:3 Aspect Ratio Mockup) */}
                 {mode === 'thermal' && (
@@ -588,7 +590,18 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
 
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
             <button className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>Cerrar</button>
-            <button className="btn btn-primary" onClick={handlePrint} style={{ flex: 1 }}>🖨️ Imprimir PDF (Navegador)</button>
+            {mode === 'thermal' && (
+              <button 
+                className="btn btn-primary" 
+                onClick={handlePrintDirect} 
+                style={{ flex: 2, backgroundColor: '#10b981', fontWeight: 'bold', minHeight: '48px' }}
+              >
+                Imprimir directo (Zebra)
+              </button>
+            )}
+            {mode === 'a4' && (
+              <button className="btn btn-primary" onClick={handlePrint} style={{ flex: 1 }}>Imprimir PDF (Navegador)</button>
+            )}
           </div>
         </div>
       </div>
