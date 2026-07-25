@@ -147,6 +147,11 @@ input[type="file"].form-control::file-selector-button:hover {
 }
 
 /* Date picker - consistent dark mode */
+input[type="date"],
+input[type="time"],
+input[type="number"] {
+  color-scheme: dark;
+}
 input[type="date"].form-control {
   color-scheme: dark;
 }
