@@ -819,6 +819,12 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
+        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1rem' }}>
+          {[1,2,3,4,5,6].map(s => (
+            <div key={s} style={{ flex: 1, height: '4px', borderRadius: '2px', background: s <= step ? 'var(--primary-color)' : 'rgba(255,255,255,0.1)', transition: 'background 0.3s' }} />
+          ))}
+        </div>
+
         <div style={{ display: 'grid', gap: '1.25rem', padding: '0.5rem 0' }}>
           
           {step === 1 && (
@@ -1275,7 +1281,20 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
             <div className="animate-fade-in">
               <h4 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>6. Resumen</h4>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '1.25rem', borderRadius: '12px' }}>
-                <div><strong>Tipo:</strong> {TIPOS_INOCULACION.find(t => t.id === formData.tipo_inoculacion)?.label}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <span style={{ padding: '0.3rem 0.7rem', borderRadius: '20px', fontSize: '0.8rem', background: 'var(--primary-color)', color: '#fff', fontWeight: 600 }}>
+                    {TIPOS_INOCULACION.find(t => t.id === formData.tipo_inoculacion)?.label}
+                  </span>
+                  <span style={{ padding: '0.3rem 0.7rem', borderRadius: '20px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}>
+                    {formData.cantidad_unidades} recipientes
+                  </span>
+                  {formData.es_hibridacion && (
+                    <span style={{ padding: '0.3rem 0.7rem', borderRadius: '20px', fontSize: '0.8rem', background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+                      Híbrido
+                    </span>
+                  )}
+                </div>
+
                 {formData.tipo_inoculacion !== 'aislamiento_primario' && (
                   <>
                     <div><strong style={{ color: 'var(--text-secondary)' }}>Origen:</strong> {formData.placa_origen?.nombre || formData.batch_liquido?.nombre || 'N/A'} {formData.tipo_inoculacion === 'placa_a_liquido' ? `· Fracción: ${formData.fraccion_placa}` : ''}</div>
@@ -1288,17 +1307,25 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   <div><strong style={{ color: 'var(--text-secondary)' }}>Origen:</strong> <span style={{ color: '#3b82f6' }}>Origen Cero (Aislamiento Primario)</span></div>
                 )}
 
-                <div><strong style={{ color: 'var(--text-secondary)' }}>Destino:</strong> {formData.medio_prep?.nombre} {formData.fraccion_destino ? `(Bolsa: ${formData.fraccion_destino.id_bolsa || formData.fraccion_destino.id})` : '(Bulk)'}</div>
-                <div><strong style={{ color: 'var(--text-secondary)' }}>Unidades:</strong> {formData.cantidad_unidades} recipientes</div>
+                <div><strong style={{ color: 'var(--text-secondary)' }}>Destino:</strong> {formData.medio_prep?.alias || formData.medio_prep?.nombre} {formData.fraccion_destino ? `(${formData.fraccion_destino.id_bolsa || formData.fraccion_destino.id})` : '(Bulk)'}</div>
                 {formData.tipo_inoculacion === 'hacia_sustrato' && formData.peso_humedo_unidad && (
                   <div><strong style={{ color: 'var(--text-secondary)' }}>Cantidad por unidad:</strong> {formData.peso_humedo_unidad} {formData.unidad_peso_humedo}</div>
                 )}
-                <div><strong style={{ color: 'var(--text-secondary)' }}>Sala:</strong> 📍 {formData.sala_destino?.nombre} {formData.estante ? `· ${formData.estante}` : ''}</div>
-                <div><strong style={{ color: 'var(--text-secondary)' }}>Responsable:</strong> 👤 {formData.operario} · 📅 {formData.fecha_inoculacion}</div>
-                {formData.contenedor_logico && <div><strong style={{ color: 'var(--text-secondary)' }}>Agrupación Fca:</strong> 📦 {formData.contenedor_logico}</div>}
+                <div><strong style={{ color: 'var(--text-secondary)' }}>Sala:</strong> {formData.sala_destino?.nombre} {formData.estante ? `· ${formData.estante}` : ''}</div>
+                <div><strong style={{ color: 'var(--text-secondary)' }}>Responsable:</strong> {formData.operario} · {formData.fecha_inoculacion}</div>
+                {formData.contenedor_logico && <div><strong style={{ color: 'var(--text-secondary)' }}>Agrupación Fca:</strong> {formData.contenedor_logico}</div>}
                 
                 <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                  <strong style={{ color: 'var(--text-secondary)' }}>IDs a generar ({formData.modo_id}):</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: 'var(--text-secondary)' }}>IDs a generar ({formData.modo_id}):</strong>
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(previewIds.join('\n')); toast.success('IDs copiados al portapapeles'); }}
+                      style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                    >
+                      Copiar IDs
+                    </button>
+                  </div>
                   <div style={{ fontFamily: 'monospace', color: 'var(--primary-color)', marginTop: '0.5rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--primary-color)' }}>
                     {previewIds.map((id, idx) => <div key={idx}>{id}</div>)}
                     {formData.cantidad_total > 10 && formData.modo_id === 'individual' && <div style={{ color: 'var(--text-secondary)' }}>... y {formData.cantidad_total - 10} más</div>}
