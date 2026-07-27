@@ -291,6 +291,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const mediosDestinoOptions = useMemo(() => {
     const options = [];
     allMedios.forEach(m => {
+      if (m.eliminado === true) return;
       if (formData.tipo_inoculacion === 'placa_a_placa') {
         if (m.categoria !== 'Agar') return;
       } else if (['placa_a_liquido', 'liquido_a_liquido'].includes(formData.tipo_inoculacion)) {
