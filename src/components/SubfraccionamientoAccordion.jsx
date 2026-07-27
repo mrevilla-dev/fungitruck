@@ -617,7 +617,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
     let finalTipoUnidad = tipoUnidad;
     if (!tipoUnidad) return toast.error('Seleccioná la unidad/recipiente');
     if (tipoUnidad === 'Otro') {
-      const val = otraUnidadNombre?.trim();
+      const val = otroUnidadNombre?.trim();
       if (!val) return toast.error('Especificá el tipo de unidad');
       finalTipoUnidad = val;
     }
@@ -644,8 +644,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
         batch.set(configRef, { tipos: arrayUnion(finalTipoEnvase) }, { merge: true });
       }
 
-      // Tipo de unidad
-      let finalTipoUnidad = tipoUnidad;
+      // Crear insumo_base si tipoUnidad es 'Otro'
       if (tipoUnidad === 'Otro') {
         const val = otroUnidadNombre.trim();
         if (!val) { setSaving(false); return toast.error('Especificá el tipo de unidad'); }
@@ -654,7 +653,6 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
           nombre: val, es_envase: true, categoria: 'Descartables',
           unidad_medida: 'uds.', createdAt: serverTimestamp(),
         });
-        finalTipoUnidad = val;
       }
 
       const parentId = parentBag.id_bolsa || parentBag.id;
@@ -1277,7 +1275,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
       batch.delete(bagRef);
       // Restaurar bulk
       batch.update(medioRef, {
-        'stock_bulk.cantidad_actual': cantidadActual + descuento,
+        'stock_bulk.cantidad_actual': cantidadActualUI + descuento,
         total_subfracciones: increment(-1),
         subfracciones_disponibles: wasAgotada ? increment(0) : increment(-1),
         ...(medio.estado === 'Agotado' ? { estado: 'Activo' } : {})
@@ -1407,6 +1405,25 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
     );
   };
 
+  const renderBagWithChildren = (bag, depth = 0) => {
+    const children = bags.filter(child => child.parent_id === (bag.id_bolsa || bag.id));
+    return (
+      <div key={bag.id}>
+        {renderBagCard(bag, depth > 0)}
+        {children.length > 0 && (
+          <div style={{ paddingLeft: '1.25rem', marginTop: '-0.25rem', marginBottom: '0.75rem', borderLeft: '2px solid rgba(255,255,255,0.1)', marginLeft: '1rem' }}>
+            {depth === 0 && (
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                ↳ Subfracciones extraídas:
+              </div>
+            )}
+            {children.map(child => renderBagWithChildren(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <details
       open={open}
@@ -1465,23 +1482,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
         {bags.length === 0 ? (
           <p style={{ color: 'var(--text-secondary)' }}>No hay subfracciones registradas.</p>
         ) : (
-          bags.filter(b => !b.parent_id).map(b => {
-        const children = bags.filter(child => child.parent_id === (b.id_bolsa || b.id));
-            return (
-              <div key={b.id}>
-                {renderBagCard(b, false)}
-                
-                {children.length > 0 && (
-                  <div style={{ paddingLeft: '1.25rem', marginTop: '-0.25rem', marginBottom: '0.75rem', borderLeft: '2px solid rgba(255,255,255,0.1)', marginLeft: '1rem' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                      ↳ Subfracciones extraídas:
-                    </div>
-                    {children.map(child => renderBagCard(child, true))}
-                  </div>
-                )}
-              </div>
-            );
-          })
+          bags.filter(b => !b.parent_id).map(b => renderBagWithChildren(b))
         )}
       </div>
 
