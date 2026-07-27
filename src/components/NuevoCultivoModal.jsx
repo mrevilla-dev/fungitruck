@@ -388,6 +388,23 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
     handleChange('perfil_zpl', p);
   };
 
+  const resolveBatchTargetField = (batchData) => {
+    const route = formData.tipo_inoculacion;
+    const soporte = (batchData.soporte || '').toLowerCase();
+    const tipo = (batchData.tipo_inoculacion || '').toLowerCase();
+    if (route === 'liquido_a_liquido') return { field: 'batch_liquido' };
+    if (route === 'hacia_grano' || route === 'hacia_sustrato') {
+      if (soporte.includes('placa') || tipo.includes('placa')) return { field: 'placa_origen', tipoBatch: 'placa' };
+      if (soporte.includes('líquido') || soporte.includes('liquido') || tipo.includes('líquido') || tipo.includes('liquido')) return { field: 'batch_liquido', tipoBatch: 'liquido' };
+      if (soporte.includes('grano') || soporte.includes('spawn') || tipo.includes('grano')) return { field: 'batch_grano', tipoBatch: 'grano' };
+      const current = formData.origen_grano_tipo_batch;
+      if (current === 'placa') return { field: 'placa_origen' };
+      if (current === 'liquido') return { field: 'batch_liquido' };
+      return { field: 'batch_grano' };
+    }
+    return null;
+  };
+
   const handleScanEjemplar = async (scannedId, field = 'ejemplar_fuente') => {
     const id = scannedId.trim();
     try {
@@ -434,19 +451,22 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           const opt = { id: ejeLinked.id, data: ejeData, nombre: `${ejeData.id_semantico || ejeLinked.id} · ${ejeData.especie || ''}` };
           handleChange(field, opt);
 
-          // Autocompletar placa/batch origen
+          // Autocompletar campo de origen según la ruta
           const batchOpt = {
             id: batchData.id,
             nombre: `${batchData.id} · ${batchData.fecha_inoculacion || batchData.fechaInoculacion || ''} · ${batchData.destinoNombre || batchData.sala_actual || ''}`,
             data: batchData
           };
-          if (field === 'ejemplar_fuente') {
-            handleChange('placa_origen', batchOpt);
+          const target = resolveBatchTargetField(batchData);
+          if (target) {
+            if (target.tipoBatch) handleChange('origen_grano_tipo_batch', target.tipoBatch);
+            handleChange(target.field, batchOpt);
           } else {
-            handleChange('placa_origen_2', batchOpt);
+            if (field === 'ejemplar_fuente') handleChange('placa_origen', batchOpt);
+            else handleChange('placa_origen_2', batchOpt);
           }
 
-          toast.success(`Placa y ejemplar seleccionados: ${batchData.id} → ${ejeData.id_semantico || ejeLinked.id}`);
+          toast.success(`Ejemplar y origen seleccionados: ${batchData.id} → ${ejeData.id_semantico || ejeLinked.id}`);
           return;
         }
       }
@@ -458,12 +478,15 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           nombre: `${batchData.id} · ${batchData.fecha_inoculacion || batchData.fechaInoculacion || ''} · ${batchData.destinoNombre || batchData.sala_actual || ''}`,
           data: batchData
         };
-        if (field === 'ejemplar_fuente') {
-          handleChange('placa_origen', batchOpt);
+        const target = resolveBatchTargetField(batchData);
+        if (target) {
+          if (target.tipoBatch) handleChange('origen_grano_tipo_batch', target.tipoBatch);
+          handleChange(target.field, batchOpt);
         } else {
-          handleChange('placa_origen_2', batchOpt);
+          if (field === 'ejemplar_fuente') handleChange('placa_origen', batchOpt);
+          else handleChange('placa_origen_2', batchOpt);
         }
-        toast.success(`Placa seleccionada: ${batchData.id} (sin ejemplar vinculado)`);
+        toast.success(`Origen seleccionado: ${batchData.id} (sin ejemplar vinculado)`);
         return;
       }
 
