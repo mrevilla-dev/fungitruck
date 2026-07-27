@@ -990,6 +990,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                  </div>
               )}
 
+              <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
               {(!['hacia_grano', 'hacia_sustrato'].includes(formData.tipo_inoculacion) || (['hacia_grano', 'hacia_sustrato'].includes(formData.tipo_inoculacion) && formData.origen_grano_tipo_material === 'interno')) && (
                 <div className="form-group" style={{ position: 'relative', zIndex: 1200 }}>
                   <label className="form-label">Ejemplar / Linaje Genético *</label>
@@ -1058,6 +1059,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   </div>
                 </>
               )}
+              </div>
 
               {['placa_a_liquido', 'placa_a_placa', 'aislamiento_primario'].includes(formData.tipo_inoculacion) && (
                 <>
@@ -1076,7 +1078,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
               )}
 
               {formData.es_hibridacion && (
-                <>
+                <div style={{ background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
                   <div className="form-group animate-fade-in" style={{ position: 'relative', zIndex: 1150 }}>
                     <label className="form-label" style={{ color: '#8b5cf6' }}>Ejemplar Padre 2 *</label>
                     <SearchableSelect 
@@ -1121,7 +1123,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                       </div>
                     </>
                   )}
-                </>
+                </div>
               )}
 
               {formData.tipo_inoculacion === 'placa_a_placa' && (
