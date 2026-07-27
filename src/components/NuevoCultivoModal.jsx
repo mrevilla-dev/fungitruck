@@ -1354,7 +1354,13 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   </div>
 
                   {(() => {
-                    const subs = allSubfracciones.filter(s => s.medioId === formData.medio_prep.id && s.disponible > 0);
+                    const subs = allSubfracciones.filter(s => {
+                      if (s.medioId !== formData.medio_prep.id || s.disponible <= 0) return false;
+                      if (busquedaPorEnvase && envaseSeleccionado) {
+                        return (s.tipo_unidad || '').toLowerCase().includes(envaseSeleccionado.toLowerCase());
+                      }
+                      return true;
+                    });
                     if (subs.length === 0) {
                       return (
                         <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
