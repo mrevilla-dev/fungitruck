@@ -433,14 +433,37 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           const ejeData = { id: ejeLinked.id, ...ejeLinked.data() };
           const opt = { id: ejeLinked.id, data: ejeData, nombre: `${ejeData.id_semantico || ejeLinked.id} · ${ejeData.especie || ''}` };
           handleChange(field, opt);
-          toast.success(`Placa escaneada. Ejemplar vinculado: ${ejeData.id_semantico || ejeLinked.id}`);
+
+          // Autocompletar placa/batch origen
+          const batchOpt = {
+            id: batchData.id,
+            nombre: `${batchData.id} · ${batchData.fecha_inoculacion || batchData.fechaInoculacion || ''} · ${batchData.destinoNombre || batchData.sala_actual || ''}`,
+            data: batchData
+          };
+          if (field === 'ejemplar_fuente') {
+            handleChange('placa_origen', batchOpt);
+          } else {
+            handleChange('placa_origen_2', batchOpt);
+          }
+
+          toast.success(`Placa y ejemplar seleccionados: ${batchData.id} → ${ejeData.id_semantico || ejeLinked.id}`);
           return;
         }
       }
 
-      // 6. Si encontró batch pero sin ejemplar vinculado, informar
+      // 6. Si encontró batch pero sin ejemplar vinculado, setear solo la placa
       if (batchData) {
-        toast.error(`Placa "${batchData.alias || batchData.id}" encontrada pero sin ejemplar vinculado.`);
+        const batchOpt = {
+          id: batchData.id,
+          nombre: `${batchData.id} · ${batchData.fecha_inoculacion || batchData.fechaInoculacion || ''} · ${batchData.destinoNombre || batchData.sala_actual || ''}`,
+          data: batchData
+        };
+        if (field === 'ejemplar_fuente') {
+          handleChange('placa_origen', batchOpt);
+        } else {
+          handleChange('placa_origen_2', batchOpt);
+        }
+        toast.success(`Placa seleccionada: ${batchData.id} (sin ejemplar vinculado)`);
         return;
       }
 
