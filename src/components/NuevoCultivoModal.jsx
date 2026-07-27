@@ -301,22 +301,22 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
       if (m.estado === 'Activo') {
         const bulkCant = m.stock_bulk?.cantidad_actual ?? m.cantidad_actual ?? 0;
-        options.push({
-          id: m.id,
-          nombre: `${m.alias || m.nombre_receta} (Bulk) — ${bulkCant > 0 ? `${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles` : 'Sin stock'}`,
-          type: 'bulk',
-          disabled: bulkCant <= 0,
-          data: { medio: m }
-        });
+        if (bulkCant > 0) {
+          options.push({
+            id: m.id,
+            nombre: `${m.alias || m.nombre_receta} (Bulk) — ${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles`,
+            type: 'bulk',
+            data: { medio: m }
+          });
+        }
       }
 
-      const subs = allSubfracciones.filter(s => s.medioId === m.id);
+      const subs = allSubfracciones.filter(s => s.medioId === m.id && s.disponible > 0);
       subs.forEach(s => {
         options.push({
           id: s.id,
           nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
-          disabled: s.disponible <= 0,
           data: { medio: m, sub: s }
         });
       });
@@ -355,8 +355,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
   const handleSelectMedioDestino = (valId) => {
     const selectedOption = mediosDestinoOptions.find(o => o.id === valId);
-    if (!selectedOption || selectedOption.disabled) {
-      if (selectedOption?.disabled) toast.error('Este medio no tiene stock disponible');
+    if (!selectedOption) {
       handleChange('medio_prep', null);
       handleChange('fraccion_destino', null);
       return;
@@ -392,28 +391,60 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const handleScanEjemplar = async (scannedId, field = 'ejemplar_fuente') => {
     const id = scannedId.trim();
     try {
-      const ejeDoc = await import('firebase/firestore').then(({ doc, getDoc }) =>
-        getDoc(doc(db, 'ejemplares', id))
-      );
+      // 1. Buscar directo en ejemplares (doc ID)
+      const ejeDoc = await getDoc(doc(db, 'ejemplares', id));
       if (ejeDoc.exists()) {
         const ejeData = { id: ejeDoc.id, ...ejeDoc.data() };
         const opt = { id: ejeDoc.id, data: ejeData, nombre: `${ejeData.id_semantico || ejeDoc.id} · ${ejeData.especie || ''}` };
         handleChange(field, opt);
         toast.success(`Ejemplar seleccionado: ${ejeData.id_semantico || id}`);
-      } else {
-        const q = await import('firebase/firestore').then(({ query, collection, where, getDocs }) =>
-          getDocs(query(collection(db, 'ejemplares'), where('id_semantico', '==', id)))
-        );
-        if (!q.empty) {
-          const d = q.docs[0];
-          const ejeData = { id: d.id, ...d.data() };
-          const opt = { id: d.id, data: ejeData, nombre: `${ejeData.id_semantico || d.id} · ${ejeData.especie || ''}` };
-          handleChange(field, opt);
-          toast.success(`Ejemplar seleccionado: ${ejeData.id_semantico || id}`);
-        } else {
-          toast.error(`No se encontró ejemplar: ${id}`);
+        return;
+      }
+
+      // 2. Buscar en ejemplares por id_semantico
+      const qEje = query(collection(db, 'ejemplares'), where('id_semantico', '==', id));
+      const snapEje = await getDocs(qEje);
+      if (!snapEje.empty) {
+        const d = snapEje.docs[0];
+        const ejeData = { id: d.id, ...d.data() };
+        const opt = { id: d.id, data: ejeData, nombre: `${ejeData.id_semantico || d.id} · ${ejeData.especie || ''}` };
+        handleChange(field, opt);
+        toast.success(`Ejemplar seleccionado: ${ejeData.id_semantico || id}`);
+        return;
+      }
+
+      // 3. Buscar en batches por doc ID (placas, lotes, etc.)
+      const batchDoc = await getDoc(doc(db, 'batches', id));
+      let batchData = batchDoc.exists() ? { id: batchDoc.id, ...batchDoc.data() } : null;
+
+      // 4. Si no encontró, buscar en batches por id_semantico
+      if (!batchData) {
+        const qBatch = query(collection(db, 'batches'), where('id_semantico', '==', id));
+        const snapBatch = await getDocs(qBatch);
+        if (!snapBatch.empty) {
+          batchData = { id: snapBatch.docs[0].id, ...snapBatch.docs[0].data() };
         }
       }
+
+      // 5. Si encontró batch, intentar traer el ejemplar vinculado
+      if (batchData && batchData.ejemplarId) {
+        const ejeLinked = await getDoc(doc(db, 'ejemplares', batchData.ejemplarId));
+        if (ejeLinked.exists()) {
+          const ejeData = { id: ejeLinked.id, ...ejeLinked.data() };
+          const opt = { id: ejeLinked.id, data: ejeData, nombre: `${ejeData.id_semantico || ejeLinked.id} · ${ejeData.especie || ''}` };
+          handleChange(field, opt);
+          toast.success(`Placa escaneada. Ejemplar vinculado: ${ejeData.id_semantico || ejeLinked.id}`);
+          return;
+        }
+      }
+
+      // 6. Si encontró batch pero sin ejemplar vinculado, informar
+      if (batchData) {
+        toast.error(`Placa "${batchData.alias || batchData.id}" encontrada pero sin ejemplar vinculado.`);
+        return;
+      }
+
+      toast.error(`No se encontró registro para: ${id}`);
     } catch (err) {
       toast.error('Error al buscar ejemplar escaneado');
     }
