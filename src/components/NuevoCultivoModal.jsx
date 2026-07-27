@@ -1026,67 +1026,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                 </div>
               )}
 
-              {['placa_a_liquido', 'placa_a_placa', 'aislamiento_primario'].includes(formData.tipo_inoculacion) && (
-                <div style={{ marginTop: '0.5rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input type="checkbox" id="chk_hibridacion" checked={formData.es_hibridacion} onChange={e => {
-                    handleChange('es_hibridacion', e.target.checked);
-                    if (!e.target.checked) {
-                      handleChange('ejemplar_fuente_2', null);
-                      handleChange('placa_origen_2', null);
-                    }
-                  }} style={{ width: '1.2rem', height: '1.2rem' }} />
-                  <label htmlFor="chk_hibridacion" style={{ margin: 0, cursor: 'pointer', color: 'var(--text-secondary)' }}>Hibridación (dos padres)</label>
-                </div>
-              )}
-
-              {formData.es_hibridacion && (
-                <>
-                  <div className="form-group animate-fade-in" style={{ position: 'relative', zIndex: 1150 }}>
-                    <label className="form-label" style={{ color: '#8b5cf6' }}>Segundo Ejemplar (Padre 2) *</label>
-                    <SearchableSelect 
-                      options={ejemplaresOptions} 
-                      value={formData.ejemplar_fuente_2?.id || ''} 
-                      onChange={val => handleChange('ejemplar_fuente_2', ejemplaresOptions.find(o => o.id === val))} 
-                      placeholder="-- Buscar Segundo Ejemplar --" 
-                      renderOption={renderEjemplarOption}
-                    />
-                    <ScanInput onScan={(id) => handleScanEjemplar(id, 'ejemplar_fuente_2')} label="Escanear Padre 2" />
-                  </div>
-                  <div className="form-group" style={{ position: 'relative', zIndex: 1100, marginTop: '0.5rem' }}>
-                    <label className="form-label">Placa Origen 2 *</label>
-                    <SearchableSelect 
-                      options={placaOrigenOptions2} 
-                      value={formData.placa_origen_2?.id || ''} 
-                      onChange={val => handleChange('placa_origen_2', placaOrigenOptions2.find(o => o.id === val))} 
-                      placeholder={formData.ejemplar_fuente_2 ? "-- Buscar Placa 2 --" : "-- Seleccioná segundo ejemplar primero --"} 
-                      disabled={!formData.ejemplar_fuente_2}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Fracción de la placa 2 usada *</label>
-                    <select className="form-control" value={formData.fraccion_placa_2} onChange={e => handleChange('fraccion_placa_2', e.target.value)}>
-                      <option value="1/8">1/8</option>
-                      <option value="1/4">1/4</option>
-                      <option value="1/2">1/2</option>
-                      <option value="1">1 placa entera</option>
-                      <option value="1/1 (placa entera)">1/1 (placa entera)</option>
-                      <option value="Sacabocados">Sacabocados</option>
-                      <option value="Anzada">Anzada</option>
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginTop: '0.2rem', marginBottom: '1rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 'bold' }}>
-                      <input type="checkbox" checked={formData.origen_declarado_agotado_2} onChange={e => handleChange('origen_declarado_agotado_2', e.target.checked)} style={{ width: '1.2rem', height: '1.2rem' }} />
-                      Declarar placa origen 2 como agotada
-                    </label>
-                  </div>
-                </>
-              )}
-
               {['placa_a_liquido', 'placa_a_placa'].includes(formData.tipo_inoculacion) && (
                 <>
                   <div className="form-group" style={{ position: 'relative', zIndex: 1100 }}>
-                    <label className="form-label">Placa Origen *</label>
+                    <label className="form-label">Placa Origen 1 *</label>
                     <SearchableSelect 
                       options={placaOrigenOptions} 
                       value={formData.placa_origen?.id || ''} 
@@ -1096,7 +1039,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Fracción de la placa usada *</label>
+                    <label className="form-label">Fracción de la placa 1 usada *</label>
                     <select className="form-control" value={formData.fraccion_placa} onChange={e => handleChange('fraccion_placa', e.target.value)}>
                       <option value="1/8">1/8</option>
                       <option value="1/4">1/4</option>
@@ -1110,30 +1053,95 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   <div className="form-group" style={{ marginTop: '0.2rem', marginBottom: '1rem' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 'bold' }}>
                       <input type="checkbox" checked={formData.origen_declarado_agotado} onChange={e => handleChange('origen_declarado_agotado', e.target.checked)} style={{ width: '1.2rem', height: '1.2rem' }} />
-                      Declarar placa origen como agotada
+                      Declarar placa origen 1 como agotada
                     </label>
                   </div>
+                </>
+              )}
 
-                  {formData.tipo_inoculacion === 'placa_a_placa' && (
-                    <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'rgba(139, 92, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: '600', color: '#8b5cf6' }}>
-                        <input
-                          type="checkbox"
-                          id="chk_seleccion_colonia"
-                          checked={formData.es_seleccion_colonia}
-                          onChange={e => handleChange('es_seleccion_colonia', e.target.checked)}
-                          style={{ width: '1.2rem', height: '1.2rem' }}
+              {['placa_a_liquido', 'placa_a_placa', 'aislamiento_primario'].includes(formData.tipo_inoculacion) && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--border-color)', margin: '0.5rem 0 1rem 0' }} />
+                  <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input type="checkbox" id="chk_hibridacion" checked={formData.es_hibridacion} onChange={e => {
+                      handleChange('es_hibridacion', e.target.checked);
+                      if (!e.target.checked) {
+                        handleChange('ejemplar_fuente_2', null);
+                        handleChange('placa_origen_2', null);
+                      }
+                    }} style={{ width: '1.2rem', height: '1.2rem' }} />
+                    <label htmlFor="chk_hibridacion" style={{ margin: 0, cursor: 'pointer', color: 'var(--text-secondary)' }}>Hibridación (dos padres)</label>
+                  </div>
+                </>
+              )}
+
+              {formData.es_hibridacion && (
+                <>
+                  <div className="form-group animate-fade-in" style={{ position: 'relative', zIndex: 1150 }}>
+                    <label className="form-label" style={{ color: '#8b5cf6' }}>Ejemplar Padre 2 *</label>
+                    <SearchableSelect 
+                      options={ejemplaresOptions} 
+                      value={formData.ejemplar_fuente_2?.id || ''} 
+                      onChange={val => handleChange('ejemplar_fuente_2', ejemplaresOptions.find(o => o.id === val))} 
+                      placeholder="-- Buscar Segundo Ejemplar --" 
+                      renderOption={renderEjemplarOption}
+                    />
+                    <ScanInput onScan={(id) => handleScanEjemplar(id, 'ejemplar_fuente_2')} label="Escanear Padre 2" />
+                  </div>
+
+                  {['placa_a_liquido', 'placa_a_placa'].includes(formData.tipo_inoculacion) && (
+                    <>
+                      <div className="form-group" style={{ position: 'relative', zIndex: 1100, marginTop: '0.5rem' }}>
+                        <label className="form-label">Placa Origen 2 *</label>
+                        <SearchableSelect 
+                          options={placaOrigenOptions2} 
+                          value={formData.placa_origen_2?.id || ''} 
+                          onChange={val => handleChange('placa_origen_2', placaOrigenOptions2.find(o => o.id === val))} 
+                          placeholder={formData.ejemplar_fuente_2 ? "-- Buscar Placa 2 --" : "-- Seleccioná segundo ejemplar primero --"} 
+                          disabled={!formData.ejemplar_fuente_2}
                         />
-                        🔬 Este repique implica selección de colonia (genera nuevo Ejemplar)
-                      </label>
-                      {formData.es_seleccion_colonia && (
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '1.7rem', marginTop: '0.4rem', marginBottom: 0 }}>
-                          Al confirmar, se abrirá un modal para registrar la identidad genética del nuevo Ejemplar derivado.
-                        </p>
-                      )}
-                    </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Fracción de la placa 2 usada *</label>
+                        <select className="form-control" value={formData.fraccion_placa_2} onChange={e => handleChange('fraccion_placa_2', e.target.value)}>
+                          <option value="1/8">1/8</option>
+                          <option value="1/4">1/4</option>
+                          <option value="1/2">1/2</option>
+                          <option value="1">1 placa entera</option>
+                          <option value="1/1 (placa entera)">1/1 (placa entera)</option>
+                          <option value="Sacabocados">Sacabocados</option>
+                          <option value="Anzada">Anzada</option>
+                        </select>
+                      </div>
+                      <div className="form-group" style={{ marginTop: '0.2rem', marginBottom: '1rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: 'bold' }}>
+                          <input type="checkbox" checked={formData.origen_declarado_agotado_2} onChange={e => handleChange('origen_declarado_agotado_2', e.target.checked)} style={{ width: '1.2rem', height: '1.2rem' }} />
+                          Declarar placa origen 2 como agotada
+                        </label>
+                      </div>
+                    </>
                   )}
                 </>
+              )}
+
+              {formData.tipo_inoculacion === 'placa_a_placa' && (
+                <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'rgba(139, 92, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: '600', color: '#8b5cf6' }}>
+                    <input
+                      type="checkbox"
+                      id="chk_seleccion_colonia"
+                      checked={formData.es_seleccion_colonia}
+                      onChange={e => handleChange('es_seleccion_colonia', e.target.checked)}
+                      style={{ width: '1.2rem', height: '1.2rem' }}
+                    />
+                    Este repique implica selección de colonia (genera nuevo Ejemplar)
+                  </label>
+                  {formData.es_seleccion_colonia && (
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '1.7rem', marginTop: '0.4rem', marginBottom: 0 }}>
+                      Al confirmar, se abrirá un modal para registrar la identidad genética del nuevo Ejemplar derivado.
+                    </p>
+                  )}
+                </div>
               )}
 
               {formData.tipo_inoculacion === 'liquido_a_liquido' && (
