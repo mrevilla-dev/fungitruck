@@ -1339,23 +1339,51 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                         {formData.medio_prep.categoria || 'Sin categoría'} · Stock bulk: {formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0} {formData.medio_prep.stock_bulk?.unidad || ''}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.5rem', borderRadius: '4px', color: 'var(--text-secondary)' }}>
                         {formData.medio_prep.alias || formData.medio_prep.nombre_receta || 'Medio'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowSubfraccionModal(true)}
-                        style={{ background: 'var(--accent-color)', color: '#000', border: 'none', padding: '0.3rem 0.7rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                      >
-                        + Subfraccionar
-                      </button>
-                    </div>
+                      {(() => {
+                        const bulkStock = formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0;
+                        const canSubfraccionar = bulkStock > 0;
+                        return (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setShowSubfraccionModal(true)}
+                              disabled={!canSubfraccionar}
+                              style={{ 
+                                background: canSubfraccionar ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)', 
+                                color: canSubfraccionar ? '#000' : 'var(--text-secondary)',
+                                border: 'none', 
+                                padding: '0.3rem 0.7rem', 
+                                borderRadius: '6px', 
+                                cursor: canSubfraccionar ? 'pointer' : 'not-allowed',
+                                fontSize: '0.75rem', 
+                                fontWeight: 600,
+                                opacity: canSubfraccionar ? 1 : 0.5
+                              }}
+                              title={!canSubfraccionar ? 'Sin stock bulk para subfraccionar' : ''}
+                            >
+                              + Subfraccionar
+                            </button>
+                            {!canSubfraccionar && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                                (Sin stock bulk)
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
+                      </div>
                   </div>
 
                   {(() => {
                     const subs = allSubfracciones.filter(s => {
                       if (s.medioId !== formData.medio_prep.id || s.disponible <= 0) return false;
+                      if (formData.fraccion_destino) {
+                        return s.id === formData.fraccion_destino.id;
+                      }
                       if (busquedaPorEnvase && envaseSeleccionado) {
                         return (s.tipo_unidad || '').toLowerCase().includes(envaseSeleccionado.toLowerCase());
                       }
@@ -1364,7 +1392,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                     if (subs.length === 0) {
                       return (
                         <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
-                          No hay subfracciones disponibles para este medio
+                          {formData.fraccion_destino 
+                            ? `Subfracción seleccionada: ${formData.fraccion_destino.id_bolsa || formData.fraccion_destino.id}`
+                            : 'No hay subfracciones disponibles para este medio'
+                          }
                         </div>
                       );
                     }
