@@ -91,6 +91,8 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const [nextSeqDiaria, setNextSeqDiaria] = useState(1);
   const [nextContadorHib, setNextContadorHib] = useState(1);
   const [showSubfraccionModal, setShowSubfraccionModal] = useState(false);
+  const [busquedaPorEnvase, setBusquedaPorEnvase] = useState(false);
+  const [envaseSeleccionado, setEnvaseSeleccionado] = useState('');
   const [subfracTipo, setSubfracTipo] = useState('Bolsa');
   const [subfracCantidad, setSubfracCantidad] = useState('');
   const [subfracSaving, setSubfracSaving] = useState(false);
@@ -300,6 +302,24 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
         if (m.categoria !== 'Semilla') return;
       }
 
+      if (busquedaPorEnvase && envaseSeleccionado) {
+        const subfraccionesConEnvase = allSubfracciones.filter(s => 
+          s.medioId === m.id && 
+          s.disponible > 0 &&
+          (s.tipo_unidad || '').toLowerCase().includes(envaseSeleccionado.toLowerCase())
+        );
+        if (subfraccionesConEnvase.length === 0) return;
+        subfraccionesConEnvase.forEach(s => {
+          options.push({
+            id: s.id,
+            nombre: `${s.id_bolsa} · ${s.tipo_unidad} — ${s.disponible}/${s.cantidad} disp.`,
+            type: 'sub',
+            data: { medio: m, sub: s }
+          });
+        });
+        return;
+      }
+
       if (m.estado === 'Activo') {
         const bulkCant = m.stock_bulk?.cantidad_actual ?? m.cantidad_actual ?? 0;
         if (bulkCant > 0) {
@@ -323,7 +343,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       });
     });
     return options;
-  }, [allMedios, allSubfracciones]);
+  }, [allMedios, allSubfracciones, formData.tipo_inoculacion, busquedaPorEnvase, envaseSeleccionado]);
 
   const salasOptions = salas.map(s => ({
     id: s.id,
@@ -1257,13 +1277,53 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           {step === 3 && (
             <div className="animate-fade-in">
               <h4 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>3. Medio Destino</h4>
+
+              {/* Toggle: Buscar por medio o por envase */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={busquedaPorEnvase} 
+                    onChange={(e) => {
+                      setBusquedaPorEnvase(e.target.checked);
+                      setEnvaseSeleccionado('');
+                    }} 
+                    style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                  />
+                  Buscar por tipo de envase
+                </label>
+              </div>
+
+              {/* Selector de envase (solo si busquedaPorEnvase es true) */}
+              {busquedaPorEnvase && (
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Tipo de Envase Destino</label>
+                  <select 
+                    className="form-control" 
+                    value={envaseSeleccionado} 
+                    onChange={(e) => setEnvaseSeleccionado(e.target.value)}
+                  >
+                    <option value="">-- Seleccionar envase --</option>
+                    <option value="Placa Petri">Placa Petri</option>
+                    <option value="Placa">Placa (cualquier tamaño)</option>
+                    <option value="Tubo Falcon 15ml">Tubo Falcon 15ml</option>
+                    <option value="Tubo">Tubo (cualquier tamaño)</option>
+                    <option value="Eppendorf">Eppendorf / Microtubo</option>
+                    <option value="Frasco">Frasco (cualquier tamaño)</option>
+                    <option value="Frasco de 500ml">Frasco de 500ml</option>
+                    <option value="Bolsa">Bolsa</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Dropdown de medios */}
               <div className="form-group">
                 <label className="form-label">Medio Preparado o Subfracción *</label>
                 <SearchableSelect 
                   options={mediosDestinoOptions} 
                   value={formData.fraccion_destino ? formData.fraccion_destino.id : (formData.medio_prep ? formData.medio_prep.id : '')} 
                   onChange={handleSelectMedioDestino} 
-                  placeholder="-- Buscar Medio Disponible --" 
+                  placeholder={busquedaPorEnvase ? "-- Buscar Medio por Envase --" : "-- Buscar Medio Disponible --"} 
                 />
                 <div style={{ marginTop: '0.5rem' }}>
                   <ScanInput onScan={handleScanMedio} label="Escanear Medio" />
