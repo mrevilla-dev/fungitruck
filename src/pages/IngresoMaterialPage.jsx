@@ -10,6 +10,34 @@ import PrintLabelsModal from '../components/PrintLabelsModal';
 import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 
+const TIPOS_MATERIAL = [
+  { id: 'sello_esporas', label: 'Sello de Esporas' },
+  { id: 'explanto', label: 'Explanto de Tejido' },
+  { id: 'micelio', label: 'Micelio' },
+  { id: 'grano', label: 'Grano Colonizado' },
+  { id: 'liquido', label: 'Cultivo Líquido' },
+];
+
+const TECNICAS_AISLAMIENTO = [
+  { id: 'aislamiento_primario', label: 'Aislamiento Primario (Origen Cero)' },
+  { id: 'explanto_estipite', label: 'Explanto de Estípite' },
+  { id: 'explanto_pileo', label: 'Explanto de Pileo' },
+  { id: 'transferencia', label: 'Transferencia Aséptica' },
+  { id: 'germinacion', label: 'Germinación de Esporas' },
+];
+
+const PLOIDIAS = [
+  { id: 'haploide', label: 'Haploide' },
+  { id: 'diploide', label: 'Diploide' },
+  { id: 'desconocido', label: 'Desconocido' },
+];
+
+const TIPOS_MICELIO = [
+  { id: 'dicarion', label: 'Dicarión' },
+  { id: 'monocarion', label: 'Monocarión' },
+  { id: 'polisporico', label: 'Polispórico' },
+];
+
 function extraerCodigoMedio(alias) {
   if (!alias) return 'MED';
   const partes = alias.split(' ');
@@ -118,13 +146,15 @@ export default function IngresoMaterialPage() {
       {
         id: Date.now() + Math.random(),
         tipo_derivacion: tipo,
-        ploidia: 'Diploide',
-        tipo_micelio: 'Dicarión',
-        tipo_material: tipo === 'seca' ? 'Sello de Esporas' : 'Explanto',
+        ploidia: tipo === 'seca' ? 'haploide' : 'diploide',
+        tipo_micelio: tipo === 'seca' ? 'polisporico' : 'dicarion',
+        tipo_material: tipo === 'seca' ? 'sello_esporas' : 'explanto',
+        tecnica: tipo === 'humeda' ? 'aislamiento_primario' : '',
         medio_prep_id: null,
         sala_destino_id: null,
         temperatura: '',
-        tecnica: tipo === 'humeda' ? 'aislamiento_primario' : ''
+        observaciones: '',
+        foto: null
       }
     ]);
   };
@@ -205,6 +235,17 @@ export default function IngresoMaterialPage() {
       return toast.error("Completá los campos obligatorios.");
     }
     
+    for (const deriv of derivaciones) {
+      if (!deriv.tipo_material) {
+        setLoading(false);
+        return toast.error('Todas las derivaciones deben tener Tipo de Material');
+      }
+      if (deriv.tipo_derivacion === 'humeda' && !deriv.tecnica) {
+        setLoading(false);
+        return toast.error('Las derivaciones húmedas deben tener Técnica de Aislamiento');
+      }
+    }
+    
     setErrors({});
     setLoading(true);
     try {
@@ -269,11 +310,22 @@ export default function IngresoMaterialPage() {
 
         let resText = `🍄 Esporoma ${esporomaId} registrado.\n\n`;
         let currentBatchSeq = seqBatch;
+        let derivIdx = 0;
 
-        derivaciones.forEach((deriv, i) => {
+        for (const deriv of derivaciones) {
+          let derivacionFotoUrl = null;
+          if (deriv.foto) {
+            try {
+              const res = await uploadFileToDrive(deriv.foto);
+              derivacionFotoUrl = res.imageUrl || res.url;
+            } catch (err) {
+              console.error('Error subiendo foto de derivación:', err);
+            }
+          }
+
           const ejemplarId = generarIdEjemplar({
             genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
-            tipo_micelio_codigo: deriv.tipo_micelio, fecha_iso: formValues.fecha, secuencia: seqEsp + i
+            tipo_micelio_codigo: deriv.tipo_micelio, fecha_iso: formValues.fecha, secuencia: seqEsp + derivIdx
           });
 
           wb.set(doc(db, 'ejemplares', ejemplarId), {
@@ -288,7 +340,10 @@ export default function IngresoMaterialPage() {
             operator: authName,
             estado: 'Activo',
             createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
+            tecnica: deriv.tecnica || null,
+            observaciones_derivacion: deriv.observaciones || null,
+            foto_derivacion: derivacionFotoUrl
           });
           
           if (deriv.tipo_derivacion === 'seca') {
@@ -298,7 +353,7 @@ export default function IngresoMaterialPage() {
           if (deriv.tipo_derivacion === 'humeda') {
             const eventoId = generarIdEvento({
               genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
-              tecnica_codigo: deriv.tecnica, fecha_iso: formValues.fecha, secuencia: seqEsp + i
+              tecnica_codigo: deriv.tecnica, fecha_iso: formValues.fecha, secuencia: seqEsp + derivIdx
             });
 
             wb.set(doc(db, 'eventos_aislamiento', eventoId), {
@@ -360,7 +415,9 @@ export default function IngresoMaterialPage() {
             resText += `✅ Ejemplar (Húmedo): ${ejemplarId} → Batch: ${batchId}\n`;
             currentBatchSeq++;
           }
-        });
+
+          derivIdx++;
+        }
 
         await wb.commit();
         toast(resText);
@@ -835,16 +892,35 @@ export default function IngresoMaterialPage() {
 
               <div className="grid-2">
                 <div className="form-group">
-                  <label className="form-label">Tipo de Material</label>
-                  <input type="text" className="form-control" value={d.tipo_material} onChange={e => updateDerivacion(d.id, 'tipo_material', e.target.value)} />
+                  <label className="form-label">Tipo de Material *</label>
+                  <select className="form-control" value={d.tipo_material} onChange={e => updateDerivacion(d.id, 'tipo_material', e.target.value)}>
+                    {TIPOS_MATERIAL.map(tm => (
+                      <option key={tm.id} value={tm.id}>{tm.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Tipo de Micelio</label>
                   <select className="form-control" value={d.tipo_micelio} onChange={e => updateDerivacion(d.id, 'tipo_micelio', e.target.value)}>
-                    <option value="Dicarión">Dicarión</option>
-                    <option value="Monocarión">Monocarión</option>
-                    <option value="Polispórico">Polispórico</option>
+                    {TIPOS_MICELIO.map(tm => (
+                      <option key={tm.id} value={tm.id}>{tm.label}</option>
+                    ))}
                   </select>
+                </div>
+              </div>
+
+              <div className="grid-2" style={{ marginTop: '0.5rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Ploidía *</label>
+                  <select className="form-control" value={d.ploidia} onChange={e => updateDerivacion(d.id, 'ploidia', e.target.value)}>
+                    {PLOIDIAS.map(p => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Temperatura Incubación</label>
+                  <input type="text" className="form-control" value={d.temperatura} onChange={e => updateDerivacion(d.id, 'temperatura', e.target.value)} />
                 </div>
               </div>
 
@@ -869,15 +945,28 @@ export default function IngresoMaterialPage() {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Técnica Aislamiento</label>
-                    <input type="text" className="form-control" placeholder="Ej: Explanto de estípite" value={d.tecnica} onChange={e => updateDerivacion(d.id, 'tecnica', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Temperatura Incubación</label>
-                    <input type="text" className="form-control" value={d.temperatura} onChange={e => updateDerivacion(d.id, 'temperatura', e.target.value)} />
+                    <label className="form-label">Técnica de Aislamiento *</label>
+                    <select className="form-control" value={d.tecnica} onChange={e => updateDerivacion(d.id, 'tecnica', e.target.value)}>
+                      <option value="">-- Seleccionar --</option>
+                      {TECNICAS_AISLAMIENTO.map(ta => (
+                        <option key={ta.id} value={ta.id}>{ta.label}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}
+
+              <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                <label className="form-label">Observaciones</label>
+                <textarea className="form-control" rows="2" value={d.observaciones || ''} onChange={e => updateDerivacion(d.id, 'observaciones', e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                <label className="form-label">Foto de evidencia</label>
+                <input type="file" accept="image/*" className="form-control" onChange={e => updateDerivacion(d.id, 'foto', e.target.files[0])} />
+                {d.foto && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#10b981' }}>✅ {d.foto.name}</div>
+                )}
+              </div>
             </div>
           ))
         )}
