@@ -1327,13 +1327,29 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
               )}
 
               {/* Dropdown de medios */}
-              <div className="form-group">
+              <div className="form-group" style={{ position: 'relative', zIndex: 1000 }}>
                 <label className="form-label">Medio Preparado o Subfracción *</label>
                 <SearchableSelect 
                   options={mediosDestinoOptions} 
                   value={formData.fraccion_destino ? formData.fraccion_destino.id : (formData.medio_prep ? formData.medio_prep.id : '')} 
                   onChange={handleSelectMedioDestino} 
-                  placeholder={busquedaPorEnvase ? "-- Buscar Medio por Envase --" : "-- Buscar Medio Disponible --"} 
+                  placeholder={busquedaPorEnvase ? "-- Buscar Medio por Envase --" : "-- Buscar Medio Disponible --"}
+                  renderOption={(opt) => (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        {opt.data.medio.alias || opt.data.medio.nombre_receta}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                        {opt.type === 'sub' ? `↳ ${opt.data.sub.id_bolsa} · ${opt.data.sub.tipo_unidad}` : '(Bulk)'}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: opt.data.sub?.disponible > 0 ? 'var(--accent-color)' : 'var(--text-secondary)' }}>
+                        {opt.type === 'sub' 
+                          ? `${opt.data.sub.disponible}/${opt.data.sub.cantidad} disp. ${opt.data.sub.volumen_por_unidad_ml ? `· ${opt.data.sub.volumen_por_unidad_ml} ml/u` : ''}`
+                          : `${opt.data.medio.stock_bulk?.cantidad_actual || 0} ${opt.data.medio.stock_bulk?.unidad || 'ml'} disponibles`
+                        }
+                      </div>
+                    </div>
+                  )}
                 />
                 <div style={{ marginTop: '0.5rem' }}>
                   <ScanInput onScan={handleScanMedio} label="Escanear Medio" />
