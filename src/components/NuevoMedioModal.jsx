@@ -532,7 +532,24 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           transaction.update(update.ref, update.data);
         }
 
-        // 2. Crear Lotes de Medios Preparados y Auditorías
+        // 2. Calcular próximo número de lote
+        let loteNumber = 1;
+        if (!isExperimental) {
+          const q = query(
+            collection(db, 'medios_preparados'),
+            where('recetaId', '==', formData.recetaId)
+          );
+          const snap = await getDocs(q);
+          const loteNumbers = snap.docs
+            .map(d => {
+              const match = d.data().alias?.match(/Lote\s+(\d+)/i);
+              return match ? parseInt(match[1], 10) : 0;
+            })
+            .filter(n => n > 0);
+          loteNumber = loteNumbers.length > 0 ? Math.max(...loteNumbers) + 1 : 1;
+        }
+
+        // 3. Crear Lotes de Medios Preparados y Auditorías
         const experimentId = isExperimental ? `EXP-${Date.now()}` : null;
         
         for (let i = 0; i < itemsToCreate; i++) {
@@ -540,7 +557,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           const variableValue = isExperimental ? variableValoresArr[i % variableValoresArr.length] : null;
           const alias = isExperimental
             ? `${formData.prefix_alias}-P${i + 1}`
-            : `${receta.nombre} Lote ${i + 1}`;
+            : `${receta.nombre} Lote ${loteNumber + i}`;
 
           const totalSubFracUnits = envasesList.reduce((acc, env) => 
             acc + env.sub_fraccionamientos.reduce((sum, sf) => sum + sf.cantidad, 0)
