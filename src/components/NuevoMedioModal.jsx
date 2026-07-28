@@ -632,8 +632,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             },
             advertencias_stock: advertenciasStock,
             observaciones: formData.observaciones || '',
-            total_subfracciones: envasesList.length,
-            subfracciones_disponibles: envasesList.length,
+            total_subfracciones: envasesList.reduce((acc, env) => acc + 1 + (env.sub_fraccionamientos?.length || 0), 0),
+            subfracciones_disponibles: envasesList.reduce((acc, env) => acc + 1 + (env.sub_fraccionamientos?.length || 0), 0),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           };
@@ -649,11 +649,14 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             batchesData.push(data);
           } else {
             const codigoMedio = extraerCodigoMedio(alias);
-            envasesList.forEach((env, index) => {
-              const sfRef = doc(collection(db, `medios_preparados/${newMedioRef.id}/subfracciones`));
-              const bagId = buildBagId(codigoMedio, index);
-              const bagData = {
-                id_bolsa: bagId,
+            let subFracGlobalIndex = 0;
+            
+            envasesList.forEach((env) => {
+              const envaseRef = doc(collection(db, `medios_preparados/${newMedioRef.id}/subfracciones`));
+              const envaseBagId = buildBagId(codigoMedio, subFracGlobalIndex);
+              
+              const envaseData = {
+                id_bolsa: envaseBagId,
                 tipo_envase: 'Envase Principal',
                 tipo_unidad: env.recipienteNombre || 'Desconocido',
                 cantidad: 1,
@@ -667,20 +670,59 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                 novedades: [],
                 createdAt: serverTimestamp()
               };
-              transaction.set(sfRef, bagData);
-              
+              transaction.set(envaseRef, envaseData);
+              subFracGlobalIndex++;
+
               batchesData.push({
-                id: bagData.id_bolsa,
-                alias: bagData.id_bolsa,
+                id: envaseData.id_bolsa,
+                alias: envaseData.id_bolsa,
                 nombre_receta: receta.nombre,
-                nombre_insumo: `${bagData.tipo_envase} de ${receta.nombre}`,
-                tipo_envase: bagData.tipo_envase,
-                tipo_unidad: bagData.tipo_unidad,
-                fecha: bagData.fecha,
+                nombre_insumo: `${envaseData.tipo_envase} de ${receta.nombre}`,
+                tipo_envase: envaseData.tipo_envase,
+                tipo_unidad: envaseData.tipo_unidad,
+                fecha: envaseData.fecha,
                 lote: data.alias,
-                ubicacion: bagData.ubicacion,
-                operador: bagData.operario,
-                especie: bagData.tipo_unidad
+                ubicacion: envaseData.ubicacion,
+                operador: envaseData.operario,
+                especie: envaseData.tipo_unidad
+              });
+
+              env.sub_fraccionamientos.forEach((sf) => {
+                const sfRef = doc(collection(db, `medios_preparados/${newMedioRef.id}/subfracciones`));
+                const sfBagId = buildBagId(codigoMedio, subFracGlobalIndex);
+                
+                const sfData = {
+                  id_bolsa: sfBagId,
+                  parent_id: envaseBagId,
+                  tipo_envase: 'Bolsa',
+                  tipo_unidad: sf.recipienteNombre || 'Fraccionamiento',
+                  cantidad: sf.cantidad,
+                  disponible: sf.cantidad,
+                  volumen_por_unidad_ml: sf.volumen_unidad,
+                  ubicacion: env.ubicacion || formData.ubicacion || '',
+                  ubicacion_detalle: env.ubicacion_detalle || formData.ubicacion_detalle || '',
+                  fecha: formData.fecha_preparacion,
+                  operario: formData.operario || 'Sistema',
+                  estado: 'Disponible',
+                  novedades: [],
+                  createdAt: serverTimestamp()
+                };
+                transaction.set(sfRef, sfData);
+                subFracGlobalIndex++;
+
+                batchesData.push({
+                  id: sfData.id_bolsa,
+                  alias: sfData.id_bolsa,
+                  nombre_receta: receta.nombre,
+                  nombre_insumo: `${sfData.tipo_envase} de ${receta.nombre}`,
+                  tipo_envase: sfData.tipo_envase,
+                  tipo_unidad: sfData.tipo_unidad,
+                  fecha: sfData.fecha,
+                  lote: data.alias,
+                  ubicacion: sfData.ubicacion,
+                  operador: sfData.operario,
+                  especie: sfData.tipo_unidad
+                });
               });
             });
           }
