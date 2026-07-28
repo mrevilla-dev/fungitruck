@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -48,7 +47,6 @@ function extraerCodigoMedio(alias) {
 }
 
 export default function IngresoMaterialPage() {
-  const navigate = useNavigate();
   const [ruta, setRuta] = useState(null); // 'A' or 'B'
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -210,11 +208,11 @@ export default function IngresoMaterialPage() {
     let tipo_m = '';
     let ploid = '';
     if (formato === 'Sello de esporas' || formato === 'Jeringa de esporas') {
-      tipo_m = 'Polispórico';
-      ploid = 'Haploide';
+      tipo_m = 'polisporico';
+      ploid = 'haploide';
     } else if (formato) {
-      tipo_m = 'Dicarión';
-      ploid = 'Diploide';
+      tipo_m = 'dicarion';
+      ploid = 'diploide';
     }
     setFormB({ ...formB, formato_recepcion: formato, tipo_micelio: tipo_m, ploidia: ploid });
   };
@@ -769,18 +767,18 @@ export default function IngresoMaterialPage() {
               <label className="form-label">Tipo de Micelio</label>
               <select className="form-control" value={formB.tipo_micelio} onChange={e => setFormB({...formB, tipo_micelio: e.target.value})}>
                 <option value="">-- Seleccionar --</option>
-                <option value="Dicarión">Dicarión</option>
-                <option value="Monocarión">Monocarión</option>
-                <option value="Polispórico">Polispórico</option>
+                {TIPOS_MICELIO.map(tm => (
+                  <option key={tm.id} value={tm.id}>{tm.label}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Ploidía</label>
               <select className="form-control" value={formB.ploidia} onChange={e => setFormB({...formB, ploidia: e.target.value})}>
                 <option value="">-- Seleccionar --</option>
-                <option value="Diploide">Diploide</option>
-                <option value="Haploide">Haploide</option>
-                <option value="Desconocido">Desconocido</option>
+                {PLOIDIAS.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
               </select>
             </div>
           </div>
