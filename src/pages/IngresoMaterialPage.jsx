@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdEsporoma, generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
@@ -54,8 +54,9 @@ export default function IngresoMaterialPage() {
     ploidia: ""
   });
 
-  const [foto, setFoto] = useState(null);
-  const [certificado, setCertificado] = useState(null);
+  const [fotos, setFotos] = useState([]);
+  const [certificados, setCertificados] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [derivaciones, setDerivaciones] = useState([]); // Solo para Ruta A
   const [errors, setErrors] = useState({});
 
@@ -133,6 +134,24 @@ export default function IngresoMaterialPage() {
     setDerivaciones(derivaciones.filter(d => d.id !== id));
   };
 
+  const MAX_TOTAL_SIZE = 50 * 1024 * 1024;
+
+  const handleAddFotos = (files) => {
+    const newFiles = Array.from(files);
+    const totalSize = [...fotos, ...newFiles].reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE) return toast.error('El total de imágenes no puede superar 50MB');
+    setFotos(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveFoto = (index) => setFotos(prev => prev.filter((_, i) => i !== index));
+
+  const handleAddCertificados = (files) => {
+    const newFiles = Array.from(files);
+    setCertificados(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveCertificado = (index) => setCertificados(prev => prev.filter((_, i) => i !== index));
+
   // Helper para resetear
   const resetForm = () => {
     setFormA({
@@ -148,8 +167,9 @@ export default function IngresoMaterialPage() {
       tipo_micelio: "", ploidia: ""
     });
     setDerivaciones([]);
-    setFoto(null);
-    setCertificado(null);
+    setFotos([]);
+    setCertificados([]);
+    setUploadingImages(false);
     setUploadProgress(0);
   };
 
@@ -212,13 +232,15 @@ export default function IngresoMaterialPage() {
         });
 
         let fotoUrl = null;
-        if (foto) {
-          let fileToUpload = foto;
-          if (foto.size > 1024 * 1024 * 8) {
-            try { fileToUpload = await compressImage(foto, { maxWidth: 4000, quality: 0.9 }); } catch(e){}
+        const fotosUrls = [];
+        if (fotos.length > 0) {
+          let fileToUpload = fotos[0];
+          if (fotos[0].size > 1024 * 1024 * 8) {
+            try { fileToUpload = await compressImage(fotos[0], { maxWidth: 4000, quality: 0.9 }); } catch(e){}
           }
           const res = await uploadFileToDrive(fileToUpload, setUploadProgress);
-          fotoUrl = res.url;
+          fotoUrl = res.imageUrl || res.url;
+          fotosUrls.push(fotoUrl);
         }
 
         const wb = writeBatch(db);
@@ -336,6 +358,32 @@ export default function IngresoMaterialPage() {
 
         await wb.commit();
         toast(resText);
+
+        if (fotos.length > 1) {
+          setUploadingImages(true);
+          const nuevasFotosUrls = [];
+          try {
+            for (let i = 1; i < fotos.length; i++) {
+              let fileToUpload = fotos[i];
+              if (fotos[i].size > 1024 * 1024 * 8) {
+                try { fileToUpload = await compressImage(fotos[i], { maxWidth: 4000, quality: 0.9 }); } catch(e){}
+              }
+              const res = await uploadFileToDrive(fileToUpload);
+              nuevasFotosUrls.push(res.imageUrl || res.url);
+            }
+            if (nuevasFotosUrls.length > 0) {
+              await updateDoc(doc(db, 'esporomas', esporomaId), {
+                fotos_urls: [...fotosUrls, ...nuevasFotosUrls]
+              });
+              toast.success(`${nuevasFotosUrls.length} imágenes adicionales subidas en segundo plano`);
+            }
+          } catch (err) {
+            console.error('Error en upload segundo plano:', err);
+            toast.error('Algunas imágenes no pudieron subirse. Reintentá desde el registro.');
+          } finally {
+            setUploadingImages(false);
+          }
+        }
       } else {
         // LÓGICA RUTA B (SOLO EJEMPLAR)
         const datePart = formValues.fecha.replace(/-/g, '').slice(2);
@@ -358,19 +406,23 @@ export default function IngresoMaterialPage() {
         });
 
         let fotoUrl = null;
-        if (foto) {
-          let fileToUpload = foto;
-          if (foto.size > 1024 * 1024 * 8) {
-            try { fileToUpload = await compressImage(foto, { maxWidth: 4000, quality: 0.9 }); } catch(e){}
+        const fotosUrls = [];
+        if (fotos.length > 0) {
+          let fileToUpload = fotos[0];
+          if (fotos[0].size > 1024 * 1024 * 8) {
+            try { fileToUpload = await compressImage(fotos[0], { maxWidth: 4000, quality: 0.9 }); } catch(e){}
           }
           const res = await uploadFileToDrive(fileToUpload, setUploadProgress);
-          fotoUrl = res.url;
+          fotoUrl = res.imageUrl || res.url;
+          fotosUrls.push(fotoUrl);
         }
 
         let certificadoUrl = null;
-        if (certificado) {
-          const resCert = await uploadFileToDrive(certificado, setUploadProgress);
-          certificadoUrl = resCert.url;
+        const certificadosUrls = [];
+        if (certificados.length > 0) {
+          const resCert = await uploadFileToDrive(certificados[0], setUploadProgress);
+          certificadoUrl = resCert.imageUrl || resCert.url;
+          certificadosUrls.push(certificadoUrl);
         }
 
         const wb = writeBatch(db);
@@ -401,6 +453,38 @@ export default function IngresoMaterialPage() {
 
         await wb.commit();
         toast.success(`Ejemplar externo registrado con éxito: ${ejemplarId} (${formValues.formato_recepcion})`);
+
+        if (fotos.length > 1 || certificados.length > 1) {
+          setUploadingImages(true);
+          const nuevasFotosUrls = [];
+          const nuevosCertUrls = [];
+          try {
+            for (let i = 1; i < fotos.length; i++) {
+              let fileToUpload = fotos[i];
+              if (fotos[i].size > 1024 * 1024 * 8) {
+                try { fileToUpload = await compressImage(fotos[i], { maxWidth: 4000, quality: 0.9 }); } catch(e){}
+              }
+              const res = await uploadFileToDrive(fileToUpload);
+              nuevasFotosUrls.push(res.imageUrl || res.url);
+            }
+            for (let i = 1; i < certificados.length; i++) {
+              const res = await uploadFileToDrive(certificados[i]);
+              nuevosCertUrls.push(res.imageUrl || res.url);
+            }
+            const updateData = {};
+            if (nuevasFotosUrls.length > 0) updateData.fotos_urls = [...fotosUrls, ...nuevasFotosUrls];
+            if (nuevosCertUrls.length > 0) updateData.certificados_urls = [...certificadosUrls, ...nuevosCertUrls];
+            if (Object.keys(updateData).length > 0) {
+              await updateDoc(doc(db, 'ejemplares', ejemplarId), updateData);
+              toast.success(`${(nuevasFotosUrls.length + nuevosCertUrls.length)} archivos subidos en segundo plano`);
+            }
+          } catch (err) {
+            console.error('Error en upload segundo plano:', err);
+            toast.error('Algunos archivos no pudieron subirse.');
+          } finally {
+            setUploadingImages(false);
+          }
+        }
       }
       
       resetForm();
@@ -531,8 +615,18 @@ export default function IngresoMaterialPage() {
           )}
 
           <div className="form-group">
-            <label className="form-label">Foto del ejemplar</label>
-            <input type="file" accept="image/*" className="form-control" onChange={e => setFoto(e.target.files[0])} />
+            <label className="form-label">Fotos del ejemplar (múltiples, máx 50MB total)</label>
+            <input type="file" accept="image/*" multiple className="form-control" onChange={e => handleAddFotos(e.target.files)} />
+            {fotos.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                {fotos.map((f, i) => (
+                  <div key={i} style={{ position: 'relative', width: '80px', height: '80px' }}>
+                    <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
+                    <button type="button" onClick={() => handleRemoveFoto(i)} style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '0.7rem', lineHeight: '20px', textAlign: 'center' }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -635,13 +729,33 @@ export default function IngresoMaterialPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Foto de Recepción</label>
-            <input type="file" accept="image/*" className="form-control" onChange={e => setFoto(e.target.files[0])} />
+            <label className="form-label">Fotos de Recepción (múltiples, máx 50MB total)</label>
+            <input type="file" accept="image/*" multiple className="form-control" onChange={e => handleAddFotos(e.target.files)} />
+            {fotos.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                {fotos.map((f, i) => (
+                  <div key={i} style={{ position: 'relative', width: '80px', height: '80px' }}>
+                    <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
+                    <button type="button" onClick={() => handleRemoveFoto(i)} style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '0.7rem', lineHeight: '20px', textAlign: 'center' }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
-            <label className="form-label">Certificado / Ficha Técnica (Opcional)</label>
-            <input type="file" className="form-control" onChange={e => setCertificado(e.target.files[0])} />
+            <label className="form-label">Certificados / Fichas Técnicas (múltiples)</label>
+            <input type="file" multiple className="form-control" onChange={e => handleAddCertificados(e.target.files)} />
+            {certificados.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                {certificados.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
+                    <span style={{ fontSize: '0.8rem' }}>📄 {c.name}</span>
+                    <button type="button" onClick={() => handleRemoveCertificado(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -752,6 +866,11 @@ export default function IngresoMaterialPage() {
         <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', marginTop: '1.5rem' }} disabled={loading}>
           {loading ? 'Guardando Transacción...' : '💾 Registrar Ingreso Completo'}
         </button>
+        {uploadingImages && (
+          <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--accent-color)', textAlign: 'center' }}>
+            🔄 Subiendo imágenes adicionales en segundo plano...
+          </div>
+        )}
       </>
     );
   }
