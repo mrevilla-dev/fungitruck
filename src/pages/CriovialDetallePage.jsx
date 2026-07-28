@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCriovialById, registrarMovimientoCriovial } from '../services/criobancService';
+import PrintLabelsModal from '../components/PrintLabelsModal';
 import toast from 'react-hot-toast';
 
 const ESTADO_CONFIG = {
@@ -19,6 +20,7 @@ export default function CriovialDetallePage() {
 
   // Modal de movimiento state
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const [movData, setMovData] = useState({
     modo: 'rack', // o 'libre'
     equipo: '',
@@ -117,7 +119,7 @@ export default function CriovialDetallePage() {
         </div>
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn btn-outline" onClick={() => window.print()} title="Imprime la pantalla completa o usa el modal global si estuviera conectado">
+          <button className="btn btn-outline" onClick={() => setShowPrintModal(true)} title="Abre el modal de impresión de etiquetas ZPL">
             🖨️ Imprimir Etiqueta
           </button>
         </div>
@@ -355,6 +357,24 @@ export default function CriovialDetallePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showPrintModal && (
+        <PrintLabelsModal
+          batches={[{
+            id: criovial.id,
+            alias: `${criovial.genero} ${criovial.especie}`.trim(),
+            especie: `${criovial.genero} ${criovial.especie}`.trim(),
+            fecha: criovial.fecha || new Date().toISOString().split('T')[0],
+            operario: criovial.operario || 'Sistema',
+            nombre_receta: criovial.medio || 'Medio de Criopreservación',
+            tipo_uso: 'Criovial',
+            tipo_etiqueta: 'MICRO_TUBOS',
+            tipo_inoculacion: 'criopreservacion'
+          }]}
+          usuarioActivo={criovial.operario || 'Sistema'}
+          onClose={() => setShowPrintModal(false)}
+        />
       )}
     </div>
   );
