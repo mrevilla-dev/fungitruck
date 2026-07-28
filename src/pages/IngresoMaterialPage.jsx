@@ -6,6 +6,7 @@ import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdEsporoma, generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
 import SearchableSelect from '../components/SearchableSelect';
+import PrintLabelsModal from '../components/PrintLabelsModal';
 import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 
@@ -57,6 +58,8 @@ export default function IngresoMaterialPage() {
   const [fotos, setFotos] = useState([]);
   const [certificados, setCertificados] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [imprimirEtiqueta, setImprimirEtiqueta] = useState(false);
+  const [batchesToPrint, setBatchesToPrint] = useState(null);
   const [derivaciones, setDerivaciones] = useState([]); // Solo para Ruta A
   const [errors, setErrors] = useState({});
 
@@ -189,6 +192,7 @@ export default function IngresoMaterialPage() {
   const handleSubmit = async (e, rutaActiva) => {
     e.preventDefault();
     const formValues = rutaActiva === 'A' ? formA : formB;
+    let newRecordId = null;
     
     const newErrors = {};
     if (!formValues.genero) newErrors.genero = true;
@@ -242,6 +246,8 @@ export default function IngresoMaterialPage() {
           fotoUrl = res.imageUrl || res.url;
           fotosUrls.push(fotoUrl);
         }
+
+        newRecordId = esporomaId;
 
         const wb = writeBatch(db);
         
@@ -425,6 +431,8 @@ export default function IngresoMaterialPage() {
           certificadosUrls.push(certificadoUrl);
         }
 
+        newRecordId = ejemplarId;
+
         const wb = writeBatch(db);
         
         wb.set(doc(db, 'ejemplares', ejemplarId), {
@@ -487,6 +495,23 @@ export default function IngresoMaterialPage() {
         }
       }
       
+      if (imprimirEtiqueta) {
+        const batchData = {
+          id: newRecordId,
+          alias: `${formValues.genero} ${formValues.especie}`.trim(),
+          especie: `${formValues.genero} ${formValues.especie}`.trim(),
+          tipo_inoculacion: rutaActiva === 'A' ? 'esporoma' : 'ejemplar_externo',
+          fecha: formValues.fecha,
+          operario: authName,
+          nombre_receta: formValues.genero,
+          tipo_uso: 'Registro',
+          tipo_etiqueta: rutaActiva === 'A' ? 'PORTAOBJETOS' : 'MEDIO_ESTANDAR'
+        };
+        setBatchesToPrint([batchData]);
+        setImprimirEtiqueta(false);
+        return;
+      }
+
       resetForm();
       setRuta(null); // volver al selector
     } catch (error) {
@@ -636,6 +661,10 @@ export default function IngresoMaterialPage() {
 
           {/* Compartido: Derivaciones UI */}
           {renderDerivacionesUI()}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+            <input type="checkbox" checked={imprimirEtiqueta} onChange={e => setImprimirEtiqueta(e.target.checked)} style={{ width: '1.2rem', height: '1.2rem' }} />
+            <span style={{ fontWeight: 600 }}>🏷️ Generar etiqueta después de registrar</span>
+          </label>
           {renderSubmitButton()}
         </form>
       )}
@@ -768,9 +797,16 @@ export default function IngresoMaterialPage() {
             💡 Las derivaciones (Seca / Húmeda) se crean desde el módulo de <strong>Inoculaciones</strong> una vez que el ejemplar está registrado.
           </div>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+            <input type="checkbox" checked={imprimirEtiqueta} onChange={e => setImprimirEtiqueta(e.target.checked)} style={{ width: '1.2rem', height: '1.2rem' }} />
+            <span style={{ fontWeight: 600 }}>🏷️ Generar etiqueta después de registrar</span>
+          </label>
+
           {renderSubmitButton()}
         </form>
       )}
+
+      {batchesToPrint && <PrintLabelsModal batches={batchesToPrint} onClose={() => setBatchesToPrint(null)} />}
     </div>
   );
 
@@ -873,5 +909,6 @@ export default function IngresoMaterialPage() {
         )}
       </>
     );
-  }
+}
+
 }
