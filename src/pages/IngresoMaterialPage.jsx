@@ -99,7 +99,10 @@ export default function IngresoMaterialPage() {
     }
 
     const unsubBatches = onSnapshot(query(collection(db, 'batches'), where('status', 'in', ['Activo', 'Incubando', 'Inoculado'])), snap => {
-      setBatchesActivos(snap.docs.map(d => ({ id: d.id, nombre: `${d.id} · ${d.genero} ${d.especie}`, ...d.data() })));
+      setBatchesActivos(snap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, nombre: `${d.id} · ${data.genero || ''} ${data.especie || ''}`.trim(), ...data };
+      }));
     });
 
     const medios = [];
@@ -705,6 +708,21 @@ export default function IngresoMaterialPage() {
                 onChange={val => setFormA({...formA, batch_origen_id: val})} 
                 placeholder="-- Buscar Batch Activo --" 
               />
+              <div style={{ marginTop: '0.5rem' }}>
+                <ScanInput 
+                  onScan={async (scannedId) => {
+                    const id = scannedId.trim();
+                    const opt = batchesActivos.find(b => b.id === id);
+                    if (opt) {
+                      setFormA({...formA, batch_origen_id: opt.id});
+                      toast.success(`Batch seleccionado: ${opt.id}`);
+                    } else {
+                      toast.error(`No se encontró batch activo: ${id}`);
+                    }
+                  }} 
+                  label="Escanear QR del Batch" 
+                />
+              </div>
             </div>
           )}
 
