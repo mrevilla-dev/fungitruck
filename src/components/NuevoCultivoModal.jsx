@@ -1352,12 +1352,27 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                       </span>
                       {(() => {
                         const bulkStock = formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0;
-                        const canSubfraccionar = bulkStock > 0;
+                        const canSubfraccionarFromBulk = bulkStock > 0;
+                        const canSubfraccionarFromSub = formData.fraccion_destino && (
+                          (formData.fraccion_destino.volumen_por_unidad_ml ?? 0) > 0 || 
+                          (formData.fraccion_destino.disponible ?? 0) > 0
+                        );
+                        const canSubfraccionar = canSubfraccionarFromBulk || canSubfraccionarFromSub;
+                        const availableVolume = canSubfraccionarFromSub 
+                          ? (formData.fraccion_destino.volumen_por_unidad_ml || formData.fraccion_destino.disponible || 0)
+                          : bulkStock;
                         return (
                           <>
                             <button
                               type="button"
-                              onClick={() => setShowSubfraccionModal(true)}
+                              onClick={() => {
+                                if (canSubfraccionarFromSub) {
+                                  window.open(`/medios-preparados/${formData.medio_prep.id}?subfraccion=${formData.fraccion_destino.id}`, '_blank');
+                                  toast.success('Abriendo maestro de medios para subfraccionar...');
+                                } else {
+                                  setShowSubfraccionModal(true);
+                                }
+                              }}
                               disabled={!canSubfraccionar}
                               style={{ 
                                 background: canSubfraccionar ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)', 
@@ -1370,13 +1385,16 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                                 fontWeight: 600,
                                 opacity: canSubfraccionar ? 1 : 0.5
                               }}
-                              title={!canSubfraccionar ? 'Sin stock bulk para subfraccionar' : ''}
+                              title={canSubfraccionarFromSub 
+                                ? `Crear sub-subfracciones desde ${formData.fraccion_destino.id_bolsa} (${availableVolume} disponibles)`
+                                : (canSubfraccionarFromBulk ? 'Crear subfracciones desde bulk' : 'Sin stock disponible')
+                              }
                             >
-                              + Subfraccionar
+                              {canSubfraccionarFromSub ? '🧪 Subfraccionar (Level 2)' : '+ Subfraccionar'}
                             </button>
                             {!canSubfraccionar && (
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
-                                (Sin stock bulk)
+                                (Sin stock disponible)
                               </span>
                             )}
                           </>
