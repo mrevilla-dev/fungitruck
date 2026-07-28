@@ -559,8 +559,12 @@ export default function IngresoMaterialPage() {
       if (imprimirEtiqueta) {
         const batchData = {
           id: newRecordId,
-          alias: `${formValues.genero} ${formValues.especie}`.trim(),
-          especie: `${formValues.genero} ${formValues.especie}`.trim(),
+          alias: formValues.codigo_cepa 
+            ? `${formValues.genero} ${formValues.especie} [${formValues.codigo_cepa}]`
+            : `${formValues.genero} ${formValues.especie}`.trim(),
+          especie: formValues.codigo_cepa 
+            ? `${formValues.genero} ${formValues.especie} [${formValues.codigo_cepa}]`
+            : `${formValues.genero} ${formValues.especie}`.trim(),
           tipo_inoculacion: rutaActiva === 'A' ? 'esporoma' : 'ejemplar_externo',
           generacion: 0,
           numero_unidad: 1,

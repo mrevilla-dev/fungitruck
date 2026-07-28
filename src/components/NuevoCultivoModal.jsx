@@ -340,9 +340,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       const subs = allSubfracciones.filter(s => s.medioId === m.id && s.disponible > 0);
       subs.forEach(s => {
         const esHija = s.parent_id ? ` ↳ (Hijo de ${s.parent_id})` : '';
+        const envaseInfo = s.tipo_unidad ? ` — ${s.tipo_unidad}` : '';
         options.push({
           id: s.id,
-          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'}${esHija} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disp. ${s.volumen_por_unidad_ml ? `· ${s.volumen_por_unidad_ml} ml/u` : ''}`,
+          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'}${esHija}${envaseInfo} — ${s.disponible}/${s.cantidad} disp. ${s.volumen_por_unidad_ml ? `· ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
           data: { medio: m, sub: s }
         });
