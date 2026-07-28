@@ -167,7 +167,13 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
     });
 
     const unsubSubfrac = onSnapshot(collectionGroup(db, 'subfracciones'), snap => {
-      setAllSubfracciones(snap.docs.map(d => ({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() })));
+      const subsData = snap.docs.map(d => ({ 
+        id: d.id, 
+        medioId: d.ref.parent.parent?.id, 
+        ...d.data() 
+      }));
+      console.log('🔍 DEBUG Subfracciones cargadas:', subsData.length, subsData);
+      setAllSubfracciones(subsData);
     });
 
     const unsubSalas = onSnapshot(collection(db, 'salas'), snap => {
@@ -334,9 +340,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
       const subs = allSubfracciones.filter(s => s.medioId === m.id && s.disponible > 0);
       subs.forEach(s => {
+        const esHija = s.parent_id ? ` ↳ (Hijo de ${s.parent_id})` : '';
         options.push({
           id: s.id,
-          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
+          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'}${esHija} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disp. ${s.volumen_por_unidad_ml ? `· ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
           data: { medio: m, sub: s }
         });
