@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup, updateDoc, getDoc, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdEsporoma, generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
 import SearchableSelect from '../components/SearchableSelect';
 import PrintLabelsModal from '../components/PrintLabelsModal';
+import ScanInput from '../components/ScanInput';
 import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 
@@ -65,7 +66,9 @@ export default function IngresoMaterialPage() {
     lugar_recoleccion: "", latitud: "", longitud: "", 
     batch_origen_id: null,
     observaciones: "",
-    fecha: new Date().toISOString().split('T')[0]
+    fecha: new Date().toISOString().split('T')[0],
+    precio: "",
+    fecha_compra: ""
   });
 
   // Estado del formulario (Ruta B)
@@ -188,7 +191,8 @@ export default function IngresoMaterialPage() {
     setFormA({
       genero: "", especie: "", codigo_cepa: "", origen: "",
       lugar_recoleccion: "", latitud: "", longitud: "", batch_origen_id: null,
-      observaciones: "", fecha: new Date().toISOString().split('T')[0]
+      observaciones: "", fecha: new Date().toISOString().split('T')[0],
+      precio: "", fecha_compra: ""
     });
     setFormB({
       genero: "", especie: "", codigo_cepa: "",
@@ -301,6 +305,8 @@ export default function IngresoMaterialPage() {
           fechaRecoleccion: formValues.fecha,
           operator: authName,
           observaciones: formValues.observaciones,
+          precio: formValues.precio ? Number(formValues.precio) : null,
+          fecha_compra: formValues.fecha_compra || null,
           fotoUrl,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -556,11 +562,15 @@ export default function IngresoMaterialPage() {
           alias: `${formValues.genero} ${formValues.especie}`.trim(),
           especie: `${formValues.genero} ${formValues.especie}`.trim(),
           tipo_inoculacion: rutaActiva === 'A' ? 'esporoma' : 'ejemplar_externo',
+          generacion: 0,
+          numero_unidad: 1,
+          total_unidades: 1,
           fecha: formValues.fecha,
           operario: authName,
-          nombre_receta: formValues.genero,
+          nombre_receta: `${formValues.genero} ${formValues.especie}`.trim(),
           tipo_uso: 'Registro',
-          tipo_etiqueta: rutaActiva === 'A' ? 'PORTAOBJETOS' : 'MEDIO_ESTANDAR'
+          tipo_etiqueta: rutaActiva === 'A' ? 'PORTAOBJETOS' : 'MEDIO_ESTANDAR',
+          codigo_cepa: formValues.codigo_cepa || null
         };
         setBatchesToPrint([batchData]);
         setImprimirEtiqueta(false);
@@ -691,6 +701,19 @@ export default function IngresoMaterialPage() {
                 onChange={val => setFormA({...formA, batch_origen_id: val})} 
                 placeholder="-- Buscar Batch Activo --" 
               />
+            </div>
+          )}
+
+          {(formA.origen === 'Compra' || formA.origen === 'Intercambio') && (
+            <div className="grid-2 animate-fade-in" style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+              <div className="form-group">
+                <label className="form-label">Precio (ARS)</label>
+                <input type="number" step="0.01" className="form-control" value={formA.precio || ''} onChange={e => setFormA({...formA, precio: e.target.value})} placeholder="Ej: 5000" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Fecha de Compra/Intercambio</label>
+                <input type="date" className="form-control" value={formA.fecha_compra || ''} onChange={e => setFormA({...formA, fecha_compra: e.target.value})} />
+              </div>
             </div>
           )}
 
@@ -924,14 +947,51 @@ export default function IngresoMaterialPage() {
 
               {d.tipo_derivacion === 'humeda' && (
                 <div className="grid-2" style={{ marginTop: '0.5rem' }}>
-                  <div className="form-group" style={{ position: 'relative', zIndex: 90 - idx }}>
+                  <div className="form-group" style={{ position: 'relative', zIndex: 90 - idx, gridColumn: '1 / -1' }}>
                     <label className="form-label">Medio Preparado *</label>
                     <SearchableSelect 
                       options={mediosDisponibles} 
                       value={d.medio_prep_id || ''} 
                       onChange={val => updateDerivacion(d.id, 'medio_prep_id', val)} 
-                      placeholder="-- Buscar Medio Disponible --" 
+                      placeholder="-- Buscar por nombre de medio o ID de bolsa --"
+                      style={{ width: '100%' }}
                     />
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <ScanInput 
+                        onScan={async (scannedId) => {
+                          const id = scannedId.trim();
+                          const medioDoc = await getDoc(doc(db, 'medios_preparados', id));
+                          if (medioDoc.exists()) {
+                            const opt = mediosDisponibles.find(o => o.type === 'bulk' && o.data?.medio?.id === id);
+                            if (opt) {
+                              updateDerivacion(d.id, 'medio_prep_id', opt.id);
+                              toast.success(`Medio seleccionado: ${opt.data.medio.alias}`);
+                            } else {
+                              toast.error('Medio encontrado pero no disponible');
+                            }
+                            return;
+                          }
+                          if (id.startsWith('FRAC-')) {
+                            const qSub = query(collectionGroup(db, 'subfracciones'), where('id_bolsa', '==', id));
+                            const snapSub = await getDocs(qSub);
+                            if (!snapSub.empty) {
+                              const opt = mediosDisponibles.find(o => o.type === 'sub' && o.id === snapSub.docs[0].id);
+                              if (opt) {
+                                updateDerivacion(d.id, 'medio_prep_id', opt.id);
+                                toast.success(`Subfracción seleccionada: ${id}`);
+                              } else {
+                                toast.error('Subfracción encontrada pero no disponible');
+                              }
+                            } else {
+                              toast.error(`No se encontró medio: ${id}`);
+                            }
+                          } else {
+                            toast.error(`No se encontró medio: ${id}`);
+                          }
+                        }} 
+                        label="Escanear QR del Medio" 
+                      />
+                    </div>
                   </div>
                   <div className="form-group" style={{ position: 'relative', zIndex: 80 - idx }}>
                     <label className="form-label">Sala Destino *</label>
