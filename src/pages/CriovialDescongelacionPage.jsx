@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getCriovialById, registrarDescongelacion } from '../services/criobancService';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import PrintLabelsModal from '../components/PrintLabelsModal';
 import toast from 'react-hot-toast';
 
 export default function CriovialDescongelacionPage() {
@@ -41,6 +42,7 @@ export default function CriovialDescongelacionPage() {
     medio_cultivo: '',
     sala: ''
   });
+  const [batchesToPrint, setBatchesToPrint] = useState(null);
 
   useEffect(() => {
     // Cargar el criovial
@@ -110,8 +112,13 @@ export default function CriovialDescongelacionPage() {
 
       const crearBatchObj = generarBatch ? batchData : null;
 
-      await registrarDescongelacion(id, datosDesc, crearBatchObj);
-      navigate(`/criobanco/criovial/${id}`);
+      const resultado = await registrarDescongelacion(id, datosDesc, crearBatchObj);
+      if (resultado.success && resultado.batchData) {
+        setBatchesToPrint([resultado.batchData]);
+      } else {
+        toast.success('Descongelación registrada');
+        navigate(`/criobanco/criovial/${id}`);
+      }
     } catch (err) {
       console.error(err);
       toast.error('Error registrando descongelación: ' + err.message);
@@ -128,6 +135,19 @@ export default function CriovialDescongelacionPage() {
     </div>
   );
   if (!criovial) return null;
+
+  if (batchesToPrint) {
+    return (
+      <PrintLabelsModal
+        batches={batchesToPrint}
+        usuarioActivo={operario || 'Sistema'}
+        onClose={() => {
+          setBatchesToPrint(null);
+          navigate(`/criobanco/criovial/${id}`);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="animate-fade-in" style={{ paddingBottom: '4rem', maxWidth: '800px', margin: '0 auto' }}>

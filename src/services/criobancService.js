@@ -281,7 +281,21 @@ export const registrarDescongelacion = async (criovialId, datosDescongelacion, c
     });
 
     await batch.commit();
-    return true;
+    return { 
+      success: true, 
+      nuevoLoteId,
+      batchData: {
+        id: nuevoLoteId,
+        alias: `${criovial.genero} ${criovial.especie}`.trim(),
+        especie: `${criovial.genero} ${criovial.especie}`.trim(),
+        fecha: new Date().toISOString().split('T')[0],
+        operario: datosDescongelacion.operario || 'Sistema',
+        nombre_receta: criovial.medio || 'Medio de Criopreservación',
+        tipo_uso: 'Descongelación',
+        tipo_etiqueta: 'MICRO_TUBOS',
+        tipo_inoculacion: 'descongelacion'
+      }
+    };
   } catch (error) {
     console.error("Error registrando descongelación: ", error);
     throw error;
