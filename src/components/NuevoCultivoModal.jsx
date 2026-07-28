@@ -172,7 +172,6 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
         medioId: d.ref.parent.parent?.id, 
         ...d.data() 
       }));
-      console.log('🔍 DEBUG Subfracciones cargadas:', subsData.length, subsData);
       setAllSubfracciones(subsData);
     });
 
@@ -845,6 +844,10 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
         const medioId = formData.fraccion_destino.medioId || formData.medio_prep.id;
         const sfRef = doc(db, 'medios_preparados', medioId, 'subfracciones', formData.fraccion_destino.id);
         wb.update(sfRef, { disponible: increment(-cantidadUnidades) });
+        if ((formData.fraccion_destino.disponible ?? 0) <= cantidadUnidades) {
+          const mRef = doc(db, 'medios_preparados', medioId);
+          wb.update(mRef, { subfracciones_disponibles: increment(-1) });
+        }
       } else if (formData.medio_prep && !formData.fraccion_destino) {
         const medioRef = doc(db, 'medios_preparados', formData.medio_prep.id);
         wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-cantidadUnidades) });

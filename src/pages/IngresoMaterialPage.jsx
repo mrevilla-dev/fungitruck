@@ -319,6 +319,10 @@ export default function IngresoMaterialPage() {
               if (medioOpt.type === 'sub') {
                 const sfRef = doc(db, 'medios_preparados', medioOpt.medio.id, 'subfracciones', medioOpt.sub.id);
                 wb.update(sfRef, { disponible: increment(-1) });
+                if ((medioOpt.sub.disponible ?? 0) <= 1) {
+                  const mRef = doc(db, 'medios_preparados', medioOpt.medio.id);
+                  wb.update(mRef, { subfracciones_disponibles: increment(-1) });
+                }
               } else {
                 const medioRef = doc(db, 'medios_preparados', medioOpt.medio.id);
                 wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-1) });

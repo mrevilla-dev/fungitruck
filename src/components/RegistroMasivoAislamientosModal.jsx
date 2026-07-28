@@ -364,6 +364,10 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
           if (dest.fraccion_destino) {
             const sfRef = doc(db, 'medios_preparados', dest.medio_prep.id, 'subfracciones', dest.fraccion_destino.id);
             wb.update(sfRef, { disponible: increment(-1) });
+            if ((dest.fraccion_destino.disponible ?? 0) <= 1) {
+              const mRef = doc(db, 'medios_preparados', dest.medio_prep.id);
+              wb.update(mRef, { subfracciones_disponibles: increment(-1) });
+            }
           } else {
             const mRef = doc(db, 'medios_preparados', dest.medio_prep.id);
             wb.update(mRef, { 'stock_bulk.cantidad_actual': increment(-1) });
