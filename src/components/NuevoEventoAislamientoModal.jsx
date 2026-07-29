@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
+import ScanInput from './ScanInput';
 import PrintLabelsModal from './PrintLabelsModal';
 import { generarIdBatch } from '../utils/idGenerator';
 import toast from 'react-hot-toast';
@@ -487,6 +488,21 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
               onChange={handleSelectMedioDestino}
               placeholder="— Buscar medio disponible —"
             />
+            <div style={{ marginTop: '0.5rem' }}>
+              <ScanInput
+                onScan={async (scannedId) => {
+                  const id = scannedId.trim();
+                  const opt = mediosDestinoOptions.find(m => m.id === id);
+                  if (opt) {
+                    handleSelectMedioDestino(opt.id);
+                    toast.success(`Medio seleccionado: ${opt.nombre}`);
+                  } else {
+                    toast.error(`No se encontró medio: ${id}`);
+                  }
+                }}
+                label="📷 Escanear QR del Medio"
+              />
+            </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 1100 }}>
