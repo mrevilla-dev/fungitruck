@@ -6,12 +6,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
 import { uploadFileToDrive } from '../services/driveService';
 import DerivacionEsporomaModal from '../components/DerivacionEsporomaModal';
+import PrintLabelsModal from '../components/PrintLabelsModal';
 import toast from 'react-hot-toast';
 
 export default function EsporomasPage() {
   const [esporomas, setEsporomas] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [derivacionEsporoma, setDerivacionEsporoma] = useState(null);
+  const [printEsporoma, setPrintEsporoma] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editingEsporoma, setEditingEsporoma] = useState(null);
   const [formData, setFormData] = useState({
@@ -37,6 +39,17 @@ export default function EsporomasPage() {
   });
   const [photo, setPhoto] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [filtroEspecie, setFiltroEspecie] = useState('');
+  const [filtroOrigen, setFiltroOrigen] = useState('');
+
+  const especiesUnicas = [...new Set(esporomas.map(e => `${e.genero} ${e.especie}`).filter(Boolean))].sort();
+  const origenesUnicos = [...new Set(esporomas.map(e => e.origen).filter(Boolean))].sort();
+
+  const esporomasFiltrados = esporomas.filter(esp => {
+    if (filtroEspecie && `${esp.genero} ${esp.especie}` !== filtroEspecie) return false;
+    if (filtroOrigen && esp.origen !== filtroOrigen) return false;
+    return true;
+  });
 
   useEffect(() => {
     const q = query(collection(db, "esporomas"), orderBy("createdAt", "desc"));
@@ -76,6 +89,22 @@ export default function EsporomasPage() {
     }
     setPhoto(null);
     setShowModal(true);
+  };
+
+  const copyId = (id) => {
+    navigator.clipboard.writeText(id);
+    toast.success('ID copiado');
+  };
+
+  const ORIGEN_COLORS = {
+    'Silvestre': '#10b981',
+    'Cultivo interno': '#3b82f6',
+    'Compra a productor': '#f59e0b',
+    'Compra': '#f59e0b',
+    'Intercambio': '#a855f7',
+    'Donación': '#8b5cf6',
+    'Comercial': '#64748b',
+    'Desconocido': '#64748b'
   };
 
   const handleDelete = async (esp) => {
@@ -217,24 +246,55 @@ export default function EsporomasPage() {
   return (
     <div className="animate-fade-in">
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2>Ejemplares DRIVETEST</h2>
+        <h2>Esporomas</h2>
         <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => openModal()}>➕ Nuevo Esporoma</button>
       </div>
 
       <p className="no-print">Registro de ejemplares silvestres recolectados para aislamiento y estudio.</p>
 
+      <div className="no-print" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+        <div style={{ flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Especie</label>
+          <select className="form-control" value={filtroEspecie} onChange={e => setFiltroEspecie(e.target.value)}>
+            <option value="">Todas las especies</option>
+            {especiesUnicas.map(esp => <option key={esp} value={esp}>{esp}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Origen</label>
+          <select className="form-control" value={filtroOrigen} onChange={e => setFiltroOrigen(e.target.value)}>
+            <option value="">Todos los orígenes</option>
+            {origenesUnicos.map(ori => <option key={ori} value={ori}>{ori}</option>)}
+          </select>
+        </div>
+        <div style={{ alignSelf: 'flex-end' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Mostrando {esporomasFiltrados.length} de {esporomas.length}</span>
+        </div>
+      </div>
+
       <div className="salas-grid">
-        {esporomas.map(esp => (
+        {esporomasFiltrados.map(esp => (
           <div key={esp.id} className="card sala-card esporoma-card">
             {esp.fotoUrl && (
               <img src={esp.fotoUrl} alt={esp.especie} className="no-print" style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '12px', marginBottom: '1rem' }} />
             )}
             <div className="sala-header">
-              <div className="label-id" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '0.5rem' }}>{esp.id}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.5rem' }}>
+                <div className="label-id" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{esp.id}</div>
+                <button className="edit-icon-btn" title="Copiar ID" onClick={() => copyId(esp.id)} style={{ fontSize: '0.75rem' }}>📋</button>
+              </div>
+              {esp.origen && (() => {
+                const c = ORIGEN_COLORS[esp.origen] || '#64748b';
+                return (
+                  <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: `${c}22`, color: c, border: `1px solid ${c}44`, display: 'inline-block', marginBottom: '0.5rem' }}>
+                    {esp.origen}
+                  </span>
+                );
+              })()}
               <div className="flex-gap no-print">
                 <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', marginRight: '0.5rem' }} onClick={() => setDerivacionEsporoma(esp)}>+ Nueva Derivación</button>
                 <button className="edit-icon-btn" title="Editar" onClick={() => openModal(esp)}>✏️</button>
-                <button className="edit-icon-btn" title="Imprimir" onClick={() => window.print()}>🖨️</button>
+                <button className="edit-icon-btn" title="Imprimir" onClick={() => setPrintEsporoma(esp)}>🖨️</button>
                 <button className="edit-icon-btn" title="Eliminar" style={{ color: 'var(--danger-color)' }} onClick={() => handleDelete(esp)}>🗑️</button>
               </div>
             </div>
@@ -400,6 +460,29 @@ export default function EsporomasPage() {
         <DerivacionEsporomaModal 
           esporoma={derivacionEsporoma} 
           onClose={() => setDerivacionEsporoma(null)} 
+        />
+      )}
+
+      {printEsporoma && (
+        <PrintLabelsModal
+          batches={[{
+            id: printEsporoma.id,
+            alias: `${printEsporoma.genero} ${printEsporoma.especie}`,
+            especie: printEsporoma.especie,
+            fecha: printEsporoma.fechaRecoleccion,
+            operario: auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema',
+            nombre_receta: printEsporoma.descripcion || '',
+            tipo_uso: 'Esporoma',
+            tipo_etiqueta: 'PORTAOBJETOS',
+            tipo_inoculacion: '',
+            generacion: 0,
+            numero_unidad: 1,
+            total_unidades: 1,
+            codigo_cepa: printEsporoma.codigo_cepa || '',
+          }]}
+          onClose={() => setPrintEsporoma(null)}
+          usuarioActivo={auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema'}
+          initialProfile="PORTAOBJETOS"
         />
       )}
     </div>
