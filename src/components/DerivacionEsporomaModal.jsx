@@ -4,6 +4,7 @@ import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increm
 import { getAuth } from 'firebase/auth';
 import { generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
 import SearchableSelect from './SearchableSelect';
+import ScanInput from './ScanInput';
 import { uploadFileToDrive } from '../services/driveService';
 import toast from 'react-hot-toast';
 
@@ -308,6 +309,21 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
                   onChange={val => setFormData({ ...formData, medio_prep_id: val })} 
                   placeholder="-- Buscar Medio --" 
                 />
+                <div style={{ marginTop: '0.5rem' }}>
+                  <ScanInput
+                    onScan={async (scannedId) => {
+                      const id = scannedId.trim();
+                      const opt = mediosDisponibles.find(m => m.id === id);
+                      if (opt) {
+                        setFormData({ ...formData, medio_prep_id: opt.id });
+                        toast.success(`Medio seleccionado: ${opt.nombre}`);
+                      } else {
+                        toast.error(`No se encontró medio: ${id}`);
+                      }
+                    }}
+                    label="📷 Escanear QR del Medio"
+                  />
+                </div>
               </div>
               <div className="form-group" style={{ zIndex: 90, position: 'relative' }}>
                 <label className="form-label">Sala Destino *</label>
