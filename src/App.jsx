@@ -6,6 +6,7 @@ import './firebase'; // Inicializar firebase
 import './App.css'; // Estilos globales
 import NavBar from './components/NavBar';
 import ErrorBoundary from './components/ErrorBoundary';
+import AsistenteFlotante from './components/AsistenteFlotante';
 import { useIsMobile } from './hooks/useIsMobile';
 import BarraInferiorMobile from './components/nav/BarraInferiorMobile';
 import LoadingPlaceholder from './components/LoadingPlaceholder';
@@ -98,6 +99,7 @@ export default function App() {
         </ErrorBoundary>
       </div>
       {isMobile && <BarraInferiorMobile />}
+      <AsistenteFlotante />
       <Toaster position="top-center" />
     </div>
   );
