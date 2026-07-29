@@ -61,6 +61,14 @@ export default function EjemplaresPage() {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroMicelio, setFiltroMicelio] = useState('');
 
+  // Filtros para Eventos de Aislamiento
+  const [filtroEventoTexto, setFiltroEventoTexto] = useState('');
+  const [filtroEventoTecnica, setFiltroEventoTecnica] = useState('');
+  const [filtroEventoOperario, setFiltroEventoOperario] = useState('');
+  const [filtroEventoFechaDesde, setFiltroEventoFechaDesde] = useState('');
+  const [filtroEventoFechaHasta, setFiltroEventoFechaHasta] = useState('');
+  const [ordenamientoEventos, setOrdenamientoEventos] = useState('fecha_desc');
+
   // Usuario actual
   const [usuarioActivo, setUsuarioActivo] = useState('Sistema');
 
@@ -262,11 +270,35 @@ export default function EjemplaresPage() {
   const especies = [...new Set(ejemplares.map(e => e.especie).filter(Boolean))].sort();
   const miceliotipos = [...new Set(ejemplares.map(e => e.tipo_micelio).filter(Boolean))].sort();
 
+  const tecnicasUnicas = [...new Set(eventosAislamiento.map(e => e.tecnica).filter(Boolean))].sort();
+  const operariosUnicos = [...new Set(eventosAislamiento.map(e => e.operario).filter(Boolean))].sort();
+
   const filtered = ejemplares.filter(e => {
     if (filtroEspecie && e.especie !== filtroEspecie) return false;
     if (filtroEstado && e.estado !== filtroEstado) return false;
     if (filtroMicelio && e.tipo_micelio !== filtroMicelio) return false;
     return true;
+  });
+
+  const eventosFiltrados = eventosAislamiento.filter(ev => {
+    if (filtroEventoTexto) {
+      const s = filtroEventoTexto.toLowerCase();
+      const matchId = (ev.id_semantico || ev.id || '').toLowerCase().includes(s);
+      const matchTecnica = (ev.tecnica || '').toLowerCase().includes(s);
+      const matchOperario = (ev.operario || '').toLowerCase().includes(s);
+      if (!matchId && !matchTecnica && !matchOperario) return false;
+    }
+    if (filtroEventoTecnica && ev.tecnica !== filtroEventoTecnica) return false;
+    if (filtroEventoOperario && ev.operario !== filtroEventoOperario) return false;
+    if (filtroEventoFechaDesde && ev.fecha < filtroEventoFechaDesde) return false;
+    if (filtroEventoFechaHasta && ev.fecha > filtroEventoFechaHasta) return false;
+    return true;
+  }).sort((a, b) => {
+    if (ordenamientoEventos === 'fecha_desc') return (b.fecha || '').localeCompare(a.fecha || '');
+    if (ordenamientoEventos === 'fecha_asc') return (a.fecha || '').localeCompare(b.fecha || '');
+    if (ordenamientoEventos === 'tecnica') return (a.tecnica || '').localeCompare(b.tecnica || '');
+    if (ordenamientoEventos === 'operario') return (a.operario || '').localeCompare(b.operario || '');
+    return 0;
   });
 
   const esporomasOptions = esporomas.map(e => ({
@@ -444,14 +476,107 @@ export default function EjemplaresPage() {
           ➕ Nuevo Evento
         </button>
       </div>
-      
-      {eventosAislamiento.length === 0 ? (
+
+      {/* Filtros de Eventos de Aislamiento */}
+      <div className="no-print" style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ flex: '1 1 200px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>🔍 Buscar</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="ID, técnica, operario..."
+            value={filtroEventoTexto}
+            onChange={e => setFiltroEventoTexto(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div style={{ flex: '1 1 150px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Técnica</label>
+          <select
+            className="form-control"
+            value={filtroEventoTecnica}
+            onChange={e => setFiltroEventoTecnica(e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <option value="">Todas las técnicas</option>
+            {tecnicasUnicas.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: '1 1 150px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Operario</label>
+          <select
+            className="form-control"
+            value={filtroEventoOperario}
+            onChange={e => setFiltroEventoOperario(e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <option value="">Todos los operarios</option>
+            {operariosUnicos.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: '1 1 120px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Desde</label>
+          <input
+            type="date"
+            className="form-control"
+            value={filtroEventoFechaDesde}
+            onChange={e => setFiltroEventoFechaDesde(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div style={{ flex: '1 1 120px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Hasta</label>
+          <input
+            type="date"
+            className="form-control"
+            value={filtroEventoFechaHasta}
+            onChange={e => setFiltroEventoFechaHasta(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div style={{ flex: '1 1 150px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Ordenar por</label>
+          <select
+            className="form-control"
+            value={ordenamientoEventos}
+            onChange={e => setOrdenamientoEventos(e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <option value="fecha_desc">Más recientes primero</option>
+            <option value="fecha_asc">Más antiguos primero</option>
+            <option value="tecnica">Por técnica (A-Z)</option>
+            <option value="operario">Por operario (A-Z)</option>
+          </select>
+        </div>
+        {(filtroEventoTexto || filtroEventoTecnica || filtroEventoOperario || filtroEventoFechaDesde || filtroEventoFechaHasta) && (
+          <button
+            className="btn btn-outline"
+            style={{ width: 'auto', alignSelf: 'flex-end' }}
+            onClick={() => {
+              setFiltroEventoTexto('');
+              setFiltroEventoTecnica('');
+              setFiltroEventoOperario('');
+              setFiltroEventoFechaDesde('');
+              setFiltroEventoFechaHasta('');
+            }}
+          >
+            ✕ Limpiar
+          </button>
+        )}
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', alignSelf: 'center', marginLeft: 'auto' }}>
+          Mostrando {eventosFiltrados.length} de {eventosAislamiento.length}
+        </span>
+      </div>
+
+      {eventosFiltrados.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-          No hay eventos de aislamiento registrados.
+          {eventosAislamiento.length === 0
+            ? 'No hay eventos de aislamiento registrados.'
+            : '🔍 Ningún evento coincide con los filtros.'}
         </div>
       ) : (
         <div className="salas-grid">
-          {eventosAislamiento.map(ev => (
+          {eventosFiltrados.map(ev => (
             <div key={ev.id} className="card" style={{ padding: '1rem', borderLeft: '4px solid #10b981' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
