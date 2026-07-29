@@ -55,6 +55,33 @@ ${esporomas.slice(0, 5).map(e => `- ${e.id}: ${e.genero} ${e.especie} (${e.orige
 
 ÚLTIMOS EJEMPLARES:
 ${ejemplares.slice(0, 5).map(e => `- ${e.id_semantico || e.id}: ${e.genero} ${e.especie} [${e.estado}]`).join('\n')}
+
+INFORMACIÓN DEL PROYECTO (Handoff v7):
+- Stack: React 18 + Vite + Firebase (Firestore + Auth + Storage + Hosting)
+- Hosting: https://fungitrack-9b463.web.app
+- IDs semánticos: ESP-XXX-YYMMDD-NNN (esporomas), EJE-XXX-YYMMDD-NNN (ejemplares)
+- NO modificar src/utils/idGenerator.js ni metadata/counters
+
+MÓDULOS IMPLEMENTADOS:
+- Medios Preparados, Inoculaciones, Ventanilla Única, Criobanco (ZPL)
+- EsporomasPage: copiar ID, badges de origen, PhotoLightbox, filtros
+- EjemplaresPage: filtros en Eventos de Aislamiento, badges de estado
+- DerivacionEsporomaModal: ScanInput para medio
+- NuevoEventoAislamientoModal: ScanInput para ejemplar origen + medio destino
+- DerivacionEsporomaModal: ScanInput para medio
+
+AGENTE IA HÍBRIDO:
+- Router: Ollama (local) → fallback Gemini Flash (cloud)
+- firestoreContext.js: contexto de Firestore con cache 60s
+- AsistenteFlotante.jsx: Web Speech API + Text-to-Speech
+- .env: VITE_GEMINI_API_KEY
+
+PENDIENTES:
+- Agente IA: completar formularios por voz
+- Agente IA: navegación contextual
+- Agente diario: sugerencias según estado de batches
+- Búsqueda global en EsporomasPage y EjemplaresPage
+- Testing integral de mejoras UX
     `.trim();
 
     cache = { data: context, timestamp: now };
