@@ -7,6 +7,7 @@ import { compressImage } from '../utils/imageUtils';
 import { uploadFileToDrive } from '../services/driveService';
 import DerivacionEsporomaModal from '../components/DerivacionEsporomaModal';
 import PrintLabelsModal from '../components/PrintLabelsModal';
+import PhotoLightbox from '../components/PhotoLightbox';
 import toast from 'react-hot-toast';
 
 export default function EsporomasPage() {
@@ -41,6 +42,7 @@ export default function EsporomasPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [filtroEspecie, setFiltroEspecie] = useState('');
   const [filtroOrigen, setFiltroOrigen] = useState('');
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   const especiesUnicas = [...new Set(esporomas.map(e => `${e.genero} ${e.especie}`).filter(Boolean))].sort();
   const origenesUnicos = [...new Set(esporomas.map(e => e.origen).filter(Boolean))].sort();
@@ -276,7 +278,23 @@ export default function EsporomasPage() {
         {esporomasFiltrados.map(esp => (
           <div key={esp.id} className="card sala-card esporoma-card">
             {esp.fotoUrl && (
-              <img src={esp.fotoUrl} alt={esp.especie} className="no-print" style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '12px', marginBottom: '1rem' }} />
+              <img
+                src={esp.fotoUrl}
+                alt={esp.especie}
+                className="no-print"
+                onClick={() => setLightboxImage(esp.fotoUrl)}
+                style={{
+                  width: '100%',
+                  height: '150px',
+                  objectFit: 'cover',
+                  borderRadius: '12px',
+                  marginBottom: '1rem',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              />
             )}
             <div className="sala-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.5rem' }}>
@@ -483,6 +501,13 @@ export default function EsporomasPage() {
           onClose={() => setPrintEsporoma(null)}
           usuarioActivo={auth.currentUser?.displayName || auth.currentUser?.email || 'Sistema'}
           initialProfile="PORTAOBJETOS"
+        />
+      )}
+
+      {lightboxImage && (
+        <PhotoLightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
         />
       )}
     </div>
