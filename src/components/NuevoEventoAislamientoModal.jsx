@@ -412,6 +412,21 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
               onChange={val => handleChange('ejemplar_origen_id', val)}
               placeholder="— Buscar ejemplar —"
             />
+            <div style={{ marginTop: '0.5rem' }}>
+              <ScanInput
+                onScan={async (scannedId) => {
+                  const id = scannedId.trim();
+                  const opt = ejemplaresOptions.find(e => e.id === id);
+                  if (opt) {
+                    handleChange('ejemplar_origen_id', opt.id);
+                    toast.success(`Ejemplar seleccionado: ${opt.nombre}`);
+                  } else {
+                    toast.error(`No se encontró ejemplar: ${id}`);
+                  }
+                }}
+                label="📷 Escanear QR del Ejemplar"
+              />
+            </div>
           </div>
 
           {/* Técnica */}
