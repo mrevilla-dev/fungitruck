@@ -9,6 +9,7 @@ import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
 import PrintLabelsModal from './PrintLabelsModal';
 import { generarIdBatch } from '../utils/idGenerator';
+import { useMediosDisponibles } from '../hooks/useMediosDisponibles';
 import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
@@ -65,8 +66,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
   const [ejemplares, setEjemplares] = useState([]);
   const [salas, setSalas] = useState([]);
   const [contenedores, setContenedores] = useState([]);
-  const [mediosPreparados, setMediosPreparados] = useState([]);
-  const [allSubfracciones, setAllSubfracciones] = useState([]);
+
   const [globalEnvaseTypes, setGlobalEnvaseTypes] = useState([]);
   const [showPrint, setShowPrint] = useState(false);
   const [createdBatches, setCreatedBatches] = useState([]);
@@ -97,22 +97,6 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'contenedores')), snap => {
       setContenedores(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.eliminado));
-    });
-    return unsub;
-  }, []);
-
-  // Cargar medios preparados
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'medios_preparados'), snap => {
-      setMediosPreparados(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, []);
-
-  // Cargar subfracciones
-  useEffect(() => {
-    const unsub = onSnapshot(collectionGroup(db, 'subfracciones'), snap => {
-      setAllSubfracciones(snap.docs.map(d => ({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() })));
     });
     return unsub;
   }, []);
@@ -159,33 +143,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
     }
   };
 
-  const mediosDestinoOptions = useMemo(() => {
-    const options = [];
-    mediosPreparados.forEach(m => {
-      if (m.estado === 'Activo') {
-        const bulkCant = m.stock_bulk?.cantidad_actual ?? m.cantidad_actual ?? 0;
-        if (bulkCant > 0) {
-          options.push({
-            id: m.id,
-            nombre: `${m.alias || ''} · ID: ${m.id} · ${m.nombre_receta} (Bulk) — ${bulkCant} ${m.stock_bulk?.unidad || 'ml'} disponibles`,
-            type: 'bulk',
-            data: { medio: m }
-          });
-        }
-      }
-
-      const subs = allSubfracciones.filter(s => s.medioId === m.id && s.disponible > 0);
-      subs.forEach(s => {
-        options.push({
-          id: s.id,
-          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || s.id} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
-          type: 'sub',
-          data: { medio: m, sub: s }
-        });
-      });
-    });
-    return options;
-  }, [mediosPreparados, allSubfracciones]);
+  const mediosDestinoOptions = useMediosDisponibles();
 
   const handleSelectMedioDestino = (valId) => {
     const selectedOption = mediosDestinoOptions.find(o => o.id === valId);
