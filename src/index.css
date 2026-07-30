@@ -344,8 +344,10 @@ input[type="date"].form-control {
 
 .sala-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .grid-2 {
@@ -356,6 +358,7 @@ input[type="date"].form-control {
 
 .flex-gap {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }
