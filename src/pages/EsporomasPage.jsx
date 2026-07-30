@@ -42,6 +42,7 @@ export default function EsporomasPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [filtroEspecie, setFiltroEspecie] = useState('');
   const [filtroOrigen, setFiltroOrigen] = useState('');
+  const [busquedaTexto, setBusquedaTexto] = useState('');
   const [lightboxImage, setLightboxImage] = useState(null);
 
   const especiesUnicas = [...new Set(esporomas.map(e => `${e.genero} ${e.especie}`).filter(Boolean))].sort();
@@ -50,6 +51,14 @@ export default function EsporomasPage() {
   const esporomasFiltrados = esporomas.filter(esp => {
     if (filtroEspecie && `${esp.genero} ${esp.especie}` !== filtroEspecie) return false;
     if (filtroOrigen && esp.origen !== filtroOrigen) return false;
+    if (busquedaTexto) {
+      const s = busquedaTexto.toLowerCase();
+      const match = (esp.id || '').toLowerCase().includes(s) ||
+                    (esp.genero || '').toLowerCase().includes(s) ||
+                    (esp.especie || '').toLowerCase().includes(s) ||
+                    (esp.lugarRecoleccion || '').toLowerCase().includes(s);
+      if (!match) return false;
+    }
     return true;
   });
 
@@ -255,6 +264,16 @@ export default function EsporomasPage() {
       <p className="no-print">Registro de ejemplares silvestres recolectados para aislamiento y estudio.</p>
 
       <div className="no-print" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+        <div style={{ flex: '1 1 250px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>🔍 Buscar</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="ID, especie, lugar..."
+            value={busquedaTexto}
+            onChange={e => setBusquedaTexto(e.target.value)}
+          />
+        </div>
         <div style={{ flex: '1 1 200px' }}>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Especie</label>
           <select className="form-control" value={filtroEspecie} onChange={e => setFiltroEspecie(e.target.value)}>
@@ -370,6 +389,8 @@ export default function EsporomasPage() {
                       <option value="Cultivo interno">Cultivo interno</option>
                       <option value="Compra a productor">Compra a productor</option>
                       <option value="Comercial">Comercial</option>
+                      <option value="Intercambio">Intercambio</option>
+                      <option value="Donación">Donación</option>
                       <option value="Desconocido">Desconocido</option>
                     </select>
 {/* Conditional fields based on origen */}
