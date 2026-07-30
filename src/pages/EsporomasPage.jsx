@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db, storage, auth } from '../firebase';
 import SearchableSelect from '../components/SearchableSelect';
 import { collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, setDoc, doc, deleteDoc, updateDoc, runTransaction, arrayUnion, getDocs } from 'firebase/firestore';
@@ -45,8 +45,14 @@ export default function EsporomasPage() {
   const [busquedaTexto, setBusquedaTexto] = useState('');
   const [lightboxImage, setLightboxImage] = useState(null);
 
-  const especiesUnicas = [...new Set(esporomas.map(e => `${e.genero} ${e.especie}`).filter(Boolean))].sort();
-  const origenesUnicos = [...new Set(esporomas.map(e => e.origen).filter(Boolean))].sort();
+  const especiesUnicas = useMemo(() =>
+    [...new Set(esporomas.map(e => `${e.genero} ${e.especie}`).filter(Boolean))].sort(),
+    [esporomas]
+  );
+  const origenesUnicos = useMemo(() =>
+    [...new Set(esporomas.map(e => e.origen).filter(Boolean))].sort(),
+    [esporomas]
+  );
 
   const esporomasFiltrados = esporomas.filter(esp => {
     if (filtroEspecie && `${esp.genero} ${esp.especie}` !== filtroEspecie) return false;
