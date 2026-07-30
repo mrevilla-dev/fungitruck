@@ -739,6 +739,27 @@ input:checked + .slider:before {
   }
 }
 
+/* ─── Responsive: móvil ─── */
+@media (max-width: 768px) {
+  .salas-grid {
+    gap: 1rem;
+  }
+  .sala-card, .card {
+    overflow-x: hidden;
+    overflow-wrap: break-word;
+  }
+  .flex-gap {
+    flex-wrap: wrap !important;
+  }
+  .edit-icon-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .salas-grid {
+    overflow-x: hidden;
+  }
+}
+
 /* ─── Collapsible Sections (Dashboard) ─── */
 details summary::-webkit-details-marker {
   display: none;
