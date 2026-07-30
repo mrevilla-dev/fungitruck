@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import {
   collection, doc, onSnapshot, orderBy, query, getDoc, setDoc,
-  serverTimestamp, runTransaction, writeBatch, collectionGroup, increment
+  serverTimestamp, runTransaction, writeBatch, collectionGroup, increment, where
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
