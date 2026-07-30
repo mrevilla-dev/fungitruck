@@ -11,6 +11,7 @@ import NuevoEventoAislamientoModal from '../components/NuevoEventoAislamientoMod
 import toast from 'react-hot-toast';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
+import PhotoLightbox from '../components/PhotoLightbox';
 
 const ESTADO_CONFIG = {
   Activo:        { badge: '🟢', color: '#10b981' },
@@ -55,6 +56,7 @@ export default function EjemplaresPage() {
   const [generacionCalc, setGeneracionCalc] = useState(0);
   const [photo, setPhoto] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   // Filtros
   const [filtroEspecie, setFiltroEspecie] = useState('');
@@ -411,7 +413,8 @@ export default function EjemplaresPage() {
                     src={eje.fotoUrl}
                     alt={eje.especie}
                     className="no-print"
-                    style={{ width: '100%', height: '130px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem' }}
+                    onClick={() => setLightboxImage(eje.fotoUrl)}
+                    style={{ width: '100%', height: '130px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem', cursor: 'pointer' }}
                   />
                 )}
 
@@ -911,6 +914,13 @@ export default function EjemplaresPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {lightboxImage && (
+        <PhotoLightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
       )}
 
       {/* Modal Evento de Aislamiento */}
