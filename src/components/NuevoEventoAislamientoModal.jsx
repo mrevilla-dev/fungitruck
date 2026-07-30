@@ -119,13 +119,13 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
 
   // Escuchar ejemplares para el SearchableSelect
   useEffect(() => {
-    const q = query(collection(db, 'ejemplares'), orderBy('createdAt', 'desc'));
+    const q = query(
+      collection(db, 'ejemplares'),
+      where('eliminado', '==', false),
+      orderBy('createdAt', 'desc')
+    );
     const unsub = onSnapshot(q, snap => {
-      setEjemplares(
-        snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(e => !e.eliminado)
-      );
+      setEjemplares(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsub;
   }, []);
