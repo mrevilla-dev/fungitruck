@@ -162,9 +162,11 @@ export default function EsporomasPage() {
           'Cultivo interno': 'INT',
           'Compra a productor': 'PRO',
           'Comercial': 'COM',
+          'Intercambio': 'EXC',
+          'Donación': 'DON',
           'Desconocido': 'DES'
         };
-        const origenCode = origenMap[formData.origen] || '';
+        const origenCode = origenMap[formData.origen] || 'UNK';
         const datePart = formData.fechaRecoleccion.replace(/-/g, '').slice(2); // YYMMDD
         const seqKey = `ESP_${datePart}`;
         const counterRef = doc(db, 'metadata', 'counters');
@@ -175,13 +177,12 @@ export default function EsporomasPage() {
           const seq = (data[seqKey] || 0) + 1;
           transaction.set(counterRef, { [seqKey]: seq }, { merge: true });
 
-          const nn = origenCode !== 'COM' && origenCode !== 'DES' && codigoCepa ? `${origenCode}${String(seq).padStart(2,'0')}` : origenCode;
-          const nnn = String(seq).padStart(3,'0');
+          const nnn = String(seq).padStart(3, '0');
           const parts = [
             'ESP',
             `${generoCode}${especieCode}`,
-            codigoCepa ? codigoCepa : null,
-            nn,
+            codigoCepa || null,
+            origenCode,
             datePart,
             nnn
           ].filter(Boolean);
