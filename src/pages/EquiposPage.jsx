@@ -6,6 +6,12 @@ import EquipoFormModal from '../components/EquipoFormModal';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+const ESTADO_CONFIG = {
+  'Operativo': { badge: '🟢', color: '#10b981' },
+  'En mantenimiento': { badge: '🟡', color: '#f59e0b' },
+  'Fuera de servicio': { badge: '🔴', color: '#ef4444' },
+};
+
 export default function EquiposPage({ user }) {
   const [equipos, setEquipos] = useState([]);
   const [salas, setSalas] = useState([]);
@@ -87,13 +93,8 @@ export default function EquiposPage({ user }) {
     }
   }
 
-  function getBadgeColor(estado) {
-    switch (estado) {
-      case 'Operativo': return '#4CAF50';
-      case 'En mantenimiento': return '#FFC107';
-      case 'Fuera de servicio': return '#F44336';
-      default: return '#9E9E9E';
-    }
+  function getEstadoConfig(estado) {
+    return ESTADO_CONFIG[estado] || { badge: '⚪', color: '#94a3b8' };
   }
 
   function getSalaNombre(salaId) {
@@ -102,57 +103,67 @@ export default function EquiposPage({ user }) {
     return s ? s.nombre : 'Desconocida';
   }
 
+  const copyId = (id) => {
+    navigator.clipboard.writeText(id);
+    toast.success('ID copiado');
+  };
+
   return (
-    <div className="page-container">
-      <div className="header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>⚙️ Gestión de Equipos</h1>
-        <button className="btn-primary" onClick={() => { setEquipoEditando(null); setModalAbierto(true); }}>
+    <div className="animate-fade-in">
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0 }}>⚙️ Gestión de Equipos</h2>
+        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => { setEquipoEditando(null); setModalAbierto(true); }}>
           ➕ Nuevo equipo
         </button>
       </div>
 
+      <p className="no-print" style={{ color: 'var(--text-secondary)' }}>
+        Inventario de equipos, parámetros ideales e historial de mantenimiento.
+      </p>
+
       {errorCarga && (
-        <div className="form-error-banner" style={{ margin: '16px 0' }}>
+        <div className="form-error-banner" style={{ margin: '0 0 1rem' }}>
           ⚠️ {errorCarga}
         </div>
       )}
 
-      <div className="filters-card" style={{ display: 'flex', gap: '10px', margin: '20px 0', padding: '15px', background: '#f5f5f5', borderRadius: '8px', flexWrap: 'wrap' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px' }}>🔍 Buscar</label>
+      <div className="no-print" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+        <div style={{ flex: '1 1 240px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>🔍 Buscar</label>
           <input
             type="text"
+            className="form-control"
             placeholder="Nombre, marca, ID..."
             value={busquedaTexto}
             onChange={e => setBusquedaTexto(e.target.value)}
           />
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px' }}>Categoría</label>
-          <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
+        <div style={{ flex: '1 1 160px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Categoría</label>
+          <select className="form-control" value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
             <option value="">Todas</option>
             {categoriasUnicas.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px' }}>Estado</label>
-          <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}>
+        <div style={{ flex: '1 1 160px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Estado</label>
+          <select className="form-control" value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}>
             <option value="">Todos</option>
             <option value="Operativo">Operativo</option>
             <option value="En mantenimiento">En mantenimiento</option>
             <option value="Fuera de servicio">Fuera de servicio</option>
           </select>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px' }}>Sala</label>
-          <select value={filtroSala} onChange={e => setFiltroSala(e.target.value)}>
+        <div style={{ flex: '1 1 160px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Sala</label>
+          <select className="form-control" value={filtroSala} onChange={e => setFiltroSala(e.target.value)}>
             <option value="">Todas</option>
             {salas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
           </select>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px' }}>Propietario</label>
-          <select value={filtroPropietario} onChange={e => setFiltroPropietario(e.target.value)}>
+        <div style={{ flex: '1 1 160px' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Propietario</label>
+          <select className="form-control" value={filtroPropietario} onChange={e => setFiltroPropietario(e.target.value)}>
             <option value="">Todos</option>
             <option value="Facultad">Facultad</option>
             <option value="Emprendimiento">Emprendimiento</option>
@@ -160,56 +171,85 @@ export default function EquiposPage({ user }) {
           </select>
         </div>
         <div style={{ alignSelf: 'flex-end' }}>
-          <span style={{ fontSize: '12px', color: '#333' }}>Mostrando {equiposFiltrados.length} de {equipos.length}</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Mostrando {equiposFiltrados.length} de {equipos.length}</span>
         </div>
       </div>
 
       {cargando ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+        <div className="salas-grid">
           {[1, 2, 3, 4].map(n => (
-            <div key={n} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '15px', height: '160px', background: '#f5f5f5' }} />
+            <div key={n} className="card" style={{ height: '180px', background: 'var(--surface-color)', opacity: '0.6' }} />
           ))}
         </div>
       ) : equipos.length === 0 ? (
-        <p>No hay equipos registrados.</p>
+        <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔧</div>
+          <h3 style={{ margin: '0 0 0.5rem' }}>No hay equipos registrados</h3>
+          <p style={{ margin: '0 0 1rem', color: 'var(--text-secondary)' }}>Registrá tu primer equipo para empezar a controlarlo.</p>
+          <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => { setEquipoEditando(null); setModalAbierto(true); }}>
+            ➕ Nuevo equipo
+          </button>
+        </div>
       ) : equiposFiltrados.length === 0 ? (
-        <p>No hay equipos que coincidan con los filtros.</p>
+        <div className="card" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>No hay equipos que coincidan con los filtros.</p>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-          {equiposFiltrados.map(eq => (
-            <div key={eq._docId} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '15px', position: 'relative', background: 'white' }}>
-              <span style={{ 
-                position: 'absolute', top: '10px', right: '10px', 
-                background: getBadgeColor(eq.estado_operativo), color: 'white', 
-                padding: '3px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold'
-              }}>
-                {eq.estado_operativo}
-              </span>
-              <h3 style={{ margin: '0 0 5px 0', paddingRight: '100px' }}>{eq.nombre}</h3>
-              <p style={{ margin: '0 0 5px 0', color: '#555', fontSize: '14px' }}>
-                <strong>{eq.categoria}</strong> {eq.marca_modelo && `· ${eq.marca_modelo}`}
-              </p>
-              <p style={{ margin: '0 0 15px 0', fontSize: '13px' }}>
-                📍 Sala: {getSalaNombre(eq.sala_actual_id)}
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  className="btn-secondary" 
-                  style={{ flex: 1, padding: '6px' }}
-                  onClick={() => navigate(`/equipos/${eq._docId}`)}
-                >
-                  🔧 Mantenimiento
-                </button>
-                <button 
-                  className="btn-secondary" 
-                  style={{ padding: '6px' }}
-                  onClick={() => { setEquipoEditando(eq); setModalAbierto(true); }}
-                >
-                  ✏️ Editar
-                </button>
+        <div className="salas-grid">
+          {equiposFiltrados.map(eq => {
+            const ec = getEstadoConfig(eq.estado_operativo);
+            return (
+              <div key={eq._docId} className="card sala-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                {eq.foto_url && (
+                  <img
+                    src={eq.foto_url}
+                    alt={eq.nombre}
+                    className="no-print"
+                    style={{
+                      width: '100%',
+                      height: '150px',
+                      objectFit: 'cover',
+                      borderRadius: '12px',
+                      marginBottom: '1rem',
+                      transition: 'transform 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  />
+                )}
+                <div className="sala-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.5rem' }}>
+                    <span className="label-id" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{eq._docId}</span>
+                    <button className="edit-icon-btn" title="Copiar ID" onClick={() => copyId(eq._docId)} style={{ fontSize: '0.75rem' }}>📋</button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: `${ec.color}22`, color: ec.color, border: `1px solid ${ec.color}44`, display: 'inline-block', marginBottom: '0.5rem' }}>
+                    {ec.badge} {eq.estado_operativo}
+                  </span>
+                </div>
+                <h3 style={{ margin: '0 0 0.4rem', fontSize: '1.05rem' }}>{eq.nombre}</h3>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                  🔧 {eq.categoria}{eq.marca_modelo ? ` · ${eq.marca_modelo}` : ''}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                  📍 {getSalaNombre(eq.sala_actual_id)}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  👤 {eq.propietario}
+                </div>
+                {eq.notas && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginBottom: '0.5rem' }}>
+                    {eq.notas}
+                  </p>
+                )}
+                <div className="flex-gap no-print" style={{ marginTop: 'auto' }}>
+                  <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', flex: '1 1 auto' }} onClick={() => navigate(`/equipos/${eq._docId}`)}>
+                    🔧 Mantenimiento
+                  </button>
+                  <button className="edit-icon-btn" title="Editar" onClick={() => { setEquipoEditando(eq); setModalAbierto(true); }}>✏️</button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
