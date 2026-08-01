@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { crearEventoCriopreservacion, crearCrioviales } from '../services/criobancService';
+import PrintLabelsModal from '../components/PrintLabelsModal';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -44,6 +45,7 @@ export default function CriopreservacionNuevaPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [batchesToPrint, setBatchesToPrint] = useState(null);
 
   // Datos del origen (batch o ejemplar)
   const [origen, setOrigen] = useState(null); // { genero, especie, cepa, ejemplar_id, batch_origen_id }
@@ -151,14 +153,29 @@ export default function CriopreservacionNuevaPage() {
         notas: evento.notas,
       });
 
-      await crearCrioviales(eventoId, filas, {
+      const criovialIds = await crearCrioviales(eventoId, filas, {
         ejemplar_id: origen.ejemplar_id ?? null,
         genero: origen.genero,
         especie: origen.especie,
         cepa: origen.cepa,
       });
 
-      navigate('/criobanco');
+      const printBatches = criovialIds.map((id, i) => {
+        const fila = filas[i];
+        return {
+          id,
+          alias: `${origen.genero} ${origen.especie}`.trim(),
+          especie: `${origen.genero} ${origen.especie}`.trim(),
+          fecha: evento.fecha || new Date().toISOString().split('T')[0],
+          operario: evento.operario || 'Sistema',
+          nombre_receta: fila?.medio_criopreservacion || globals.medio_criopreservacion || 'Medio de Criopreservación',
+          tipo_uso: 'Criovial',
+          tipo_etiqueta: 'MICRO_TUBOS',
+          tipo_inoculacion: 'criopreservacion'
+        };
+      });
+
+      setBatchesToPrint(printBatches);
     } catch (e) {
       // Si el batch falla: toast de error, NO resetear el formulario
       setError('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
@@ -180,6 +197,19 @@ export default function CriopreservacionNuevaPage() {
       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
         🔄 Cargando datos del origen...
       </div>
+    );
+  }
+
+  if (batchesToPrint) {
+    return (
+      <PrintLabelsModal
+        batches={batchesToPrint}
+        usuarioActivo={evento.operario || 'Sistema'}
+        onClose={() => {
+          setBatchesToPrint(null);
+          navigate('/criobanco');
+        }}
+      />
     );
   }
 

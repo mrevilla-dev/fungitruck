@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, updateDoc, serverTimestamp, collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { uploadFileToDrive } from '../services/driveService';
@@ -17,6 +18,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showCosechaModal, setShowCosechaModal] = useState(false);
@@ -200,14 +202,14 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
                 <button
                   className="btn btn-outline"
                   style={{ color: 'var(--primary-color)', borderColor: 'var(--primary-color)', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                  onClick={() => window.open(`/arbol/batch/${batch.id}`, '_blank')}
+                  onClick={() => navigate(`/arbol/batch/${batch.id}`)}
                 >
                   🌳 Ver Árbol
                 </button>
                 <button
                   className="btn btn-outline"
                   style={{ color: '#3b82f6', borderColor: '#3b82f6', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                  onClick={() => window.open(`/criobanco/nuevo/batch/${batch.id}`, '_blank')}
+                  onClick={() => navigate(`/criobanco/nuevo/batch/${batch.id}`)}
                 >
                   🧊 Criopreservar
                 </button>
