@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { getEquipos, crearEquipo, actualizarEquipo } from '../services/equipoService';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { crearEquipo, actualizarEquipo } from '../services/equipoService';
+import { collection, getDocs, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import EquipoFormModal from '../components/EquipoFormModal';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ export default function EquiposPage({ user }) {
   const [equipos, setEquipos] = useState([]);
   const [salas, setSalas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [equipoEditando, setEquipoEditando] = useState(null);
   const navigate = useNavigate();
@@ -19,40 +20,56 @@ export default function EquiposPage({ user }) {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroSala, setFiltroSala] = useState('');
   const [filtroPropietario, setFiltroPropietario] = useState('');
+  const [busquedaTexto, setBusquedaTexto] = useState('');
 
+  // Listener de equipos: query simple (sin índice compuesto) + filtrado en cliente
   useEffect(() => {
-    cargarDatos();
-  }, [filtroCategoria, filtroEstado, filtroSala]);
-
-  async function cargarDatos() {
-    setCargando(true);
-    try {
-      // Cargar salas para los filtros
-      if (salas.length === 0) {
-        const snapSalas = await getDocs(query(collection(db, 'salas'), orderBy('nombre')));
-        setSalas(snapSalas.docs.map(d => ({ id: d.id, ...d.data() })));
+    const q = query(collection(db, 'equipos'), orderBy('fecha_creacion', 'desc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setEquipos(snap.docs.map(d => ({ ...d.data(), _docId: d.id })));
+        setCargando(false);
+        setErrorCarga('');
+      },
+      (err) => {
+        console.error('Error escuchando equipos:', err);
+        setCargando(false);
+        setErrorCarga('No se pudieron cargar los equipos.');
       }
+    );
+    return unsub;
+  }, []);
 
-      const filtros = {};
-      if (filtroCategoria) filtros.categoria = filtroCategoria;
-      if (filtroEstado) filtros.estado_operativo = filtroEstado;
-      if (filtroSala) filtros.sala_actual_id = filtroSala;
+  // Salas (una sola carga, para filtros y cards)
+  useEffect(() => {
+    let activo = true;
+    getDocs(query(collection(db, 'salas'), orderBy('nombre')))
+      .then(snap => { if (activo) setSalas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); })
+      .catch(err => console.error('Error cargando salas:', err));
+    return () => { activo = false; };
+  }, []);
 
-      let res = await getEquipos(filtros);
+  const categoriasUnicas = useMemo(
+    () => [...new Set(equipos.map(e => e.categoria).filter(Boolean))].sort(),
+    [equipos]
+  );
 
-      // Filtro cliente para propietario
-      if (filtroPropietario) {
-        res = res.filter(e => e.propietario === filtroPropietario);
-      }
-
-      setEquipos(res);
-    } catch (err) {
-      console.error(err);
-      toast.error('Error cargando equipos');
-    } finally {
-      setCargando(false);
+  const equiposFiltrados = useMemo(() => equipos.filter(eq => {
+    if (filtroCategoria && eq.categoria !== filtroCategoria) return false;
+    if (filtroEstado && eq.estado_operativo !== filtroEstado) return false;
+    if (filtroSala && eq.sala_actual_id !== filtroSala) return false;
+    if (filtroPropietario && eq.propietario !== filtroPropietario) return false;
+    if (busquedaTexto) {
+      const s = busquedaTexto.toLowerCase();
+      const match = (eq.nombre || '').toLowerCase().includes(s) ||
+                    (eq.marca_modelo || '').toLowerCase().includes(s) ||
+                    (eq.notas || '').toLowerCase().includes(s) ||
+                    (eq._docId || '').toLowerCase().includes(s);
+      if (!match) return false;
     }
-  }
+    return true;
+  }), [equipos, filtroCategoria, filtroEstado, filtroSala, filtroPropietario, busquedaTexto]);
 
   async function handleGuardar(datos, id) {
     try {
@@ -63,7 +80,7 @@ export default function EquiposPage({ user }) {
       }
       setModalAbierto(false);
       setEquipoEditando(null);
-      cargarDatos();
+      toast.success('Equipo guardado');
     } catch (err) {
       console.error(err);
       toast.error('Error al guardar');
@@ -94,16 +111,27 @@ export default function EquiposPage({ user }) {
         </button>
       </div>
 
+      {errorCarga && (
+        <div className="form-error-banner" style={{ margin: '16px 0' }}>
+          ⚠️ {errorCarga}
+        </div>
+      )}
+
       <div className="filters-card" style={{ display: 'flex', gap: '10px', margin: '20px 0', padding: '15px', background: '#f5f5f5', borderRadius: '8px', flexWrap: 'wrap' }}>
+        <div>
+          <label style={{ display: 'block', fontSize: '12px' }}>🔍 Buscar</label>
+          <input
+            type="text"
+            placeholder="Nombre, marca, ID..."
+            value={busquedaTexto}
+            onChange={e => setBusquedaTexto(e.target.value)}
+          />
+        </div>
         <div>
           <label style={{ display: 'block', fontSize: '12px' }}>Categoría</label>
           <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
             <option value="">Todas</option>
-            <option value="Incubación">Incubación</option>
-            <option value="Refrigeración">Refrigeración</option>
-            <option value="Freezer">Freezer</option>
-            <option value="Laboratorio">Laboratorio</option>
-            <option value="Otro">Otro</option>
+            {categoriasUnicas.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
@@ -124,22 +152,31 @@ export default function EquiposPage({ user }) {
         </div>
         <div>
           <label style={{ display: 'block', fontSize: '12px' }}>Propietario</label>
-          <select value={filtroPropietario} onChange={e => { setFiltroPropietario(e.target.value); cargarDatos(); }}>
+          <select value={filtroPropietario} onChange={e => setFiltroPropietario(e.target.value)}>
             <option value="">Todos</option>
             <option value="Facultad">Facultad</option>
             <option value="Emprendimiento">Emprendimiento</option>
             <option value="Personal">Personal</option>
           </select>
         </div>
+        <div style={{ alignSelf: 'flex-end' }}>
+          <span style={{ fontSize: '12px', color: '#333' }}>Mostrando {equiposFiltrados.length} de {equipos.length}</span>
+        </div>
       </div>
 
       {cargando ? (
-        <p>Cargando equipos...</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+          {[1, 2, 3, 4].map(n => (
+            <div key={n} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '15px', height: '160px', background: '#f5f5f5' }} />
+          ))}
+        </div>
       ) : equipos.length === 0 ? (
-        <p>No se encontraron equipos.</p>
+        <p>No hay equipos registrados.</p>
+      ) : equiposFiltrados.length === 0 ? (
+        <p>No hay equipos que coincidan con los filtros.</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-          {equipos.map(eq => (
+          {equiposFiltrados.map(eq => (
             <div key={eq._docId} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '15px', position: 'relative', background: 'white' }}>
               <span style={{ 
                 position: 'absolute', top: '10px', right: '10px', 
