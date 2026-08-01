@@ -32,7 +32,7 @@ export async function crearEquipo(datos) {
     valor_residual: datos.valor_residual ?? 0,
     sala_actual_id: datos.sala_actual_id ?? null,
     es_destino_de_batches: CATEGORIAS_DESTINO.includes(datos.categoria),
-    estado_operativo: 'Operativo',
+    estado_operativo: datos.estado_operativo ?? 'Operativo',
     parametros_ideales: {
       temp_min: datos.temp_min ?? null,
       temp_max: datos.temp_max ?? null,
