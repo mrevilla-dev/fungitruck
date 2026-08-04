@@ -133,6 +133,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
         externo: false,
         operator: authName,
         estado: 'Activo',
+        eliminado: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });

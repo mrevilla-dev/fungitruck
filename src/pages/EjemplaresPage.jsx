@@ -244,6 +244,7 @@ export default function EjemplaresPage() {
           transaction.set(newDocRef, {
             ...payload,
             id_semantico: newId,
+            eliminado: false,
             createdAt: serverTimestamp(),
           });
         });

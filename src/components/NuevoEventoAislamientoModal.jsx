@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import {
-  collection, doc, onSnapshot, orderBy, query, getDoc, setDoc,
-  serverTimestamp, runTransaction, writeBatch, collectionGroup, increment, where
+  collection, doc, onSnapshot, query, getDoc, setDoc,
+  serverTimestamp, runTransaction, writeBatch, increment
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
@@ -103,14 +103,14 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
 
   // Escuchar ejemplares para el SearchableSelect
   useEffect(() => {
-    const q = query(
-      collection(db, 'ejemplares'),
-      where('eliminado', '==', false),
-      orderBy('createdAt', 'desc')
-    );
-    const unsub = onSnapshot(q, snap => {
-      setEjemplares(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsub = onSnapshot(collection(db, 'ejemplares'), snap => {
+      setEjemplares(
+        snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(e => !e.eliminado)
+          .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+      );
+    }, err => console.error('Error cargando ejemplares:', err));
     return unsub;
   }, []);
 
@@ -370,6 +370,9 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
               onChange={val => handleChange('ejemplar_origen_id', val)}
               placeholder="— Buscar ejemplar —"
             />
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.35rem', lineHeight: 1.4 }}>
+              Solo se listan ejemplares. Si venís de un esporoma, generá el ejemplar con «+ Nueva Derivación» en Esporomas o crealo en Ejemplares.
+            </p>
             <div style={{ marginTop: '0.5rem' }}>
               <ScanInput
                 onScan={async (scannedId) => {
