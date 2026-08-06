@@ -267,9 +267,11 @@ function ScannerPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
             <div>
-              <label className="form-label">Stock Disponible</label>
+              <label className="form-label">Disponible</label>
               <p style={{ margin: 0, fontWeight: '700', fontSize: '1.2rem' }}>
-                {recordData.stock_bulk?.cantidad_actual} {recordData.stock_bulk?.unidad}
+                {recordData.subfraccion
+                  ? `${recordData.subfraccion.disponible ?? recordData.subfraccion.cantidad ?? 0} ${recordData.subfraccion.tipo_unidad || 'unidades'}`
+                  : `${recordData.stock_bulk?.cantidad_actual ?? 0} ${recordData.stock_bulk?.unidad ?? ''}`}
               </p>
             </div>
             <div>
@@ -280,6 +282,12 @@ function ScannerPage() {
               <label className="form-label">Fecha de Preparación</label>
               <p style={{ margin: 0 }}>📅 {recordData.trazabilidad?.fecha_preparacion || '—'}</p>
             </div>
+            {recordData.subfraccion?.volumen_por_unidad_ml && (
+              <div>
+                <label className="form-label">Volumen por Unidad</label>
+                <p style={{ margin: 0 }}>💧 {recordData.subfraccion.volumen_por_unidad_ml} ml</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
