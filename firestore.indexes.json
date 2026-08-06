@@ -1,0 +1,56 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "insumos_lotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estado_apertura",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cantidad_base_actual",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "insumos_lotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estado_apertura",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "insumoId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cantidad_base_actual",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "subfracciones",
+      "fieldPath": "id_bolsa",
+      "indexes": [
+        {
+          "queryScope": "COLLECTION_GROUP",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ]
+}

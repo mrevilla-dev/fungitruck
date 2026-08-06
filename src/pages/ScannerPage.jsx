@@ -102,13 +102,17 @@ function ScannerPage() {
         }
       }
 
+      const esIdValido = (s) => Boolean(s) && !s.includes('/') && s.length <= 1500;
+
       // 1. Intentar como Medio Preparado (ID de Firestore)
-      const medioDoc = await getDoc(doc(db, "medios_preparados", id));
-      if (medioDoc.exists()) {
-        setRecordData({ dbId: id, ...medioDoc.data() });
-        setRecordType('medio');
-        setLoading(false);
-        return;
+      if (esIdValido(id)) {
+        const medioDoc = await getDoc(doc(db, "medios_preparados", id));
+        if (medioDoc.exists()) {
+          setRecordData({ dbId: id, ...medioDoc.data() });
+          setRecordType('medio');
+          setLoading(false);
+          return;
+        }
       }
 
       // 3. Intentar como Lote de Insumo (insumos_lotes)
@@ -122,17 +126,19 @@ function ScannerPage() {
       }
 
       // 4. Intentar como Insumo Base (Maestro)
-      const insumoDoc = await getDoc(doc(db, "insumos_base", id));
-      if (insumoDoc.exists()) {
-        setRecordData({ id: id, ...insumoDoc.data() });
-        setRecordType('insumo_base');
-        setLoading(false);
-        return;
+      if (esIdValido(id)) {
+        const insumoDoc = await getDoc(doc(db, "insumos_base", id));
+        if (insumoDoc.exists()) {
+          setRecordData({ id: id, ...insumoDoc.data() });
+          setRecordType('insumo_base');
+          setLoading(false);
+          return;
+        }
       }
 
       // 5. Intentar como Batch (legacy)
-      const batchDoc = await getDoc(doc(db, "batches", id));
-      if (batchDoc.exists()) {
+      const batchDoc = esIdValido(id) ? await getDoc(doc(db, "batches", id)) : null;
+      if (batchDoc && batchDoc.exists()) {
         setRecordData(batchDoc.data());
         setRecordType('batch');
         const hQuery = query(collection(db, "tracking"), where("batchId", "==", id), orderBy("createdAt", "desc"));
@@ -146,7 +152,7 @@ function ScannerPage() {
       setScanResult(null);
     } catch (err) {
       console.error("Error al buscar:", err);
-      toast.error("Error al buscar el registro.");
+      toast.error(`Error al buscar el registro: ${err?.message || err}`);
       setScanResult(null);
     } finally {
       setLoading(false);
