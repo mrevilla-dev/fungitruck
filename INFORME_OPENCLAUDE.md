@@ -121,7 +121,7 @@ Uso real en laboratorio. Flujo probado: medio creado → subfraccionado → espo
 | 3 | Árbol genealógico "con cosas por mejorar" | ⏳ Cualitativo, pendiente de auditoría (`ArbolGenealogicoPage.jsx` + `construirArbolGenealogico.js`) |
 | 4 | Etiquetas impresas "con algunos problemas" | ⏳ Cualitativo, pendiente de revisión (`PrintLabelsModal.jsx` + `zplProfiles.js`) |
 
-### 🔧 Fix escaneo QR del medio (sesión de lab) — commit pendiente de hash
+### 🔧 Fix escaneo QR del medio (sesión de lab) — commit `e64d8bc` (pusheado + deploy)
 **Síntoma:** el QR de la etiqueta del medio (bolsa/frasco subfraccionado) se lee pero la tarjeta sale vacía ("no lo encuentra").
 
 **Causa raíz (verificada en código):**
