@@ -65,14 +65,25 @@ function ScannerPage() {
         return;
       }
 
-      // 0b. Subfracción (FRAC-) — buscar por id_bolsa en collectionGroup
+      // 0b. Subfracción (FRAC-) — buscar por id_bolsa en collectionGroup y resolver el medio padre
       if (id.startsWith('FRAC-')) {
         const qSub = query(collectionGroup(db, 'subfracciones'), where('id_bolsa', '==', id));
         const snapSub = await getDocs(qSub);
         if (!snapSub.empty) {
           const subDoc = snapSub.docs[0];
-          const parentPath = subDoc.ref.parent.parent;
-          setRecordData({ dbId: subDoc.id, medioId: parentPath?.id, ...subDoc.data() });
+          const parentRef = subDoc.ref.parent.parent;
+          const subData = subDoc.data();
+          let medioData = {};
+          if (parentRef) {
+            const parentSnap = await getDoc(parentRef);
+            if (parentSnap.exists()) medioData = parentSnap.data();
+          }
+          setRecordData({
+            dbId: subDoc.id,
+            medioId: parentRef?.id,
+            subfraccion: { ...subData },
+            ...medioData
+          });
           setRecordType('medio');
           setLoading(false);
           return;
@@ -220,6 +231,27 @@ function ScannerPage() {
         </div>
 
         <div className="card" style={{ borderTop: '6px solid var(--primary-color)' }}>
+          {recordData.subfraccion && (
+            <div style={{
+              background: 'rgba(59,130,246,0.1)',
+              border: '1px solid rgba(59,130,246,0.25)',
+              borderRadius: '8px',
+              padding: '0.6rem 0.9rem',
+              fontSize: '0.85rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <span>🔎 Bolsa escaneada: <strong style={{ fontFamily: 'monospace' }}>{recordData.subfraccion.id_bolsa}</strong></span>
+              <span>
+                {recordData.subfraccion.tipo_envase} · {recordData.subfraccion.tipo_unidad || '—'} ·{' '}
+                <strong>{recordData.subfraccion.disponible ?? recordData.subfraccion.cantidad ?? 0} disp.</strong>
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h2 style={{ marginBottom: '0.25rem' }}>{recordData.alias}</h2>

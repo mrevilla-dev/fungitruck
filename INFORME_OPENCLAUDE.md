@@ -1,6 +1,6 @@
 # INFORME PARA OPENCLAUDE — FungiTrack
 
-**Fecha:** 02/08/2026
+**Fecha:** 02/08/2026 (última actualización: 05/08/2026 — sesión de validación en labo)
 **Repo:** https://github.com/mrevilla-dev/fungitruck (rama `main`)
 **Web:** https://fungitrack-9b463.web.app (Firebase Hosting)
 **Stack:** Vite + React 18 + Firebase (Firestore, Auth, Hosting) + Google Drive API
@@ -111,6 +111,28 @@ Diagnóstico previo: el toast "Error cargando equipos" venía de queries con `wh
 | `dc9a7b2` | Overflow: `flex-wrap` en `.sala-header` y `.flex-gap`. |
 | `38b1936` | Responsive mobile (`@media max-width: 768px`). |
 
+### 🔎 Sesión de lab (05/08/2026): hallazgos de campo
+Uso real en laboratorio. Flujo probado: medio creado → subfraccionado → esporoma registrado → aislamiento primario logrado tras varios intentos; 3 placas físicas registradas; árbol "con cosas por mejorar"; etiquetas impresas "con algunos problemas"; escaneo de QR del medio "lo lee pero no lo encuentra".
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| 1 | **Escaneo QR del medio preparado no muestra el registro** | ✅ **FIXEADO** (ver abajo, commit de esta sesión) |
+| 2 | Aislamiento primario "tras varios intentos" (selector de origen / ejemplares nuevos) | ⏳ Cualitativo, pendiente de auditoría (el fix `9afb20f` ya cubrió la parte de ejemplares nuevos en el selector) |
+| 3 | Árbol genealógico "con cosas por mejorar" | ⏳ Cualitativo, pendiente de auditoría (`ArbolGenealogicoPage.jsx` + `construirArbolGenealogico.js`) |
+| 4 | Etiquetas impresas "con algunos problemas" | ⏳ Cualitativo, pendiente de revisión (`PrintLabelsModal.jsx` + `zplProfiles.js`) |
+
+### 🔧 Fix escaneo QR del medio (sesión de lab) — commit pendiente de hash
+**Síntoma:** el QR de la etiqueta del medio (bolsa/frasco subfraccionado) se lee pero la tarjeta sale vacía ("no lo encuentra").
+
+**Causa raíz (verificada en código):**
+- La etiqueta del medio codifica el `id_bolsa` de la **subfracción** (`FRAC-{CODIGO}-{YYYYMMDD}-{LETRA}`), generado en `NuevoMedioModal.jsx:656-724` y usado como `batch.id` en `PrintLabelsModal.jsx:372` y `zplProfiles.js:166` (el QR = `batch.id`).
+- En `ScannerPage.jsx`, la rama `FRAC-` encontraba la subfracción vía `collectionGroup('subfracciones')` pero **reemplazaba `recordData` con los campos de la subfracción** (`id_bolsa`, `tipo_envase`, `cantidad`, `fecha`…) y marcaba `recordType='medio'`. La vista de medio lee campos del doc `medios_preparados` (`alias`, `nombre_receta`, `stock_bulk`, `trazabilidad`) → todos `undefined` → tarjeta en blanco.
+- El medio padre (`subDoc.ref.parent.parent`) estaba disponible pero nunca se usaba.
+
+**Fix aplicado (solo `ScannerPage.jsx`):** en la rama `FRAC-` se hace `getDoc` del medio padre y se mergea su data en `recordData`. Además, la vista de medio ahora muestra un badge con la bolsa escaneada (`id_bolsa`, tipo de envase, unidades disponibles).
+
+**Gap latente detectado (sin tocar):** la rama `MED-` de `ScannerPage` consulta `where('id_semantico','==',id)` en `medios_preparados`, pero ese campo **no se guarda** al crear medios → es código muerto. Si en el futuro las etiquetas de medios usan IDs `MED-...`, hay que generar/guardar `id_semantico` al crear el medio.
+
 ### 🧫 Ejemplares (previo)
 | Commit | Qué |
 |---|---|
@@ -131,6 +153,7 @@ Diagnóstico previo: el toast "Error cargando equipos" venía de queries con `wh
 | `src/components/BatchEditModal.jsx` | Navegación con `useNavigate` en vez de `window.open`. |
 | `src/components/NuevoEventoAislamientoModal.jsx` | Import completo de Firestore (fix `where`). |
 | `src/hooks/useMediosDisponibles.js` | Hook DRY de medios. |
+| `src/pages/ScannerPage.jsx` | Escáner QR. Rama `FRAC-` resuelve el medio padre (`getDoc`) + badge de bolsa escaneada (fix sesión lab 05/08). Rama `MED-` es código muerto (ver Pendientes). |
 | `src/utils/idGenerator.js` | **NO TOCAR** (lógica de IDs semánticos). |
 | `src/index.css` | Variables CSS dark + `.salas-grid`, `.flex-gap`, `.card`, `.sala-card`, `@media 768px`. |
 
@@ -138,11 +161,16 @@ Diagnóstico previo: el toast "Error cargando equipos" venía de queries con `wh
 
 ## 6. Pendientes / recomendaciones para la próxima sesión
 
-1. **Validar en el labo:** entrar a Equipos → filtros funcionando; editar un equipo migrado y asignarle sala/estado real; crear un aislamiento (fix `where`); crear una criopreservación y probar la impresión de etiquetas.
-2. **Índices compuestos:** si se quiere volver a filtros server-side en algún lado, crear `firestore.indexes.json` + `firestore.rules` y subirlos con `firebase deploy`. Hoy todo el filtrado de Equipos es en cliente para evitarlo.
-3. **Datos de equipos migrados:** la categoría/sala/estado reales hay que cargarlos (por UI o una migración de datos puntual) — no es un bug de código.
-4. **`getMantenimientosDeEquipo`** usa `where('equipo_id') + orderBy('createdAt')` → requiere índice compuesto. Si el historial de mantenimiento no aparece en el detalle, es eso (crear el índice o pasar a filtrado en cliente).
-5. **Errores de consola benignos conocidos:** CORS a `http://localhost:11434/api/tags` desde el dominio (el router cae a Gemini, esperable), `sw.js` con respuestas de error, fotos de Google Drive devolviendo 403 (no bloquean el flujo).
+1. **Auditar hallazgos cualitativos del lab** (sin arreglar todavía, falta pedir el texto de error/evidencia concreta):
+   - **Aislamiento primario "varios intentos":** revisar flujo completo en `NuevoEventoAislamientoModal.jsx` / `DerivacionEsporomaModal.jsx` / `EjemplaresPage.jsx`. El fix `9afb20f` (ejemplares nuevos no aparecían en el selector de origen) ya está en la web. Preguntar a Maxi qué exactamente falló en el lab.
+   - **Árbol genealógico "con cosas por mejorar":** auditar `ArbolGenealogicoPage.jsx` + `construirArbolGenealogico.js` (relaciones esporoma→ejemplar→batch→cosecha→criovial).
+   - **Etiquetas "con algunos problemas":** revisar `PrintLabelsModal.jsx` + `zplProfiles.js` (layout, tamaño de QR, `^BQN` vs contenido).
+2. **Validar en el labo:** escanear el QR de una bolsa/frasco de medio → debe mostrar la ficha del medio con el badge de la bolsa escaneada. Confirmar que el fix del QR anda en el celular real.
+3. **Gap `MED-` (deuda):** las etiquetas de medios no guardan `id_semantico`. Decidir si generar `id_semantico` al crear el medio (alineado con el resto de módulos) o eliminar la rama `MED-` de `ScannerPage`.
+4. **Índices compuestos:** si se quiere volver a filtros server-side en algún lado, crear `firestore.indexes.json` + `firestore.rules` y subirlos con `firebase deploy`. Hoy todo el filtrado de Equipos es en cliente para evitarlo.
+5. **Datos de equipos migrados:** la categoría/sala/estado reales hay que cargarlos (por UI o una migración de datos puntual) — no es un bug de código.
+6. **`getMantenimientosDeEquipo`** usa `where('equipo_id') + orderBy('createdAt')` → requiere índice compuesto. Si el historial de mantenimiento no aparece en el detalle, es eso (crear el índice o pasar a filtrado en cliente).
+7. **Errores de consola benignos conocidos:** CORS a `http://localhost:11434/api/tags` desde el dominio (el router cae a Gemini, esperable), `sw.js` con respuestas de error, fotos de Google Drive devolviendo 403 (no bloquean el flujo).
 
 ---
 
