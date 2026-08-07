@@ -4,6 +4,7 @@ import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increm
 import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdEsporoma, generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
+import { getTipoMaterialCodigo } from '../utils/tipoMaterialCodes';
 import SearchableSelect from '../components/SearchableSelect';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import ScanInput from '../components/ScanInput';
@@ -341,7 +342,7 @@ export default function IngresoMaterialPage() {
 
           const ejemplarId = generarIdEjemplar({
             genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
-            tipo_micelio_codigo: deriv.tipo_micelio, fecha_iso: formValues.fecha, secuencia: seqEsp + derivIdx
+            tipo_micelio_codigo: getTipoMaterialCodigo(deriv.tipo_material), fecha_iso: formValues.fecha, secuencia: seqEsp + derivIdx
           });
 
           wb.set(doc(db, 'ejemplares', ejemplarId), {
@@ -481,7 +482,7 @@ export default function IngresoMaterialPage() {
 
         const ejemplarId = generarIdEjemplar({
           genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
-          tipo_micelio_codigo: formValues.tipo_micelio, fecha_iso: formValues.fecha, secuencia: seqEje
+          tipo_micelio_codigo: getTipoMaterialCodigo(formValues.formato_recepcion), fecha_iso: formValues.fecha, secuencia: seqEje
         });
 
         let fotoUrl = null;

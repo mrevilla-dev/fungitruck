@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
+import { getTipoMaterialCodigo } from '../utils/tipoMaterialCodes';
 import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
 import { uploadFileToDrive } from '../services/driveService';
@@ -116,7 +117,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
 
       const ejemplarId = generarIdEjemplar({
         genero: esporoma.genero, especie: esporoma.especie, codigo_cepa: esporoma.codigo_cepa,
-        tipo_micelio_codigo: formData.tipo_micelio, fecha_iso: todayIso, secuencia: seqEsp
+        tipo_micelio_codigo: getTipoMaterialCodigo(formData.tipo_material), fecha_iso: todayIso, secuencia: seqEsp
       });
 
       wb.set(doc(db, 'ejemplares', ejemplarId), {
