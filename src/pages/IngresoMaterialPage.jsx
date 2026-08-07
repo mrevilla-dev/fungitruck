@@ -274,7 +274,16 @@ export default function IngresoMaterialPage() {
           t.set(counterRef, { [seqKeyEsp]: seqEsp, [batchSeqKey]: seqBatch + derivaciones.filter(d => d.tipo_derivacion==='humeda').length }, { merge: true });
         });
 
-        const origenCode = formValues.origen === 'Silvestre' ? 'SIL' : 'INT';
+        const origenMap = {
+          'Silvestre': 'SIL',
+          'Cultivo interno': 'INT',
+          'Compra a productor': 'PRO',
+          'Comercial': 'COM',
+          'Intercambio': 'EXC',
+          'Donación': 'DON',
+          'Desconocido': 'DES'
+        };
+        const origenCode = origenMap[formValues.origen] || 'UNK';
         
         const esporomaId = generarIdEsporoma({
           genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
