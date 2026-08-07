@@ -54,7 +54,7 @@ const EMPTY_EVT = {
   medio_prep_id: '',
   sala_destino_id: '',
   ubicacion_detalle: '',
-  cantidad_unidades: 1,
+  cantidad_unidades: null,
   modo_id: 'individual',
   medio_prep: null,
   fraccion_destino: null,
@@ -222,7 +222,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
         sala_destino_id: formData.sala_destino_id || null,
         contenedor_id: formData.contenedor_id || null,
         ubicacion_detalle: formData.ubicacion_detalle || null,
-        cantidad_unidades: Number(formData.cantidad_unidades) || 1,
+        cantidad_unidades: formData.cantidad_unidades != null && formData.cantidad_unidades !== '' ? Number(formData.cantidad_unidades) : null,
         modo_id: formData.modo_id || 'individual',
         createdAt: serverTimestamp(),
       });
@@ -288,7 +288,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
         });
       }
 
-      const totalDescuento = (Number(formData.cantidad_derivados) || 1) * (Number(formData.cantidad_unidades) || 1);
+      const totalDescuento = Number(formData.cantidad_derivados) || 1;
       if (formData.fraccion_destino && formData.medio_prep) {
         const medioId = formData.fraccion_destino.medioId || formData.medio_prep.id;
         const sfRef = doc(db, 'medios_preparados', medioId, 'subfracciones', formData.fraccion_destino.id);
@@ -523,16 +523,22 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
             />
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Cantidad de unidades <span style={{ color: 'red' }}>*</span></label>
-            <input
-              type="number"
-              className="form-control"
-              min="1"
-              value={formData.cantidad_unidades}
-              onChange={e => handleChange('cantidad_unidades', e.target.value)}
-            />
-          </div>
+          {(formData.tecnica === 'Subcultivo' || formData.tecnica === 'Explanto directo') && (
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">
+                Explantos por placa (opcional)
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>— Solo descriptivo, no afecta stock</span>
+              </label>
+              <input
+                type="number"
+                className="form-control"
+                min="1"
+                value={formData.cantidad_unidades || ''}
+                onChange={e => handleChange('cantidad_unidades', e.target.value)}
+                placeholder="Ej: 3"
+              />
+            </div>
+          )}
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Modo de ID</label>
