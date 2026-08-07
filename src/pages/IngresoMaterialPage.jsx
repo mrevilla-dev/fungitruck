@@ -358,7 +358,7 @@ export default function IngresoMaterialPage() {
             estado: 'Activo',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            tecnica: deriv.tecnica || null,
+            tecnica_aislamiento: deriv.tecnica || null,
             observaciones_derivacion: deriv.observaciones || null,
             foto_derivacion: derivacionFotoUrl
           });

@@ -129,6 +129,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
         tipo_micelio: formData.tipo_micelio || null,
         ploidia: formData.ploidia || null,
         tipo_material: formData.tipo_material || null,
+        tecnica_aislamiento: formData.tecnica || null,
         observaciones: formData.observaciones || null,
         foto_url: fotoUrl,
         fechaIngreso: todayIso,
