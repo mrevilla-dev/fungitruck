@@ -80,11 +80,20 @@ export default function EsporomasPage() {
     if (esp) {
       setEditingEsporoma(esp);
       setFormData({
-        genero: esp.genero,
-        especie: esp.especie,
-        descripcion: esp.descripcion,
-        lugarRecoleccion: esp.lugarRecoleccion,
-        fechaRecoleccion: esp.fechaRecoleccion,
+        genero: esp.genero || '',
+        especie: esp.especie || '',
+        codigo_cepa: esp.codigo_cepa || '',
+        nombre_comun: esp.nombre_comun || '',
+        origen: esp.origen || '',
+        latitud: esp.latitud || '',
+        longitud: esp.longitud || '',
+        batch_origen_id: esp.batch_origen_id || '',
+        productor_nombre: esp.productor_nombre || '',
+        estado_biologico: esp.estado_biologico || 'Esporoma',
+        otro_estado_biologico: esp.otro_estado_biologico || '',
+        descripcion: esp.descripcion || '',
+        lugarRecoleccion: esp.lugarRecoleccion || '',
+        fechaRecoleccion: esp.fechaRecoleccion || new Date().toISOString().split('T')[0],
         ploidia: esp.ploidia || esp.genetica || 'Diploide',
         tipo_micelio: esp.tipo_micelio || 'Dicarión',
         mat: esp.mat || 'N/A',
@@ -93,15 +102,11 @@ export default function EsporomasPage() {
     } else {
       setEditingEsporoma(null);
       setFormData({
-        genero: '',
-        especie: '',
-        descripcion: '',
-        lugarRecoleccion: '',
-        fechaRecoleccion: new Date().toISOString().split('T')[0],
-        ploidia: 'Diploide',
-        tipo_micelio: 'Dicarión',
-        mat: 'N/A',
-        operator: 'Maxi'
+        genero: '', especie: '', codigo_cepa: '', nombre_comun: '', origen: '',
+        latitud: '', longitud: '', batch_origen_id: '', productor_nombre: '',
+        estado_biologico: 'Esporoma', otro_estado_biologico: '', descripcion: '',
+        lugarRecoleccion: '', fechaRecoleccion: new Date().toISOString().split('T')[0],
+        ploidia: 'Diploide', tipo_micelio: 'Dicarión', mat: 'N/A', operator: 'Maxi'
       });
     }
     setPhoto(null);
