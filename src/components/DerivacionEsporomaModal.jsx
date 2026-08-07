@@ -39,6 +39,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
   const [fotoPreview, setFotoPreview] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fotoInputRef = useRef(null);
+  const [crearBatch, setCrearBatch] = useState(false);
 
   useEffect(() => {
     const auth = getAuth();
@@ -55,6 +56,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
 
   const handleChangeTipo = (tipo) => {
     setTipoDerivacion(tipo);
+    setCrearBatch(false);
     setFormData({
       ...formData,
       tipo_material: tipo === 'seca' ? 'Sello de Esporas' : 'Explanto',
@@ -71,7 +73,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (tipoDerivacion === 'humeda') {
+    if (tipoDerivacion === 'humeda' && crearBatch) {
       if (!formData.medio_prep_id) return toast.error("Falta seleccionar el medio preparado.");
       if (!formData.sala_destino_id) return toast.error("Falta seleccionar la sala de destino.");
     }
@@ -95,7 +97,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
         seqBatch = (data[batchSeqKey] || 0) + 1;
         
         const updates = { [seqKeyEsp]: seqEsp };
-        if (tipoDerivacion === 'humeda') {
+        if (tipoDerivacion === 'humeda' && crearBatch) {
           updates[batchSeqKey] = seqBatch + 1;
         }
         t.set(counterRef, updates, { merge: true });
@@ -140,7 +142,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
 
       let resText = `✅ Derivación exitosa.\nNuevo Ejemplar: ${ejemplarId}`;
 
-      if (tipoDerivacion === 'humeda') {
+      if (tipoDerivacion === 'humeda' && crearBatch) {
         const eventoId = generarIdEvento({
           genero: esporoma.genero, especie: esporoma.especie, codigo_cepa: esporoma.codigo_cepa,
           tecnica_codigo: formData.tecnica, fecha_iso: todayIso, secuencia: seqEsp
@@ -312,6 +314,19 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
               <div className="form-group">
                 <label className="form-label">Temp. Incubación</label>
                 <input type="text" className="form-control" value={formData.temperatura} onChange={e => setFormData({ ...formData, temperatura: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={crearBatch}
+                    onChange={e => setCrearBatch(e.target.checked)}
+                  />
+                  <span>Crear batch y consumir medio (marcar si vas a inocular ahora)</span>
+                </label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  Si no marcás, solo se crea el ejemplar (identidad genética) sin consumir insumos.
+                </p>
               </div>
             </div>
           )}
