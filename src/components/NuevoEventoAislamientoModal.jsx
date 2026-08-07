@@ -589,7 +589,12 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
             {loading ? '💾 Guardando...' : '🔬 Registrar Evento'}
           </button>
         </form>
-        {showPrint && <PrintLabelsModal batches={createdBatches} onClose={() => { setShowPrint(false); onClose(); }} usuarioActivo={formData.operario} />}
+        {showPrint && <PrintLabelsModal
+          batches={createdBatches}
+          onClose={() => { setShowPrint(false); onClose(); }}
+          usuarioActivo={formData.operario}
+          initialProfile={createdBatches[0]?.tipo_etiqueta || 'PORTAOBJETOS'}
+        />}
       </div>
     </div>
   );
