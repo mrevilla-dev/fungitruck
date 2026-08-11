@@ -251,7 +251,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
               <label className="form-label">Tipo de Material</label>
               <select className="form-control" value={formData.tipo_material} onChange={e => setFormData({ ...formData, tipo_material: e.target.value })} required>
                 {opcionesDe('tipo_material').map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
             </div>
@@ -259,7 +259,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
               <label className="form-label">Tipo de Micelio</label>
               <select className="form-control" value={formData.tipo_micelio} onChange={e => setFormData({ ...formData, tipo_micelio: e.target.value })}>
                 {opcionesDe('tipo_micelio').map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
             </div>
@@ -267,7 +267,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
               <label className="form-label">Ploidía</label>
               <select className="form-control" value={formData.ploidia} onChange={e => setFormData({ ...formData, ploidia: e.target.value })}>
                 {opcionesDe('ploidia').map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
             </div>
@@ -313,7 +313,7 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
                 <select className="form-control" value={formData.tecnica} onChange={e => setFormData({ ...formData, tecnica: e.target.value })}>
                   <option value="">-- Seleccionar --</option>
                   {opcionesDe('tecnica').map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.id} value={o.id}>{o.label}</option>
                   ))}
                 </select>
               </div>

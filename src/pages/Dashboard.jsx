@@ -4,6 +4,7 @@ import { collection, query, orderBy, limit, onSnapshot, where, doc, updateDoc } 
 import { Link } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 import RegistroMasivoAislamientosModal from '../components/RegistroMasivoAislamientosModal';
+import { idCanonico } from '../utils/vocabulario';
 import toast from 'react-hot-toast';
 
 // Configuración de ciclos teóricos (en días) para el motor de alertas
@@ -228,7 +229,7 @@ export default function Dashboard() {
 
     // Computar Ejemplares sin MAT determinado
     const sinM = ejemplares.filter(e => 
-      e.tipo_micelio === 'Monocarión' && 
+      idCanonico('tipo_micelio', e.tipo_micelio) === 'monocarion' && 
       (!e.mat || e.mat === 'No determinado' || e.mat === 'N/A') &&
       e.estado === 'Activo'
     );

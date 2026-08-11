@@ -28,17 +28,17 @@ const EMPTY_FORM = {
   genero: '',
   especie: '',
   codigo_cepa: '',
-  tipo_material: 'DES',
+  tipo_material: 'micelio',
   procedencia: 'Desconocido',
-  ploidia: 'Diploide',
-  tipo_micelio: 'Dicarión',
+  ploidia: 'nn',
+  tipo_micelio: 'dicarion',
   mat: 'N/A',
   esporomaOrigenId: '',
   ejemplarPadreId: '',
   evento_aislamiento_id: '',
   tecnica_aislamiento: '',
-  fecha_ingreso: new Date().toISOString().split('T')[0],
-  operario: '',
+  fechaIngreso: new Date().toISOString().split('T')[0],
+  operator: '',
   observaciones: '',
   estado: 'Activo',
   motivo_inviabilidad: '',
@@ -87,7 +87,7 @@ export default function EjemplaresPage() {
     const q = query(
       collection(db, 'ejemplares'),
       where('eliminado', '==', false),
-      orderBy('fecha_ingreso', 'desc')
+      orderBy('createdAt', 'desc')
     );
     const unsub = onSnapshot(q, snap => {
       setEjemplares(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -152,7 +152,7 @@ export default function EjemplaresPage() {
 
   // Si ploidia cambia a Diploide, resetear mat a N/A
   useEffect(() => {
-    if (formData.ploidia === 'Diploide') {
+    if (formData.ploidia === 'nn' || formData.ploidia === 'diploide') {
       setFormData(prev => ({ ...prev, mat: 'N/A' }));
     }
   }, [formData.ploidia]);
@@ -160,21 +160,22 @@ export default function EjemplaresPage() {
   const openModal = (eje = null) => {
     if (eje) {
       setEditingId(eje.id);
+      const espOrigen = eje.esporomaOrigenId ? esporomas.find(s => s.id === eje.esporomaOrigenId) : null;
       setFormData({
         genero: eje.genero || '',
         especie: eje.especie || '',
         codigo_cepa: eje.codigo_cepa || '',
-        tipo_material: eje.tipo_material || 'DES',
-        procedencia: eje.procedencia || 'Desconocido',
-        ploidia: eje.ploidia || 'Diploide',
-        tipo_micelio: eje.tipo_micelio || 'Dicarión',
+        tipo_material: idCanonico('tipo_material', eje.tipo_material) || 'micelio',
+        procedencia: eje.procedencia || espOrigen?.procedencia || 'Desconocido',
+        ploidia: idCanonico('ploidia', eje.ploidia) || 'nn',
+        tipo_micelio: idCanonico('tipo_micelio', eje.tipo_micelio) || 'dicarion',
         mat: eje.mat || 'N/A',
         esporomaOrigenId: eje.esporomaOrigenId || '',
         ejemplarPadreId: eje.ejemplarPadreId || '',
         evento_aislamiento_id: eje.evento_aislamiento_id || '',
-        tecnica_aislamiento: eje.tecnica_aislamiento || '',
-        fecha_ingreso: eje.fecha_ingreso || new Date().toISOString().split('T')[0],
-        operario: eje.operario || usuarioActivo,
+        tecnica_aislamiento: idCanonico('tecnica', eje.tecnica_aislamiento) || '',
+        fechaIngreso: eje.fechaIngreso || eje.fecha_ingreso || new Date().toISOString().split('T')[0],
+        operator: eje.operator || eje.operario || usuarioActivo,
         observaciones: eje.observaciones || '',
         estado: eje.estado || 'Activo',
         motivo_inviabilidad: eje.motivo_inviabilidad || '',
@@ -194,8 +195,9 @@ export default function EjemplaresPage() {
     ev.preventDefault();
     setLoading(true);
     try {
+      const ejeActual = editingId ? ejemplares.find(e => e.id === editingId) : null;
       let fotoUrl = editingId
-        ? (ejemplares.find(e => e.id === editingId)?.fotoUrl ?? null)
+        ? (ejeActual?.fotoUrl ?? (Array.isArray(ejeActual?.fotos_urls) ? ejeActual.fotos_urls[0] : null) ?? ejeActual?.foto_derivacion ?? ejeActual?.foto_url ?? null)
         : null;
 
       if (photo) {
@@ -216,15 +218,13 @@ export default function EjemplaresPage() {
         estado: formData.estado,
         motivo_inviabilidad: formData.estado === 'Inviable' ? formData.motivo_inviabilidad : '',
         updatedAt: serverTimestamp(),
-        fechaIngreso: formData.fecha_ingreso,
-        operator: formData.operario,
       };
 
       if (editingId) {
         await updateDoc(doc(db, 'ejemplares', editingId), payload);
         toast.success('Ejemplar actualizado');
       } else {
-        const fechaStr = formData.fecha_ingreso;
+        const fechaStr = formData.fechaIngreso;
         const yymmdd = fechaStr.replace(/-/g, '').substring(2);
         const seqKey = `EJE_${yymmdd}`;
         const counterRef = doc(db, 'metadata', 'counters');
@@ -291,7 +291,7 @@ export default function EjemplaresPage() {
     if (filtroEventoTexto) {
       const s = filtroEventoTexto.toLowerCase();
       const matchId = (ev.id_semantico || ev.id || '').toLowerCase().includes(s);
-      const matchTecnica = (ev.tecnica || '').toLowerCase().includes(s);
+      const matchTecnica = (idCanonico('tecnica', ev.tecnica) || ev.tecnica || '').toLowerCase().includes(s);
       const matchOperario = (ev.operario || '').toLowerCase().includes(s);
       if (!matchId && !matchTecnica && !matchOperario) return false;
     }
@@ -398,6 +398,7 @@ export default function EjemplaresPage() {
         <div className="salas-grid">
           {filtered.map(eje => {
             const estadoCfg = ESTADO_CONFIG[eje.estado] || ESTADO_CONFIG.Activo;
+            const fotoEje = eje.fotoUrl || (Array.isArray(eje.fotos_urls) ? eje.fotos_urls[0] : null) || eje.foto_derivacion || eje.foto_url;
             return (
               <div key={eje.id} className="card sala-card" style={{ position: 'relative' }}>
                 {/* Badge estado */}
@@ -413,12 +414,12 @@ export default function EjemplaresPage() {
                 </div>
 
                 {/* Foto */}
-                {eje.fotoUrl && (
+                {fotoEje && (
                   <img
-                    src={eje.fotoUrl}
+                    src={fotoEje}
                     alt={eje.especie}
                     className="no-print"
-                    onClick={() => setLightboxImage(eje.fotoUrl)}
+                    onClick={() => setLightboxImage(fotoEje)}
                     style={{ width: '100%', height: '130px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem', cursor: 'pointer' }}
                   />
                 )}
@@ -438,11 +439,11 @@ export default function EjemplaresPage() {
                 </h3>
 
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '0.75rem' }}>
-                  <span>🧫 {eje.tipo_micelio} · {eje.ploidia}</span>
+                  <span>🧫 {labelDe('tipo_micelio', eje.tipo_micelio, eje)} · {labelDe('ploidia', eje.ploidia, eje)}</span>
                   {eje.mat && eje.mat !== 'N/A' && <span>🔀 {eje.mat}</span>}
                   <span>🔢 Generación {eje.generacion ?? 0}</span>
-                  {eje.fecha_ingreso && <span>📅 {eje.fecha_ingreso}</span>}
-                  {eje.operario && <span>👤 {eje.operario}</span>}
+                  {(eje.fechaIngreso || eje.fecha_ingreso) && <span>📅 {eje.fechaIngreso || eje.fecha_ingreso}</span>}
+                  {(eje.operator || eje.operario) && <span>👤 {eje.operator || eje.operario}</span>}
                   {eje.evento_aislamiento_id && <span>🔬 Evento Origen: {eje.evento_aislamiento_id}</span>}
                   {eje.batch_origen_id && <span>📍 Batch Origen: {eje.batch_origen_id}</span>}
                 </div>
@@ -507,7 +508,7 @@ export default function EjemplaresPage() {
             style={{ width: '100%' }}
           >
             <option value="">Todas las técnicas</option>
-            {tecnicasUnicas.map(t => <option key={t} value={t}>{t}</option>)}
+            {tecnicasUnicas.map(t => <option key={t} value={t}>{labelDe('tecnica', t)}</option>)}
           </select>
         </div>
         <div style={{ flex: '1 1 150px' }}>
@@ -593,7 +594,7 @@ export default function EjemplaresPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-                    {ev.tecnica}
+                    {ev.tecnica ? labelDe('tecnica', ev.tecnica) : ''}
                   </span>
                 </div>
               </div>
@@ -667,9 +668,14 @@ export default function EjemplaresPage() {
                     onChange={e => setFormData({ ...formData, procedencia: e.target.value })}
                   >
                     <option value="Desconocido">Desconocido</option>
+                    <option value="Silvestre">Silvestre</option>
                     <option value="Recolección propia">Recolección propia</option>
                     <option value="Compra a productor">Compra a productor</option>
                     <option value="Comercial">Comercial</option>
+                    <option value="Interna">Interna</option>
+                    <option value="Intercambio">Intercambio</option>
+                    <option value="Donación">Donación</option>
+                    <option value="Cultivo interno">Cultivo interno</option>
                     <option value="Generado internamente">Generado internamente</option>
                   </select>
                 </div>
@@ -683,12 +689,9 @@ export default function EjemplaresPage() {
                   value={formData.tipo_material}
                   onChange={e => setFormData({ ...formData, tipo_material: e.target.value })}
                 >
-                  <option value="ESP">Esporas (placa/sella) [ESP]</option>
-                  <option value="EXP">Explanto [EXP]</option>
-                  <option value="JER">Jeringa (LC) [JER]</option>
-                  <option value="AGA">Micelio en agar [AGA]</option>
-                  <option value="GRA">Micelio en grano [GRA]</option>
-                  <option value="DES">Desconocido [DES]</option>
+                  {opcionesDe('tipo_material').map(o => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -701,9 +704,9 @@ export default function EjemplaresPage() {
                     value={formData.ploidia}
                     onChange={e => setFormData({ ...formData, ploidia: e.target.value })}
                   >
-                    <option value="Haploide">Haploide</option>
-                    <option value="Diploide">Diploide</option>
-                    <option value="No determinado">No determinado</option>
+                    {opcionesDe('ploidia').map(o => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
@@ -713,16 +716,15 @@ export default function EjemplaresPage() {
                     value={formData.tipo_micelio}
                     onChange={e => setFormData({ ...formData, tipo_micelio: e.target.value })}
                   >
-                    <option value="Monocarión">Monocarión</option>
-                    <option value="Dicarión">Dicarión</option>
-                    <option value="Polispórico">Polispórico</option>
-                    <option value="Población">Población</option>
+                    {opcionesDe('tipo_micelio').map(o => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               {/* MAT — solo si Haploide */}
-              {formData.ploidia === 'Haploide' && (
+              {formData.ploidia === 'haploide' && (
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">MAT (Tipo de Apareamiento) <span style={{ color: 'red' }}>*</span></label>
                   <select
@@ -756,7 +758,7 @@ export default function EjemplaresPage() {
                 <SearchableSelect
                   options={eventosAislamiento.map(ev => ({
                     id: ev.id,
-                    nombre: `${ev.id_semantico || ev.id} · ${ev.tecnica ?? ''} · ${ev.fecha ?? ''}`,
+                    nombre: `${ev.id_semantico || ev.id} · ${ev.tecnica ? labelDe('tecnica', ev.tecnica) : ''} · ${ev.fecha ?? ''}`,
                   }))}
                   value={formData.evento_aislamiento_id}
                   onChange={val => setFormData({ ...formData, evento_aislamiento_id: val })}
@@ -774,7 +776,7 @@ export default function EjemplaresPage() {
                 >
                   <option value="">— Seleccionar —</option>
                   {opcionesDe('tecnica').map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.id} value={o.id}>{o.label}</option>
                   ))}
                 </select>
               </div>
@@ -816,16 +818,16 @@ export default function EjemplaresPage() {
                   <label className="form-label">Fecha de Ingreso <span style={{ color: 'red' }}>*</span></label>
                   <input
                     type="date" className="form-control" required
-                    value={formData.fecha_ingreso}
-                    onChange={e => setFormData({ ...formData, fecha_ingreso: e.target.value })}
+                    value={formData.fechaIngreso}
+                    onChange={e => setFormData({ ...formData, fechaIngreso: e.target.value })}
                   />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Operario <span style={{ color: 'red' }}>*</span></label>
                   <input
                     type="text" className="form-control" required
-                    value={formData.operario}
-                    onChange={e => setFormData({ ...formData, operario: e.target.value })}
+                    value={formData.operator}
+                    onChange={e => setFormData({ ...formData, operator: e.target.value })}
                   />
                 </div>
               </div>

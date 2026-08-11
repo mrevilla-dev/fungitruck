@@ -8,6 +8,7 @@ import { uploadFileToDrive } from '../services/driveService';
 import DerivacionEsporomaModal from '../components/DerivacionEsporomaModal';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import PhotoLightbox from '../components/PhotoLightbox';
+import { labelDe, idCanonico } from '../utils/vocabulario';
 import toast from 'react-hot-toast';
 
 export default function EsporomasPage() {
@@ -33,10 +34,9 @@ export default function EsporomasPage() {
     lugarRecoleccion: '',
     fechaRecoleccion: new Date().toISOString().split('T')[0],
     // Genetic fields kept for Firestore but hidden in UI
-    ploidia: 'Diploide',
-    tipo_micelio: 'Dicarión',
+    ploidia: 'nn',
+    tipo_micelio: 'dicarion',
     mat: 'N/A',
-    operator: 'Maxi'
   });
   const [photo, setPhoto] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -91,11 +91,11 @@ export default function EsporomasPage() {
         productor_nombre: esp.productor_nombre || '',
         estado_biologico: esp.estado_biologico || 'Esporoma',
         otro_estado_biologico: esp.otro_estado_biologico || '',
-        descripcion: esp.descripcion || '',
+        descripcion: esp.observaciones || esp.descripcion || '',
         lugarRecoleccion: esp.lugarRecoleccion || '',
         fechaRecoleccion: esp.fechaRecoleccion || new Date().toISOString().split('T')[0],
-        ploidia: esp.ploidia || esp.genetica || 'Diploide',
-        tipo_micelio: esp.tipo_micelio || 'Dicarión',
+        ploidia: idCanonico('ploidia', esp.ploidia || esp.genetica) || 'nn',
+        tipo_micelio: idCanonico('tipo_micelio', esp.tipo_micelio) || 'dicarion',
         mat: esp.mat || 'N/A',
         operator: esp.operator || 'Maxi'
       });
@@ -106,7 +106,7 @@ export default function EsporomasPage() {
         latitud: '', longitud: '', batch_origen_id: '', productor_nombre: '',
         estado_biologico: 'Esporoma', otro_estado_biologico: '', descripcion: '',
         lugarRecoleccion: '', fechaRecoleccion: new Date().toISOString().split('T')[0],
-        ploidia: 'Diploide', tipo_micelio: 'Dicarión', mat: 'N/A', operator: 'Maxi'
+        ploidia: 'nn', tipo_micelio: 'dicarion', mat: 'N/A', operator: 'Maxi'
       });
     }
     setPhoto(null);
@@ -155,7 +155,10 @@ export default function EsporomasPage() {
     setLoading(true);
     try {
       let esporomaId = editingEsporoma ? editingEsporoma.id : null;
-      let fotoUrl = editingEsporoma ? editingEsporoma.fotoUrl : null;
+      const espActual = editingEsporoma;
+      let fotoUrl = espActual
+        ? (espActual.fotoUrl ?? (Array.isArray(espActual.fotos_urls) ? espActual.fotos_urls[0] : null) ?? espActual.foto_url ?? null)
+        : null;
 
       if (!editingEsporoma) {
         // Generate semantic ID according to spec
@@ -309,12 +312,14 @@ export default function EsporomasPage() {
       <div className="salas-grid">
         {esporomasFiltrados.map(esp => (
           <div key={esp.id} className="card sala-card esporoma-card">
-            {esp.fotoUrl && (
-              <img
-                src={esp.fotoUrl}
-                alt={esp.especie}
-                className="no-print"
-                onClick={() => setLightboxImage(esp.fotoUrl)}
+            {(() => {
+              const fotoEsp = esp.fotoUrl || (Array.isArray(esp.fotos_urls) ? esp.fotos_urls[0] : null) || esp.foto_url || null;
+              return fotoEsp && (
+                <img
+                  src={fotoEsp}
+                  alt={esp.especie}
+                  className="no-print"
+                  onClick={() => setLightboxImage(fotoEsp)}
                 style={{
                   width: '100%',
                   height: '150px',
@@ -327,7 +332,8 @@ export default function EsporomasPage() {
                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               />
-            )}
+              )
+            })()}
             <div className="sala-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.5rem' }}>
                 <div className="label-id" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{esp.id}</div>
@@ -353,7 +359,7 @@ export default function EsporomasPage() {
               <div style={{ flex: 1 }}>
                 <h3>{esp.genero} {esp.especie}</h3>
                 <p style={{ fontSize: '0.9rem' }}>📍 {esp.lugarRecoleccion}</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>📅 {esp.fechaRecoleccion} | 🧬 <strong>{esp.ploidia || esp.genetica || 'Diploide'}</strong> · {esp.tipo_micelio || 'Dicarión'}</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>📅 {esp.fechaRecoleccion} | 🧬 <strong>{labelDe('ploidia', esp.ploidia || esp.genetica, esp)}</strong> · {labelDe('tipo_micelio', esp.tipo_micelio, esp)}</p>
               </div>
               <div className="print-only" style={{ background: 'white', padding: '5px' }}>
                 <QRCodeSVG value={esp.id} size={80} />
@@ -361,7 +367,7 @@ export default function EsporomasPage() {
             </div>
 
             <div className="no-print" style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontSize: '0.85rem' }}>
-              {esp.descripcion}
+              {esp.descripcion || esp.observaciones}
             </div>
           </div>
         ))}
