@@ -1,16 +1,18 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PROFILES, generateZPL, sendToPrinter } from '../utils/zplProfiles';
+import { PROFILES, generateZPL, generateMixedZPL, sendToPrinter } from '../utils/zplProfiles';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export default function PrintLabelsModal({ batches, onClose, usuarioActivo, initialProfile }) {
   const [mode, setMode] = useState('thermal'); // 'thermal' or 'a4'
-  const [activeProfile, setActiveProfile] = useState(initialProfile || 'PORTAOBJETOS');
+  const [activeProfile, setActiveProfile] = useState(initialProfile || batches[0]?.tipo_etiqueta || 'PORTAOBJETOS');
   const [copies, setCopies] = useState(1);
   const [profile, setProfile] = useState('standard'); // for PDF backup
+
+  const hasMixedProfiles = batches.length > 0 && batches.some(b => b.tipo_etiqueta && b.tipo_etiqueta !== batches[0].tipo_etiqueta);
 
   const uniqueContainers = Array.from(new Set(batches.map(b => b.contenedorId).filter(Boolean)));
   const hasContainers = uniqueContainers.length > 0;
@@ -35,7 +37,9 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
   const activeProf = PROFILES.find(p => p.id === activeProfile) || PROFILES[0];
 
   const handleDownloadZPL = () => {
-    let zpl = generateZPL(activeProfile, batches, copies);
+    let zpl = hasMixedProfiles
+      ? generateMixedZPL(batches.map(b => ({ batch: b, profileId: b.tipo_etiqueta || activeProfile, copies })))
+      : generateZPL(activeProfile, batches, copies);
     if (imprimirContenedor && hasContainers) {
        const containerBatches = uniqueContainers.map(cId => ({
          id: cId,
@@ -59,7 +63,9 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
   };
 
   const handlePrintDirect = async () => {
-    let zpl = generateZPL(activeProfile, batches, copies);
+    let zpl = hasMixedProfiles
+      ? generateMixedZPL(batches.map(b => ({ batch: b, profileId: b.tipo_etiqueta || activeProfile, copies })))
+      : generateZPL(activeProfile, batches, copies);
     if (imprimirContenedor && hasContainers) {
        const containerBatches = uniqueContainers.map(cId => ({
          id: cId,
@@ -87,12 +93,17 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
         tipo_uso: batch.tipo_uso || '',
         fecha_vencimiento: batch.fecha_vencimiento || '',
         generacion: batch.generacion || '',
+        numero_unidad: batch.numero_unidad || 1,
+        total_unidades: batch.total_unidades || 1,
+        sala: batch.sala || '',
+        origen_trazabilidad: batch.origen_trazabilidad || '',
+        tipo_etiqueta: batch.tipo_etiqueta || activeProfile,
       }));
 
       await addDoc(collection(db, 'cola_impresion'), {
         modulo: 'medios',
         batch_ids: batches.map(b => b.id || '').filter(Boolean),
-        tipo_etiqueta: activeProfile,
+        tipo_etiqueta: hasMixedProfiles ? 'MIXED' : activeProfile,
         datos_etiquetas: datosEtiquetas,
         copias: copies,
         estado: 'Pendiente',

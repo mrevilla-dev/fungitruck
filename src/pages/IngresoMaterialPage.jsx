@@ -157,6 +157,7 @@ export default function IngresoMaterialPage() {
         tecnica: tipo === 'humeda' ? 'aislamiento_primario' : '',
         medio_prep_id: null,
         sala_destino_id: null,
+        cantidad_placas: 1,
         temperatura: '',
         observaciones: '',
         foto: null
@@ -329,8 +330,11 @@ export default function IngresoMaterialPage() {
         let currentBatchSeq = seqBatch;
         let derivIdx = 0;
 
+        const etiquetas = [];
+
         for (const deriv of derivaciones) {
           let derivacionFotoUrl = null;
+          const aliasStr = `${formValues.genero} ${formValues.especie}${formValues.codigo_cepa ? ` [${formValues.codigo_cepa}]` : ''}`;
           if (deriv.foto) {
             try {
               const res = await uploadFileToDrive(deriv.foto);
@@ -364,6 +368,21 @@ export default function IngresoMaterialPage() {
           });
           
           if (deriv.tipo_derivacion === 'seca') {
+            etiquetas.push({
+              id: ejemplarId,
+              alias: aliasStr,
+              especie: aliasStr,
+              tipo_inoculacion: 'aislamiento',
+              generacion: 0,
+              numero_unidad: 1,
+              total_unidades: 1,
+              fecha: formValues.fecha,
+              operario: authName,
+              nombre_receta: aliasStr,
+              tipo_uso: 'Registro',
+              tipo_etiqueta: 'PORTAOBJETOS',
+              codigo_cepa: formValues.codigo_cepa || null
+            });
             resText += `✅ Ejemplar (Seco): ${ejemplarId}\n`;
           }
 
@@ -387,50 +406,72 @@ export default function IngresoMaterialPage() {
             const salaOpt = salas.find(s => s.id === deriv.sala_destino_id);
             const codMedio = extraerCodigoMedio(medioOpt?.medio?.alias || medioOpt?.medio?.codigo);
             const soporteFinal = medioOpt?.type === 'sub' ? medioOpt.sub.tipo_unidad : medioOpt?.medio?.tipo_soporte || medioOpt?.medio?.soporte || 'No definido';
+            const cantidadPlacas = Math.max(1, parseInt(deriv.cantidad_placas, 10) || 1);
 
-            const batchId = generarIdBatch({
-              genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
-              codigo_medio: codMedio, fecha_iso: formValues.fecha, secuencia_diaria: currentBatchSeq
-            });
+            for (let b = 0; b < cantidadPlacas; b++) {
+              const batchId = generarIdBatch({
+                genero: formValues.genero, especie: formValues.especie, codigo_cepa: formValues.codigo_cepa,
+                codigo_medio: codMedio, fecha_iso: formValues.fecha, secuencia_diaria: currentBatchSeq
+              });
 
-            wb.set(doc(db, 'batches', batchId), {
-              experimento_id: null,
-              tratamiento_id: null,
-              atributos_experimentales: {},
-              id: batchId,
-              genero: formValues.genero, especie: formValues.especie,
-              ejemplarId: ejemplarId,
-              medioPrepId: medioOpt?.medio?.id || null,
-              fraccionId: medioOpt?.type === 'sub' ? medioOpt.sub.id : null,
-              destinoId: salaOpt?.id || null,
-              destinoNombre: salaOpt?.nombre || '',
-              operator: authName,
-              fechaInoculacion: formValues.fecha,
-              status: 'Inoculado',
-              tipo_inoculacion: 'aislamiento_primario',
-              es_aislamiento_primario: true,
-              destino_criopreservacion: false,
-              batch_origen_id: null,
-              soporte: soporteFinal,
-              createdAt: serverTimestamp()
-            });
+              wb.set(doc(db, 'batches', batchId), {
+                experimento_id: null,
+                tratamiento_id: null,
+                atributos_experimentales: {},
+                id: batchId,
+                genero: formValues.genero, especie: formValues.especie,
+                ejemplarId: ejemplarId,
+                medioPrepId: medioOpt?.medio?.id || null,
+                fraccionId: medioOpt?.type === 'sub' ? medioOpt.sub.id : null,
+                destinoId: salaOpt?.id || null,
+                destinoNombre: salaOpt?.nombre || '',
+                operator: authName,
+                fechaInoculacion: formValues.fecha,
+                status: 'Inoculado',
+                tipo_inoculacion: 'aislamiento_primario',
+                es_aislamiento_primario: true,
+                destino_criopreservacion: false,
+                batch_origen_id: null,
+                soporte: soporteFinal,
+                createdAt: serverTimestamp()
+              });
 
-            if (medioOpt) {
-              if (medioOpt.type === 'sub') {
-                const sfRef = doc(db, 'medios_preparados', medioOpt.medio.id, 'subfracciones', medioOpt.sub.id);
-                wb.update(sfRef, { disponible: increment(-1) });
-                if ((medioOpt.sub.disponible ?? 0) <= 1) {
-                  const mRef = doc(db, 'medios_preparados', medioOpt.medio.id);
-                  wb.update(mRef, { subfracciones_disponibles: increment(-1) });
+              if (medioOpt) {
+                if (medioOpt.type === 'sub') {
+                  const sfRef = doc(db, 'medios_preparados', medioOpt.medio.id, 'subfracciones', medioOpt.sub.id);
+                  wb.update(sfRef, { disponible: increment(-1) });
+                  if ((medioOpt.sub.disponible ?? 0) <= 1) {
+                    const mRef = doc(db, 'medios_preparados', medioOpt.medio.id);
+                    wb.update(mRef, { subfracciones_disponibles: increment(-1) });
+                  }
+                } else {
+                  const medioRef = doc(db, 'medios_preparados', medioOpt.medio.id);
+                  wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-1) });
                 }
-              } else {
-                const medioRef = doc(db, 'medios_preparados', medioOpt.medio.id);
-                wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-1) });
               }
+
+              etiquetas.push({
+                id: batchId,
+                alias: aliasStr,
+                especie: aliasStr,
+                tipo_inoculacion: 'aislamiento_primario',
+                generacion: 0,
+                numero_unidad: b + 1,
+                total_unidades: cantidadPlacas,
+                fecha: formValues.fecha,
+                operario: authName,
+                nombre_receta: aliasStr,
+                tipo_uso: 'Cultivo',
+                tipo_etiqueta: (soporteFinal || '').toLowerCase().includes('placa') ? 'SLIM_PETRI' : 'MEDIO_ESTANDAR',
+                sala: salaOpt?.nombre || '',
+                codigo_cepa: formValues.codigo_cepa || null,
+                origen_trazabilidad: `EJE: ${ejemplarId} | ESP: ${esporomaId}`
+              });
+
+              currentBatchSeq++;
             }
 
-            resText += `✅ Ejemplar (Húmedo): ${ejemplarId} → Batch: ${batchId}\n`;
-            currentBatchSeq++;
+            resText += `✅ Ejemplar (Húmedo): ${ejemplarId} → ${cantidadPlacas} placa(s)\n`;
           }
 
           derivIdx++;
@@ -589,7 +630,7 @@ export default function IngresoMaterialPage() {
           tipo_etiqueta: rutaActiva === 'A' ? 'PORTAOBJETOS' : 'MEDIO_ESTANDAR',
           codigo_cepa: formValues.codigo_cepa || null
         };
-        setBatchesToPrint([batchData]);
+        setBatchesToPrint([batchData, ...etiquetas]);
         setImprimirEtiqueta(false);
         return;
       }
@@ -1042,6 +1083,17 @@ export default function IngresoMaterialPage() {
                         <option key={ta.id} value={ta.id}>{ta.label}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Cantidad de placas</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="1"
+                      value={d.cantidad_placas || 1}
+                      onChange={e => updateDerivacion(d.id, 'cantidad_placas', Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    />
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Se crea 1 batch por placa, todas vinculadas al mismo ejemplar</p>
                   </div>
                 </div>
               )}

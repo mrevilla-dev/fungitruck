@@ -48,9 +48,11 @@ export default function PrintQueue() {
     const batches = colaItem.datos_etiquetas || [];
     
     // En bloques posteriores se puede afinar según el módulo o tipo de etiqueta.
-    const profileToUse = colaItem.tipo_etiqueta || (colaItem.modulo === 'inoculaciones' ? 'MAXI_BOLSA' : 'MEDIO_ESTANDAR');
+    const profileToUse = colaItem.tipo_etiqueta === 'MIXED' ? '' : (colaItem.tipo_etiqueta || (colaItem.modulo === 'inoculaciones' ? 'MAXI_BOLSA' : 'MEDIO_ESTANDAR'));
     
-    const zpl = generateZPL(profileToUse, batches, 1);
+    const zpl = profileToUse
+      ? generateZPL(profileToUse, batches, 1)
+      : generateMixedZPL(batches.map(b => ({ batch: b, profileId: b.tipo_etiqueta || 'PORTAOBJETOS', copies: 1 })));
     
     const blob = new Blob([zpl], { type: 'text/plain;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
@@ -65,8 +67,10 @@ export default function PrintQueue() {
 
   const handlePrintDirectLote = async (colaItem) => {
     const batches = colaItem.datos_etiquetas || [];
-    const profileToUse = colaItem.tipo_etiqueta || (colaItem.modulo === 'inoculaciones' ? 'MAXI_BOLSA' : 'MEDIO_ESTANDAR');
-    const zpl = generateZPL(profileToUse, batches, 1);
+    const profileToUse = colaItem.tipo_etiqueta === 'MIXED' ? '' : (colaItem.tipo_etiqueta || (colaItem.modulo === 'inoculaciones' ? 'MAXI_BOLSA' : 'MEDIO_ESTANDAR'));
+    const zpl = profileToUse
+      ? generateZPL(profileToUse, batches, 1)
+      : generateMixedZPL(batches.map(b => ({ batch: b, profileId: b.tipo_etiqueta || 'PORTAOBJETOS', copies: 1 })));
     await sendToPrinter(zpl);
   };
 
@@ -157,7 +161,7 @@ export default function PrintQueue() {
       const batches = item.datos_etiquetas || [];
       const profileToUse = item.tipo_etiqueta || (item.modulo === 'inoculaciones' ? 'MAXI_BOLSA' : 'MEDIO_ESTANDAR');
       batches.forEach(b => {
-        itemsToPrint.push({ batch: b, profileId: profileToUse, copies: 1 });
+        itemsToPrint.push({ batch: b, profileId: b.tipo_etiqueta || profileToUse, copies: 1 });
       });
     });
     return itemsToPrint;

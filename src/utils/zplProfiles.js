@@ -219,6 +219,9 @@ function getZplForProfile(profileId, batch, xStart, yStart) {
         // Long stretched text layout for edge of plate
         zpl += `^FO${xStart + 130},${yStart + 30}^A0N,30,30^FD${alias} | ${nombre.substring(0, 30)}^FS\n`;
         zpl += `^FO${xStart + 130},${yStart + 70}^A0N,24,24^FB650,2,0,L,0^FDFec: ${fecha} | Ref: ${meta}${transferencia ? ` | ${transferencia}` : ''}^FS\n`;
+        if (batch.origen_trazabilidad) {
+          zpl += `^FO${xStart + 130},${yStart + 95}^A0N,18,18^FB650,1,0,L,0^FD${batch.origen_trazabilidad.substring(0, 60)}^FS\n`;
+        }
 
       } else if (profileId === 'MEDIO_ESTANDAR') {
         // --- 4. MEDIO_ESTANDAR (Slot: 400 x 400) ---
@@ -249,6 +252,11 @@ function getZplForProfile(profileId, batch, xStart, yStart) {
 
         if (ubicacion) {
           zpl += `^FO${xStart + 15},${currentBottomY}^A0N,20,20^FDUbic: ${ubicacion}^FS\n`;
+        }
+
+        if (batch.origen_trazabilidad) {
+          currentBottomY += 30;
+          zpl += `^FO${xStart + 15},${currentBottomY}^A0N,18,18^FB580,1,0,L,0^FDOrigen: ${batch.origen_trazabilidad.substring(0, 50)}^FS\n`;
         }
 
       } else if (profileId === 'MAXI_BOLSA') {
