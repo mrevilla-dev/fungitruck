@@ -7,6 +7,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
+import { labelDe } from '../utils/vocabulario';
 import PrintLabelsModal from './PrintLabelsModal';
 import { generarIdBatch } from '../utils/idGenerator';
 import { useMediosDisponibles } from '../hooks/useMediosDisponibles';
@@ -32,17 +33,17 @@ const getZplProfileForSoporte = (soporte) => {
 const TIPO_ENVASE_OPTIONS = ['Bolsa', 'Caja', 'Cajón', 'Bandeja', 'Canasto'];
 
 const TECNICAS = [
-  'Agotamiento en superficie',
-  'Aislamiento monospórico',
-  'Subcultivo',
-  'Explanto directo',
-  'Esporulación directa',
-  'N/A',
+  'agotamiento_superficie',
+  'aislamiento_monosporico',
+  'subcultivo',
+  'explanto_directo',
+  'esporulacion_directa',
+  'na',
 ];
 
 const EMPTY_EVT = {
   ejemplar_origen_id: '',
-  tecnica: 'Subcultivo',
+  tecnica: 'subcultivo',
   temperatura_C: '',
   dias_incubacion: '',
   cantidad_derivados: 1,
@@ -398,7 +399,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
               value={formData.tecnica}
               onChange={e => handleChange('tecnica', e.target.value)}
             >
-              {TECNICAS.map(t => <option key={t} value={t}>{t}</option>)}
+              {TECNICAS.map(t => <option key={t} value={t}>{labelDe('tecnica', t)}</option>)}
             </select>
           </div>
 
@@ -523,7 +524,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
             />
           </div>
 
-          {(formData.tecnica === 'Subcultivo' || formData.tecnica === 'Explanto directo') && (
+          {(formData.tecnica === 'subcultivo' || formData.tecnica === 'explanto_directo') && (
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">
                 Explantos por placa (opcional)

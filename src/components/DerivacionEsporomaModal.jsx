@@ -8,6 +8,7 @@ import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
 import { uploadFileToDrive } from '../services/driveService';
 import { useMediosDisponibles } from '../hooks/useMediosDisponibles';
+import { opcionesDe } from '../utils/vocabulario';
 import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
@@ -27,9 +28,9 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
 
   const [tipoDerivacion, setTipoDerivacion] = useState('seca'); // 'seca' o 'humeda'
   const [formData, setFormData] = useState({
-    tipo_material: 'Sello de Esporas',
-    tipo_micelio: 'Dicarión',
-    ploidia: 'Diploide',
+    tipo_material: 'sello_esporas',
+    tipo_micelio: 'polisporico',
+    ploidia: 'haploide',
     medio_prep_id: null,
     sala_destino_id: null,
     temperatura: '',
@@ -58,11 +59,13 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
   const handleChangeTipo = (tipo) => {
     setTipoDerivacion(tipo);
     setCrearBatch(false);
-    setFormData({
-      ...formData,
-      tipo_material: tipo === 'seca' ? 'Sello de Esporas' : 'Explanto',
+    setFormData(prev => ({
+      ...prev,
+      tipo_material: tipo === 'seca' ? 'sello_esporas' : 'explanto',
+      tipo_micelio: tipo === 'seca' ? 'polisporico' : 'dicarion',
+      ploidia: tipo === 'seca' ? 'haploide' : 'nn',
       tecnica: tipo === 'humeda' ? 'aislamiento_primario' : ''
-    });
+    }));
   };
 
   const handleFotoChange = (e) => {
@@ -246,22 +249,26 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Tipo de Material</label>
-              <input type="text" className="form-control" value={formData.tipo_material} onChange={e => setFormData({ ...formData, tipo_material: e.target.value })} required />
+              <select className="form-control" value={formData.tipo_material} onChange={e => setFormData({ ...formData, tipo_material: e.target.value })} required>
+                {opcionesDe('tipo_material').map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Tipo de Micelio</label>
               <select className="form-control" value={formData.tipo_micelio} onChange={e => setFormData({ ...formData, tipo_micelio: e.target.value })}>
-                <option value="Dicarión">Dicarión</option>
-                <option value="Monocarión">Monocarión</option>
-                <option value="Polispórico">Polispórico</option>
+                {opcionesDe('tipo_micelio').map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Ploidía</label>
               <select className="form-control" value={formData.ploidia} onChange={e => setFormData({ ...formData, ploidia: e.target.value })}>
-                <option value="Diploide">Diploide</option>
-                <option value="Haploide">Haploide</option>
-                <option value="Desconocido">Desconocido</option>
+                {opcionesDe('ploidia').map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -305,12 +312,9 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
                 <label className="form-label">Técnica Aislamiento</label>
                 <select className="form-control" value={formData.tecnica} onChange={e => setFormData({ ...formData, tecnica: e.target.value })}>
                   <option value="">-- Seleccionar --</option>
-                  <option value="Subcultivo">Subcultivo</option>
-                  <option value="Agotamiento en superficie">Agotamiento en superficie</option>
-                  <option value="Aislamiento monospórico">Aislamiento monospórico</option>
-                  <option value="Esporulación directa">Esporulación directa</option>
-                  <option value="Explanto directo">Explanto directo</option>
-                  <option value="N/A">N/A</option>
+                  {opcionesDe('tecnica').map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">

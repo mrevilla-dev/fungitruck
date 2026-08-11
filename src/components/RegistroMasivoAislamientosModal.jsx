@@ -291,7 +291,7 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
           ejemplarPadreId: batchMadre.ejemplarId || null,
           batch_origen_id: batchMadre.id,
           estado: 'Activo',
-          tecnica_aislamiento: 'Aislamiento de colonias', // Genérico
+          tecnica_aislamiento: 'aislamiento_colonias', // Genérico
           generacion: (batchMadre.generacion ?? 0) + 1,
           observaciones: ais.observaciones,
           id_semantico: idSemanticoEje,

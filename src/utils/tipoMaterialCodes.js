@@ -15,7 +15,14 @@ export const TIPO_MATERIAL_CODES = {
   'Tubo/Slant': 'AGA',
   'Spawn externo': 'GRA',
   'Granos colonizados': 'GRA',
-  'Cultivo líquido': 'DES'
+  'Cultivo líquido': 'DES',
+  /* Códigos ya canónicos (idempotente: getTipoMaterialCodigo('ESP') === 'ESP') */
+  ESP: 'ESP',
+  EXP: 'EXP',
+  JER: 'JER',
+  AGA: 'AGA',
+  GRA: 'GRA',
+  DES: 'DES'
 };
 
 export function getTipoMaterialCodigo(tipoMaterial) {

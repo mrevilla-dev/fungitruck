@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { getTipoMaterialCodigo } from '../utils/tipoMaterialCodes';
 
 export default function AltaRapidaEjemplarExterno({ onSuccess, onCancel }) {
   const [formData, setFormData] = useState({
@@ -34,7 +35,7 @@ export default function AltaRapidaEjemplarExterno({ onSuccess, onCancel }) {
       const g = formData.genero.substring(0, 3).toUpperCase().replace(/\s/g, '');
       const e_val = formData.especie.substring(0, 3).toUpperCase().replace(/\s/g, '');
       const cepa = formData.codigo_cepa ? `-${formData.codigo_cepa}` : '';
-      const tm = formData.tipo_material === 'Micelio en grano' ? 'GRA' : 'LIQ';
+      const tm = formData.tipo_material === 'Micelio en grano' ? getTipoMaterialCodigo('grano') : getTipoMaterialCodigo('liquido');
       
       const fDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
       const yymmdd = fDate.substring(2);
@@ -63,7 +64,7 @@ export default function AltaRapidaEjemplarExterno({ onSuccess, onCancel }) {
         proveedor: formData.proveedor,
         observaciones: formData.observaciones,
         estado: 'Activo',
-        tecnica_aislamiento: 'Material externo',
+        tecnica_aislamiento: 'na',
         generacion: 0,
         id_semantico: idSemantico,
         createdAt: serverTimestamp(),

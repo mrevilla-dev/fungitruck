@@ -12,6 +12,8 @@ import toast from 'react-hot-toast';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
 import PhotoLightbox from '../components/PhotoLightbox';
+import { getTipoMaterialCodigo } from '../utils/tipoMaterialCodes';
+import { labelDe, opcionesDe, idCanonico } from '../utils/vocabulario';
 
 const ESTADO_CONFIG = {
   Activo:        { badge: '🟢', color: '#10b981' },
@@ -235,7 +237,7 @@ export default function EjemplaresPage() {
           const g = (formData.genero || '').substring(0, 3).toUpperCase().replace(/\s/g, '');
           const e = (formData.especie || '').substring(0, 3).toUpperCase().replace(/\s/g, '');
           const cepa = formData.codigo_cepa ? `-${formData.codigo_cepa}` : '';
-          const tm = formData.tipo_material || 'DES';
+          const tm = getTipoMaterialCodigo(formData.tipo_material);
           const nnn = String(currentSeq).padStart(3, '0');
           
           newId = `EJE-${g}${e}${cepa}-${tm}-${yymmdd}-${nnn}`;
@@ -765,16 +767,13 @@ export default function EjemplaresPage() {
                 <label className="form-label">Técnica de aislamiento (opcional)</label>
                 <select
                   className="form-control"
-                  value={formData.tecnica_aislamiento}
+                  value={idCanonico('tecnica', formData.tecnica_aislamiento)}
                   onChange={e => setFormData({ ...formData, tecnica_aislamiento: e.target.value })}
                 >
                   <option value="">— Seleccionar —</option>
-                  <option value="Agotamiento en superficie">Agotamiento en superficie</option>
-                  <option value="Aislamiento monospórico">Aislamiento monospórico</option>
-                  <option value="Subcultivo">Subcultivo</option>
-                  <option value="Explanto directo">Explanto directo</option>
-                  <option value="Esporulación directa">Esporulación directa</option>
-                  <option value="N/A">N/A</option>
+                  {opcionesDe('tecnica').map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
 
