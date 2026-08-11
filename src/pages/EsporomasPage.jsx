@@ -223,6 +223,7 @@ export default function EsporomasPage() {
           ...formData,
           id: esporomaId,
           fotoUrl,
+          observaciones: formData.observaciones ?? formData.descripcion ?? '',
           // Ensure genetic fields are stored even if hidden
           ploidia: formData.ploidia,
           tipo_micelio: formData.tipo_micelio,

@@ -359,8 +359,8 @@ export default function IngresoMaterialPage() {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             tecnica_aislamiento: deriv.tecnica || null,
-            observaciones_derivacion: deriv.observaciones || null,
-            foto_derivacion: derivacionFotoUrl
+            observaciones: deriv.observaciones || null,
+            fotoUrl: derivacionFotoUrl
           });
           
           if (deriv.tipo_derivacion === 'seca') {

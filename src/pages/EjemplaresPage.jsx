@@ -216,6 +216,8 @@ export default function EjemplaresPage() {
         estado: formData.estado,
         motivo_inviabilidad: formData.estado === 'Inviable' ? formData.motivo_inviabilidad : '',
         updatedAt: serverTimestamp(),
+        fechaIngreso: formData.fecha_ingreso,
+        operator: formData.operario,
       };
 
       if (editingId) {
