@@ -5,6 +5,7 @@ import { getAuth } from 'firebase/auth';
 import PrintLabelsModal from './PrintLabelsModal';
 import { Html5Qrcode } from 'html5-qrcode';
 import SearchableSelect from './SearchableSelect';
+import { normalizarScan } from '../utils/normalizarScan';
 import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
@@ -140,7 +141,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
           { facingMode: "environment" },
           config,
           (decodedText) => {
-            if (isMounted) handleScanSuccess(decodedText, activeScannerForInsumo, qrScanner);
+            if (isMounted) handleScanSuccess(normalizarScan(decodedText), activeScannerForInsumo, qrScanner);
           },
           () => {}
         );
@@ -153,7 +154,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
             { facingMode: "user" },
             config,
             (decodedText) => {
-              if (isMounted) handleScanSuccess(decodedText, activeScannerForInsumo, qrScanner);
+              if (isMounted) handleScanSuccess(normalizarScan(decodedText), activeScannerForInsumo, qrScanner);
             },
             () => {}
           );

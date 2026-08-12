@@ -5,6 +5,7 @@ import '@xyflow/react/dist/style.css';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Html5Qrcode } from 'html5-qrcode';
+import { normalizarScan } from '../utils/normalizarScan';
 import toast from 'react-hot-toast';
 
 // Nodos custom
@@ -169,7 +170,7 @@ export default function ArbolGenealogicoPage({ tipo }) {
           if (html5QrCode.isScanning) {
             await html5QrCode.stop().catch(err => console.warn(err));
           }
-          handleScanResult(decodedText);
+          handleScanResult(normalizarScan(decodedText));
         },
         () => {}
       ).catch(err => {
@@ -178,7 +179,7 @@ export default function ArbolGenealogicoPage({ tipo }) {
           if (html5QrCode.isScanning) {
             await html5QrCode.stop().catch(e => console.warn(e));
           }
-          handleScanResult(decodedText);
+          handleScanResult(normalizarScan(decodedText));
         }, () => {});
       });
     }

@@ -4,6 +4,7 @@ import { db, storage } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp, collection, query, onSnapshot, orderBy, where, writeBatch, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { normalizarScan } from '../utils/normalizarScan';
 import DestinoSelector from '../components/DestinoSelector';
 import { generateSemanticId, getSubstrateCode } from '../utils/idGenerator';
 import toast from 'react-hot-toast';
@@ -139,7 +140,7 @@ function NewBatch() {
   useEffect(() => {
     if (showOrigenScanner) {
       const scanner = new Html5QrcodeScanner("origen-reader", { fps: 10, qrbox: 220 }, false);
-      scanner.render(handleParentScan, () => {});
+      scanner.render((texto) => handleParentScan(normalizarScan(texto)), () => {});
       scannerRef.current = scanner;
       return () => scanner.clear().catch(() => {});
     }

@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
 import { labelDe } from '../utils/vocabulario';
+import { normalizarScan } from '../utils/normalizarScan';
 import toast from 'react-hot-toast';
 
 function ScannerPage() {
@@ -30,7 +31,7 @@ function ScannerPage() {
         { facingMode: "environment" }, 
         config,
         (decodedText) => { 
-          setScanResult(decodedText); 
+          setScanResult(normalizarScan(decodedText)); 
           html5QrCode.stop().catch(err => console.warn("Error stopping scanner", err));
         },
         () => {}
@@ -38,7 +39,7 @@ function ScannerPage() {
         console.error("Unable to start scanner", err);
         // Fallback to any camera if environment fails
         html5QrCode.start({ facingMode: "user" }, config, (decodedText) => {
-          setScanResult(decodedText);
+          setScanResult(normalizarScan(decodedText));
           html5QrCode.stop().catch(e => console.warn(e));
         }, () => {});
       });

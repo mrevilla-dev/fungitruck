@@ -5,6 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import PrintLabelsModal from './PrintLabelsModal';
 import { uploadFileToDrive } from '../services/driveService';
 import { compressImage } from '../utils/imageUtils';
+import { normalizarScan } from '../utils/normalizarScan';
 import toast from 'react-hot-toast';
 import PropTypes from 'prop-types';
 
@@ -844,14 +845,14 @@ function ScannerModal({ onScan, onClose }) {
       { facingMode: "environment" },
       config,
       (text) => {
-        onScan(text);
+        onScan(normalizarScan(text));
         html5QrCode.stop();
       },
       () => {}
     ).catch(err => {
       // Si falla environment (común en PC), intentar con cualquier cámara
       html5QrCode.start({ facingMode: "user" }, config, (text) => {
-        onScan(text);
+        onScan(normalizarScan(text));
         html5QrCode.stop();
       }, () => {});
     });
