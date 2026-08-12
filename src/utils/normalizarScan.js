@@ -7,5 +7,7 @@
  */
 export function normalizarScan(texto) {
   if (!texto) return '';
-  return String(texto).trim().replace(/^MA,\s*/i, '');
+  // trim + prefijo de modo Zebra "MA," + NULs terminales que a veces agregan
+  // los decodificadores a payloads impresos por ZPL
+  return String(texto).trim().replace(/^MA,\s*/i, '').replace(/\0/g, '');
 }
