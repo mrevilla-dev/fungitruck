@@ -6,13 +6,14 @@ import { doc, getDoc, collection, collectionGroup, addDoc, query, where, getDocs
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { QRCodeSVG } from 'qrcode.react';
 import { compressImage } from '../utils/imageUtils';
+import { labelDe } from '../utils/vocabulario';
 import toast from 'react-hot-toast';
 
 function ScannerPage() {
   const navigate = useNavigate();
   const [scanResult, setScanResult] = useState(null);
   const [recordData, setRecordData] = useState(null);  // batch OR medio
-  const [recordType, setRecordType] = useState(null);  // 'batch' | 'medio' | 'insumo_lote' | 'insumo_base'
+  const [recordType, setRecordType] = useState(null);  // 'batch' | 'medio' | 'insumo_lote' | 'insumo_base' | 'esporoma' | 'ejemplar'
   const [history, setHistory] = useState([]);
   const [statusText, setStatusText] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
@@ -103,6 +104,33 @@ function ScannerPage() {
       }
 
       const esIdValido = (s) => Boolean(s) && !s.includes('/') && s.length <= 1500;
+
+      // 0d. Esporoma (ESP-) — el doc id ES el ID semántico
+      if (id.startsWith('ESP-')) {
+        const espDoc = await getDoc(doc(db, 'esporomas', id));
+        if (espDoc.exists()) {
+          setRecordData(espDoc.data());
+          setRecordType('esporoma');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 0e. Ejemplar (EJE-) — por doc id o id_semantico
+      if (id.startsWith('EJE-')) {
+        let ejeSnap = await getDoc(doc(db, 'ejemplares', id));
+        if (!ejeSnap.exists()) {
+          const qEje = query(collection(db, 'ejemplares'), where('id_semantico', '==', id));
+          const snapEje = await getDocs(qEje);
+          if (!snapEje.empty) ejeSnap = snapEje.docs[0];
+        }
+        if (ejeSnap.exists()) {
+          setRecordData({ id: ejeSnap.id, ...ejeSnap.data() });
+          setRecordType('ejemplar');
+          setLoading(false);
+          return;
+        }
+      }
 
       // 1. Intentar como Medio Preparado (ID de Firestore)
       if (esIdValido(id)) {
@@ -288,6 +316,122 @@ function ScannerPage() {
                 <p style={{ margin: 0 }}>💧 {recordData.subfraccion.volumen_por_unidad_ml} ml</p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista: Esporoma (ESP-) ──
+  if (recordType === 'esporoma' && recordData) {
+    const fotoEsp = recordData.fotoUrl || (Array.isArray(recordData.fotos_urls) ? recordData.fotos_urls[0] : null) || recordData.foto_url || null;
+    return (
+      <div className="animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <button className="btn btn-outline" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>
+            {recordData.id || scanResult}
+          </div>
+        </div>
+
+        <div className="card" style={{ borderTop: '6px solid #fbbf24' }}>
+          {fotoEsp && (
+            <img src={fotoEsp} alt={recordData.especie} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem' }} />
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ marginBottom: '0.25rem' }}><em>{recordData.genero}</em> {recordData.especie}</h2>
+              <p style={{ margin: 0 }}>🍄 Esporoma · {recordData.origen || '—'}</p>
+            </div>
+            <QRCodeSVG value={scanResult} size={64} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div>
+              <label className="form-label">Genética</label>
+              <p style={{ margin: 0 }}>{labelDe('tipo_micelio', recordData.tipo_micelio, recordData)} · {labelDe('ploidia', recordData.ploidia, recordData)}</p>
+            </div>
+            <div>
+              <label className="form-label">Recolección</label>
+              <p style={{ margin: 0 }}>📅 {recordData.fechaRecoleccion || '—'} · 📍 {recordData.lugarRecoleccion || '—'}</p>
+            </div>
+            {(recordData.observaciones || recordData.descripcion) && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Observaciones</label>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>{recordData.observaciones || recordData.descripcion}</p>
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: '1rem' }}>
+            <button className="btn btn-outline" style={{ width: 'auto' }} onClick={() => navigate('/esporomas')}>Ver en Esporomas</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista: Ejemplar (EJE-) ──
+  if (recordType === 'ejemplar' && recordData) {
+    const fotoEje = recordData.fotoUrl || (Array.isArray(recordData.fotos_urls) ? recordData.fotos_urls[0] : null) || recordData.foto_derivacion || recordData.foto_url || null;
+    return (
+      <div className="animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <button className="btn btn-outline" style={{ width: 'auto' }}
+            onClick={() => { setScanResult(null); setRecordData(null); }}>← Volver</button>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.75rem', borderRadius: '6px' }}>
+            {recordData.id_semantico || recordData.id}
+          </div>
+        </div>
+
+        <div className="card" style={{ borderTop: '6px solid #818cf8' }}>
+          {fotoEje && (
+            <img src={fotoEje} alt={recordData.especie} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem' }} />
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ marginBottom: '0.25rem' }}><em>{recordData.genero}</em> {recordData.especie}</h2>
+              <p style={{ margin: 0 }}><span className="sala-tipo">{recordData.estado || 'Activo'}</span> · {recordData.procedencia || '—'}</p>
+            </div>
+            <QRCodeSVG value={scanResult} size={64} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div>
+              <label className="form-label">Material</label>
+              <p style={{ margin: 0 }}>{labelDe('tipo_material', recordData.tipo_material)}</p>
+            </div>
+            <div>
+              <label className="form-label">Genética</label>
+              <p style={{ margin: 0 }}>{labelDe('tipo_micelio', recordData.tipo_micelio, recordData)} · {labelDe('ploidia', recordData.ploidia, recordData)}</p>
+            </div>
+            <div>
+              <label className="form-label">Técnica de aislamiento</label>
+              <p style={{ margin: 0 }}>{recordData.tecnica_aislamiento ? labelDe('tecnica', recordData.tecnica_aislamiento) : '—'}</p>
+            </div>
+            <div>
+              <label className="form-label">Ingreso</label>
+              <p style={{ margin: 0 }}>📅 {recordData.fechaIngreso || recordData.fecha_ingreso || '—'}</p>
+            </div>
+            {recordData.esporoma_origen_id && (
+              <div>
+                <label className="form-label">Esporoma de origen</label>
+                <p style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.85rem' }}>{recordData.esporoma_origen_id}</p>
+              </div>
+            )}
+            {recordData.batch_origen_id && (
+              <div>
+                <label className="form-label">Batch de origen</label>
+                <p style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.85rem' }}>{recordData.batch_origen_id}</p>
+              </div>
+            )}
+            {recordData.observaciones && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Observaciones</label>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>{recordData.observaciones}</p>
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: '1rem' }}>
+            <button className="btn btn-outline" style={{ width: 'auto' }} onClick={() => navigate('/ejemplares')}>Ver en Ejemplares</button>
           </div>
         </div>
       </div>

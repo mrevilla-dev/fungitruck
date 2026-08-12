@@ -256,6 +256,8 @@ export default function IngresoMaterialPage() {
     setErrors({});
     setLoading(true);
     try {
+      const etiquetas = [];
+
       if (rutaActiva === 'A') {
         // LÓGICA RUTA A (ESPOROMA + DERIVACIONES)
         const datePart = formValues.fecha.replace(/-/g, '').slice(2);
@@ -329,8 +331,6 @@ export default function IngresoMaterialPage() {
         let resText = `🍄 Esporoma ${esporomaId} registrado.\n\n`;
         let currentBatchSeq = seqBatch;
         let derivIdx = 0;
-
-        const etiquetas = [];
 
         for (const deriv of derivaciones) {
           let derivacionFotoUrl = null;
@@ -610,7 +610,11 @@ export default function IngresoMaterialPage() {
         }
       }
       
+      resetForm();
+      setRuta(null); // volver al selector
+
       if (imprimirEtiqueta) {
+        try {
         const batchData = {
           id: newRecordId,
           alias: formValues.codigo_cepa 
@@ -632,11 +636,13 @@ export default function IngresoMaterialPage() {
         };
         setBatchesToPrint([batchData, ...etiquetas]);
         setImprimirEtiqueta(false);
+        } catch (printErr) {
+          console.error('Error generando etiquetas (el registro ya se guardó):', printErr);
+          toast.error('Registro guardado, pero falló la generación de etiquetas. Reintentá desde el módulo de impresión.');
+        }
         return;
       }
 
-      resetForm();
-      setRuta(null); // volver al selector
     } catch (error) {
       console.error(error);
       toast.error(`Error al guardar: ${error.message}. Tus datos NO se borraron, podés reintentar.`);
