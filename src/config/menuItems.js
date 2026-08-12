@@ -103,6 +103,12 @@ export const MENU_ITEMS = [
     icono: '⚙️',
     ruta: '/equipos',
   },
+  {
+    id: 'limpieza',
+    label: 'Limpieza',
+    icono: '🧹',
+    ruta: '/limpieza-duplicado',
+  },
 ].filter(item => item.id); // Filter out empty commented out items
 
 // Ítems que aparecen en la barra inferior fija (siempre visibles en mobile)
@@ -129,6 +135,7 @@ export const MENU_GROUPS = [
       { id: 'salas', label: 'Salas', icono: '🌡️', ruta: '/salas' },
       { id: 'mantenimiento', label: 'Mantenim.', icono: '🔧', ruta: '/mantenimiento' },
       { id: 'equipos', label: 'Equipos', icono: '⚙️', ruta: '/equipos' },
+      { id: 'limpieza', label: 'Limpieza', icono: '🧹', ruta: '/limpieza-duplicado' },
       { id: 'inventario', label: 'Inventario', icono: '📦', ruta: '/inventario' },
       { id: 'cola', label: 'Cola', icono: '📋', ruta: '/print-queue' },
     ],

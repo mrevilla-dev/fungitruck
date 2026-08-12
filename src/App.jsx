@@ -30,6 +30,7 @@ const CriovialDescongelacionPage = React.lazy(() => import('./pages/CriovialDesc
 const ExperimentoNuevoPage = React.lazy(() => import('./pages/ExperimentoNuevoPage'));
 const ExperimentosListPage = React.lazy(() => import('./pages/ExperimentosListPage'));
 const MigracionEquiposPage = React.lazy(() => import('./pages/MigracionEquiposPage'));
+const LimpiezaDuplicadoPage = React.lazy(() => import('./pages/LimpiezaDuplicadoPage'));
 const EquiposPage = React.lazy(() => import('./pages/EquiposPage'));
 const EquipoDetallePage = React.lazy(() => import('./pages/EquipoDetallePage'));
 
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="/experimentos" element={<ExperimentosListPage />} />
           {/* Bloque 1 — Migración Equipos */}
           <Route path="/migracion-equipos" element={<MigracionEquiposPage />} />
+          <Route path="/limpieza-duplicado" element={<LimpiezaDuplicadoPage />} />
           {/* Bloque 3 y 4 — Equipos */}
           <Route path="/equipos" element={<EquiposPage user={user} />} />
           <Route path="/equipos/:id" element={<EquipoDetallePage user={user} />} />
