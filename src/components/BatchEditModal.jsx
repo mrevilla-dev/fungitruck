@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { doc, updateDoc, serverTimestamp, collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, collection, onSnapshot, query, where, getDocs, arrayUnion } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import NuevaCosechaModal from './NuevaCosechaModal';
 import RegistroMasivoAislamientosModal from './RegistroMasivoAislamientosModal';
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 const STATUS_OPTIONS = [
   { label: 'Planificado', emoji: '📅', color: '#94a3b8' },
   { label: 'Incubación', emoji: '🌡️', color: 'var(--primary-color)' },
+  { label: 'Inoculado', emoji: '🧬', color: '#06b6d4' },
   { label: 'Fructificación', emoji: '🍄', color: '#8b5cf6' },
   { label: 'Colonias visibles', emoji: '🧫', color: '#10b981' },
   { label: 'Cosechado', emoji: '🧺', color: 'var(--accent-color)' },
@@ -43,6 +45,9 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
     observaciones_cierre: batch.observaciones_cierre || '',
     contenedor_devuelto: batch.contenedor_devuelto ?? false,
   });
+
+  const [fotoAuditoria, setFotoAuditoria] = useState([]);
+  const [auditoriaObs, setAuditoriaObs] = useState('');
 
   useEffect(() => {
     return onSnapshot(collection(db, 'salas'), (snap) => {
@@ -151,13 +156,51 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
     }
   };
 
+  const handleAuditoriaFotos = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const totalSize = [...fotoAuditoria, ...files].reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > 50 * 1024 * 1024) return toast.error('El total de imágenes no puede superar 50MB');
+    setFotoAuditoria(prev => [...prev, ...files]);
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
+      // Subir fotos de auditoría (si hay) a Drive
+      let fotosUrls = [];
+      if (fotoAuditoria.length > 0) {
+        try {
+          for (const file of fotoAuditoria) {
+            const result = await uploadFileToDrive(file);
+            const url = result?.url ?? result?.imageUrl;
+            if (url) fotosUrls.push(url);
+          }
+        } catch (err) {
+          console.error('Error subiendo fotos de auditoría:', err);
+          toast.error('No se pudieron subir algunas fotos de evidencia. Guardando sin ellas.');
+        }
+      }
+
+      // Entrada de auditoría solo si cambió el status o hay fotos nuevas
+      const statusCambio = editData.status !== batch.status;
+      const auditoriaEntry = (statusCambio || fotosUrls.length > 0) ? {
+        status_previo: batch.status,
+        status_nuevo: editData.status,
+        fecha: serverTimestamp(),
+        operator: getAuth().currentUser?.displayName || getAuth().currentUser?.email || 'Sistema',
+        observaciones: auditoriaObs || '',
+        fotos_urls: fotosUrls,
+      } : null;
+
       await updateDoc(doc(db, 'batches', batch.id), {
         ...editData,
+        ...(fotosUrls.length > 0 && { foto_evidencia: fotosUrls[0] }),
+        ...(auditoriaEntry && { fotos_auditoria: arrayUnion(auditoriaEntry) }),
         updatedAt: serverTimestamp(),
       });
+      setFotoAuditoria([]);
+      setAuditoriaObs('');
       onClose();
     } catch (err) {
       toast.error('Error al actualizar: ' + err.message);
@@ -247,6 +290,48 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* ─── Auditoría con evidencia ─── */}
+              <div className="form-group" style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '8px' }}>
+                <label className="form-label">
+                  📷 Fotos de evidencia de auditoría (opcional)
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                    — Recomendadas al cambiar el estado
+                  </span>
+                </label>
+                <input
+                  type="file" accept="image/*" multiple className="form-control"
+                  onChange={handleAuditoriaFotos}
+                />
+                {fotoAuditoria.length > 0 && (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    {fotoAuditoria.map((f, i) => (
+                      <img key={i} src={URL.createObjectURL(f)} alt={`Preview ${i + 1}`}
+                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+                    ))}
+                  </div>
+                )}
+                {batch.foto_evidencia && fotoAuditoria.length === 0 && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                      Foto de evidencia actual:
+                    </p>
+                    <img src={batch.foto_evidencia} alt="Evidencia actual"
+                      style={{ maxWidth: '200px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+                  </div>
+                )}
+                {editData.status !== batch.status && (
+                  <div className="form-group" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+                    <label className="form-label">Observaciones de la auditoría</label>
+                    <textarea
+                      className="form-control" rows="2"
+                      placeholder="Ej: Contaminación bacteriana en sector NE. Descartado por protocolo."
+                      value={auditoriaObs}
+                      onChange={e => setAuditoriaObs(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* ─── BLOQUE 6: Historial de Cosechas y Métricas ─── */}
@@ -491,6 +576,37 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
                               📷 Ver Foto
                             </a>
                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Historial de Auditorías ─── */}
+              {batch.fotos_auditoria && batch.fotos_auditoria.length > 0 && (
+                <div className="card" style={{ background: 'rgba(251, 191, 36, 0.05)', border: '1px solid rgba(251, 191, 36, 0.25)', borderRadius: '12px', padding: '1rem' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#f59e0b' }}>📋 Historial de auditorías</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {batch.fotos_auditoria.slice(-3).reverse().map((entry, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px' }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          {entry.fotos_urls && entry.fotos_urls.length > 0 && (
+                            <>
+                              <img src={entry.fotos_urls[0]} alt="" style={{ width: '60px', height: '60px', borderRadius: '6px', objectFit: 'cover' }} />
+                              {entry.fotos_urls.length > 1 && (
+                                <span style={{ position: 'absolute', bottom: 0, right: 0, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.65rem', padding: '1px 4px', borderRadius: '4px' }}>
+                                  +{entry.fotos_urls.length - 1}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <div>
+                            <strong>{entry.status_previo || '—'}</strong> → <strong>{entry.status_nuevo}</strong> · {entry.operator}
+                          </div>
+                          {entry.observaciones && <div style={{ color: 'var(--text-secondary)' }}>{entry.observaciones}</div>}
                         </div>
                       </div>
                     ))}
