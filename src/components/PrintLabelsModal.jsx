@@ -18,6 +18,18 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
   const hasContainers = uniqueContainers.length > 0;
   const [imprimirContenedor, setImprimirContenedor] = useState(false);
   const [activeContainerProfile, setActiveContainerProfile] = useState('MAXI_BOLSA');
+  const [agregarBolsaMulti, setAgregarBolsaMulti] = useState(false);
+
+  // Agrupación por ejemplar para la etiqueta de bolsa contenedora (N en 1)
+  const gruposBolsa = {};
+  batches.forEach(b => {
+    const grupoKey = b.ejemplarId || (b.origen_trazabilidad && b.origen_trazabilidad.match(/EJE:\s*(\S+)/)?.[1]);
+    if (grupoKey) {
+      if (!gruposBolsa[grupoKey]) gruposBolsa[grupoKey] = [];
+      gruposBolsa[grupoKey].push(b);
+    }
+  });
+  const gruposBolsaMulti = Object.values(gruposBolsa).filter(g => g.length > 1);
 
   const handlePrint = () => {
     // Apply class to HTML for browser-based print size
@@ -129,6 +141,28 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
            fecha_generacion: serverTimestamp(),
            operario: usuarioActivo || 'Sistema',
          });
+      }
+
+      if (agregarBolsaMulti && gruposBolsaMulti.length > 0) {
+        for (const grupo of gruposBolsaMulti) {
+          const bloques = grupo.map(b => ({ ...b }));
+          await addDoc(collection(db, 'cola_impresion'), {
+            modulo: 'bolsa_multi',
+            batch_ids: grupo.map(b => b.id || '').filter(Boolean),
+            tipo_etiqueta: 'BOLSA_MULTI',
+            datos_etiquetas: [{
+              ...grupo[0],
+              id: `BOLSA-MULTI-${grupo[0].id || ''}`,
+              alias: grupo[0].alias || grupo[0].cepa || grupo[0].especie || '',
+              tipo_etiqueta: 'BOLSA_MULTI',
+              bloques,
+            }],
+            copias: 1,
+            estado: 'Pendiente',
+            fecha_generacion: serverTimestamp(),
+            operario: usuarioActivo || 'Sistema',
+          });
+        }
       }
 
       toast.success('Etiqueta(s) enviadas a la cola de impresión');
@@ -285,6 +319,18 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
                   </div>
                 )}
 
+                {gruposBolsaMulti.length > 0 && (
+                  <div style={{ marginTop: '1rem', background: 'rgba(139, 92, 246, 0.08)', padding: '1rem', borderRadius: '12px', border: '1px solid #8b5cf6' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                      <input type="checkbox" checked={agregarBolsaMulti} onChange={e => setAgregarBolsaMulti(e.target.checked)} style={{ transform: 'scale(1.2)' }} />
+                      🏷️ Etiqueta de bolsa contenedora (N en 1)
+                    </label>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0', lineHeight: 1.4 }}>
+                      Agrega una etiqueta por ejemplar con {gruposBolsaMulti.map(g => g.length).join(' + ')} placa(s) apiladas, sin reemplazar las individuales.
+                    </p>
+                  </div>
+                )}
+
               </div>
             )}
 
@@ -436,14 +482,35 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
                             )}
 
                             {activeProfile === 'SLIM_PETRI' && (
-                              <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', gap: '12px', paddingLeft: '8px' }}>
-                                <div style={{ width: '32px', height: '32px', flexShrink: 0 }}>
-                                  <QRCodeSVG value={qrData} size={32} level="M" />
-                                </div>
-                                <div style={{ fontSize: '11px', textAlign: 'left', flex: 1 }}>
-                                  <strong>{alias}</strong> | <span style={{ fontSize: '9px' }}>{nombre}</span>
-                                  <div style={{ fontSize: '8px', color: '#475569' }}>Fecha: {fecha} | Ref: {meta} {transferencia && `| ${transferencia}`}</div>
-                                </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', padding: '10px', boxSizing: 'border-box', gap: '4px' }}>
+                                <QRCodeSVG value={qrData} size={54} level="M" />
+                                <div style={{ fontSize: '9px', fontWeight: 'bold', marginTop: '2px' }}>{qrData}</div>
+                                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{alias}</div>
+                                <div style={{ fontSize: '8px', color: '#475569' }}>Fecha: {fecha} {transferencia && `| ${transferencia}`}</div>
+                                <div style={{ fontSize: '8px', color: '#475569' }}>Gen: {batch.generacion ?? 0} | Placa {batch.numero_unidad ?? 1}/{batch.total_unidades ?? 1}</div>
+                                <div style={{ fontSize: '8px', color: '#475569' }}>Sala: {batch.sala || ''} | Op: {operador}</div>
+                              </div>
+                            )}
+
+                            {activeProfile === 'BOLSA_MULTI' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', boxSizing: 'border-box', gap: '4px' }}>
+                                {(batch.bloques && batch.bloques.length ? batch.bloques : [batch]).map((bl, i, arr) => (
+                                  <div key={i} style={{
+                                    flex: 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    borderBottom: i < arr.length - 1 ? '1px dashed #cbd5e1' : 'none',
+                                    padding: '4px'
+                                  }}>
+                                    <QRCodeSVG value={bl.id || qrData} size={34} level="M" />
+                                    <div style={{ fontSize: '7px', textAlign: 'left', lineHeight: '1.2', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                                      <div style={{ fontWeight: 'bold', fontSize: '8px' }}>{bl.alias || bl.cepa || bl.especie || 'S/C'}</div>
+                                      <div>{(bl.id || '').split('-').slice(-2).join('-')} | {i + 1}/{arr.length}</div>
+                                      <div>{formatDate(bl.fecha || bl.fecha_inoculacion || '')} | {bl.sala || ''}</div>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )}
 

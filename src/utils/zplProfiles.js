@@ -31,14 +31,14 @@ export const PROFILES = [
   },
   {
     id: 'SLIM_PETRI',
-    name: 'Petri / Falcon Slim',
+    name: 'Placa Petri (Etiqueta Grande)',
     icon: '🧫',
-    group: 'Rollo Chico (Tiled)',
-    description: 'Para borde de placa de Petri y tubos Falcon. Texto alargado + QR mini.',
+    group: 'Rollo Grande (Full)',
+    description: 'Etiqueta completa 10×15cm por placa. QR grande legible a 20-30cm + datos completos.',
     cols: 1,
-    rows: 10,
+    rows: 1,
     slotWidth: 800,
-    slotHeight: 120,
+    slotHeight: 1200,
   },
   {
     id: 'MEDIO_ESTANDAR',
@@ -57,6 +57,17 @@ export const PROFILES = [
     icon: '📦',
     group: 'Rollo Grande (Full)',
     description: 'Para bolsas de 20-60cm. Cepa e historial visibles a gran distancia.',
+    cols: 1,
+    rows: 1,
+    slotWidth: 800,
+    slotHeight: 1200,
+  },
+  {
+    id: 'BOLSA_MULTI',
+    name: 'Bolsa Contenedora (N placas en 1)',
+    icon: '🛍️',
+    group: 'Rollo Grande (Full)',
+    description: 'Una sola etiqueta con hasta 4 bloques apilados (uno por placa) para la bolsa contenedora.',
     cols: 1,
     rows: 1,
     slotWidth: 800,
@@ -88,6 +99,20 @@ const formatDate = (dateStr) => {
 };
 
 /**
+ * Sanitiza textos para ZPL: elimina acentos/diacríticos y caracteres no ASCII.
+ * La fuente ^A0N de la Zebra no renderiza bien UTF-8.
+ */
+const sanitizarZpl = (texto) => {
+  if (!texto) return '';
+  return String(texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ñÑ]/g, m => (m === 'ñ' ? 'n' : 'N'))
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
+};
+
+/**
  * Generates ZPL II code for a set of batches tiled onto a single 100x150mm sheet (800x1200 dots)
  * @param {string} profileId - The active profile ID
  * @param {Array} batches - List of batches to print
@@ -108,6 +133,27 @@ export function generateZPL(profileId, batches, copies = 1) {
 
   const slotsPerPage = profile.cols * profile.rows;
   let zpl = '';
+
+  // BOLSA_MULTI: todos los ítems son bloques de UNA etiqueta de bolsa contenedora
+  // (hasta 4 bloques apilados por hoja de 800×1200)
+  if (profileId === 'BOLSA_MULTI') {
+    const bloques = [];
+    itemsToPrint.forEach(it => {
+      if (Array.isArray(it.bloques) && it.bloques.length) bloques.push(...it.bloques);
+      else bloques.push(it);
+    });
+    for (let i = 0; i < bloques.length; i += 4) {
+      const grupo = bloques.slice(i, i + 4);
+      zpl += '^XA\n';
+      zpl += '^CI28\n';
+      zpl += '^PW800\n';
+      zpl += '^LL1200\n';
+      zpl += '^LH0,0\n';
+      zpl += generarBloquesBolsa(grupo);
+      zpl += '^XZ\n\n';
+    }
+    return zpl;
+  }
 
   // Process items in chunks of slotsPerPage (each chunk is one physical 100x150mm label)
   for (let i = 0; i < itemsToPrint.length; i += slotsPerPage) {
@@ -158,9 +204,27 @@ export function generateZPL(profileId, batches, copies = 1) {
 }
 
 /**
+ * Genera los N bloques apilados de una etiqueta BOLSA_MULTI (máx 4 por hoja).
+ * @param {Array} bloques - batches a incluir como bloques
+ */
+function generarBloquesBolsa(bloques) {
+  const n = bloques.length;
+  const blockHeight = Math.floor(1200 / n);
+  let zpl = '';
+  bloques.forEach((b, i) => {
+    const y = i * blockHeight;
+    zpl += getZplForProfile('BOLSA_MULTI', b, 0, y, { index: i, total: n, blockHeight });
+    if (i < n - 1) {
+      zpl += `^FO40,${y + blockHeight - 2}^GB720,4,4^FS\n`;
+    }
+  });
+  return zpl;
+}
+
+/**
  * Returns the ZPL code for a single label given its profile and coordinates
  */
-function getZplForProfile(profileId, batch, xStart, yStart) {
+function getZplForProfile(profileId, batch, xStart, yStart, ctx) {
   let zpl = '';
   // Extract batch information safely
   const qrData = batch.id || 'N/A';
@@ -213,15 +277,45 @@ function getZplForProfile(profileId, batch, xStart, yStart) {
         zpl += `^FO${xStart + 110},${yStart + 75}^A0N,18,18^FDRef: ${meta.substring(0, 15)}^FS\n`;
 
       } else if (profileId === 'SLIM_PETRI') {
-        // --- 3. SLIM_PETRI (Slot: 800 x 120) ---
-        // QR compact far left
-        zpl += `^FO${xStart + 20},${yStart + 15}^BQN,2,3^FDMA,${qrData}^FS\n`;
-        // Long stretched text layout for edge of plate
-        zpl += `^FO${xStart + 130},${yStart + 30}^A0N,30,30^FD${alias} | ${nombre.substring(0, 30)}^FS\n`;
-        zpl += `^FO${xStart + 130},${yStart + 70}^A0N,24,24^FB650,2,0,L,0^FDFec: ${fecha} | Ref: ${meta}${transferencia ? ` | ${transferencia}` : ''}^FS\n`;
-        if (batch.origen_trazabilidad) {
-          zpl += `^FO${xStart + 130},${yStart + 95}^A0N,18,18^FB650,1,0,L,0^FD${batch.origen_trazabilidad.substring(0, 60)}^FS\n`;
-        }
+        // --- 3. SLIM_PETRI (Full Sheet: 800 x 1200) ---
+        // Etiqueta completa para placa de Petri: QR grande arriba + 6 filas de texto
+        const genEsp = [batch.genero, batch.especie].filter(Boolean).join(' ').trim() || batch.alias || batch.cepa || 'S/C';
+        const comun = batch.nombre_comun ? ` (${sanitizarZpl(batch.nombre_comun)})` : '';
+        const tecnica = (batch.tecnica_aislamiento || batch.tipo_inoculacion || batch.tipo_uso || '').replace(/_/g, ' ');
+        const gen = batch.generacion ?? 0;
+        const numUni = batch.numero_unidad ?? '1';
+        const totUni = batch.total_unidades ?? '1';
+
+        // QR grande (size 10 ≈ 290×290 dots) arriba a la izquierda
+        zpl += `^FO${xStart + 15},${yStart + 15}^BQN,2,10^FDMA,${sanitizarZpl(batch.id || 'N/A')}^FS\n`;
+
+        // Fila 1: ID completo
+        zpl += `^FO${xStart + 15},${yStart + 450}^A0N,30,30^FB770,1,0,L,0^FD${sanitizarZpl(batch.id || '')}^FS\n`;
+        // Fila 2: Género + Especie + nombre común
+        zpl += `^FO${xStart + 15},${yStart + 510}^A0N,36,36^FB770,1,0,L,0^FD${sanitizarZpl(genEsp)}${comun}^FS\n`;
+        // Fila 3: Técnica legible
+        zpl += `^FO${xStart + 15},${yStart + 580}^A0N,30,30^FB770,1,0,L,0^FD${sanitizarZpl(tecnica)}^FS\n`;
+        // Fila 4: Generación + Placa n/N
+        zpl += `^FO${xStart + 15},${yStart + 640}^A0N,30,30^FDGen: ${gen} | Placa ${numUni}/${totUni}^FS\n`;
+        // Fila 5: Fecha + Sala
+        zpl += `^FO${xStart + 15},${yStart + 700}^A0N,30,30^FDFec: ${fecha} | Sala: ${sanitizarZpl(batch.sala || '')}^FS\n`;
+        // Fila 6: Operario
+        zpl += `^FO${xStart + 15},${yStart + 760}^A0N,30,30^FDOperario: ${sanitizarZpl(operador)}^FS\n`;
+
+      } else if (profileId === 'BOLSA_MULTI') {
+        // --- 3b. BOLSA_MULTI (bloque de la etiqueta de bolsa contenedora) ---
+        // QR a la izquierda (size 8 ≈ 232×232 dots) + texto a la derecha
+        const total = ctx?.total || 1;
+        const index = ctx?.index || 0;
+        const genEsp = [batch.genero, batch.especie].filter(Boolean).join(' ').trim() || batch.alias || batch.cepa || 'S/C';
+        const tecnica = (batch.tipo_uso || batch.tipo_inoculacion || '').replace(/_/g, ' ');
+        const idCorto = (batch.id || '').split('-').slice(-2).join('-');
+        const fechaBloque = formatDate(batch.fecha || batch.fecha_inoculacion || batch.trazabilidad?.fecha_preparacion || '');
+
+        zpl += `^FO${xStart + 15},${yStart + 15}^BQN,2,8^FDMA,${sanitizarZpl(batch.id || 'N/A')}^FS\n`;
+        zpl += `^FO${xStart + 270},${yStart + 15}^A0N,30,30^FB510,1,0,L,0^FD${sanitizarZpl(genEsp)}^FS\n`;
+        zpl += `^FO${xStart + 270},${yStart + 55}^A0N,26,26^FB510,1,0,L,0^FD${sanitizarZpl(idCorto)} | ${index + 1}/${total} | ${sanitizarZpl(tecnica)}^FS\n`;
+        zpl += `^FO${xStart + 270},${yStart + 95}^A0N,26,26^FB510,1,0,L,0^FDFec: ${fechaBloque} | Sala: ${sanitizarZpl(batch.sala || '')}^FS\n`;
 
       } else if (profileId === 'MEDIO_ESTANDAR') {
         // --- 4. MEDIO_ESTANDAR (Slot: 400 x 400) ---
@@ -378,6 +472,21 @@ export function generateMixedZPL(itemsToPrint) {
   };
 
   flatItems.forEach((item) => {
+    // BOLSA_MULTI: ocupa la hoja completa como etiqueta de bolsa (bloques apilados)
+    if (item.profileId === 'BOLSA_MULTI') {
+      if (pageZpl !== '') {
+        startNewPage();
+      }
+      const bloques = (Array.isArray(item.batch?.bloques) && item.batch.bloques.length)
+        ? item.batch.bloques
+        : [item.batch];
+      pageZpl += generarBloquesBolsa(bloques.slice(0, 4));
+      currentX = pw;
+      currentY = ll;
+      rowMaxHeight = 0;
+      return;
+    }
+
     const { w, h } = item;
 
     if (currentX + w > pw) {
