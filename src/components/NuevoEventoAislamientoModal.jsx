@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import {
   collection, doc, onSnapshot, query, getDoc, setDoc,
-  serverTimestamp, runTransaction, writeBatch, increment
+  serverTimestamp, runTransaction, writeBatch, increment, where
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
@@ -43,6 +43,7 @@ const TECNICAS = [
 
 const EMPTY_EVT = {
   ejemplar_origen_id: '',
+  batch_origen_id: '',
   tecnica: 'subcultivo',
   temperatura_C: '',
   dias_incubacion: '',
@@ -65,6 +66,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
   const [formData, setFormData] = useState(EMPTY_EVT);
   const [loading, setLoading] = useState(false);
   const [ejemplares, setEjemplares] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [salas, setSalas] = useState([]);
   const [contenedores, setContenedores] = useState([]);
 
@@ -112,6 +114,18 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
           .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
       );
     }, err => console.error('Error cargando ejemplares:', err));
+    return unsub;
+  }, []);
+
+  // Escuchar batches activos (para resolver placa → ejemplar y selector de placa origen)
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'batches'), where('status', 'not-in', ['Descartado', 'Contaminado'])),
+      snap => {
+        setBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      },
+      err => console.error('Error cargando batches:', err)
+    );
     return unsub;
   }, []);
 
@@ -212,6 +226,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
       wb.set(newDocRef, {
         id_semantico: newId,
         ejemplar_origen_id: formData.ejemplar_origen_id,
+        batch_origen_id: formData.batch_origen_id || null,
         tecnica: formData.tecnica,
         temperatura_C: formData.temperatura_C !== '' ? Number(formData.temperatura_C) : null,
         dias_incubacion: formData.dias_incubacion !== '' ? Number(formData.dias_incubacion) : null,
@@ -257,6 +272,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
           especie: ejemplarOrigen?.especie || '',
           evento_aislamiento_id: newId,
           ejemplarId: formData.ejemplar_origen_id,
+          batch_origen_id: formData.batch_origen_id || null,
           tecnica_aislamiento: formData.tecnica,
           operator: formData.operario || 'Sistema',
           fechaInoculacion: formData.fecha,
@@ -378,18 +394,83 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
               <ScanInput
                 onScan={async (scannedId) => {
                   const id = scannedId.trim();
+
+                  // Caso 1: es un batch (BAT-...) → buscar batch y extraer ejemplarId
+                  if (id.startsWith('BAT-')) {
+                    const batch = batches.find(b => b.id === id);
+                    if (batch && batch.ejemplarId) {
+                      const ejemplar = ejemplares.find(e => e.id === batch.ejemplarId);
+                      if (ejemplar) {
+                        handleChange('ejemplar_origen_id', ejemplar.id);
+                        handleChange('batch_origen_id', batch.id);
+                        toast.success(`Ejemplar seleccionado: ${ejemplar.id} (desde batch ${batch.id})`);
+                        return;
+                      }
+                    }
+                    toast.error(`No se encontró el ejemplar del batch: ${id}`);
+                    return;
+                  }
+
+                  // Caso 2: es un ejemplar directo (EJE-...)
                   const opt = ejemplaresOptions.find(e => e.id === id);
                   if (opt) {
                     handleChange('ejemplar_origen_id', opt.id);
+                    handleChange('batch_origen_id', '');
                     toast.success(`Ejemplar seleccionado: ${opt.nombre}`);
                   } else {
                     toast.error(`No se encontró ejemplar: ${id}`);
                   }
                 }}
-                label="📷 Escanear QR del Ejemplar"
+                label="📷 Escanear QR del Ejemplar o Placa"
               />
             </div>
           </div>
+
+          {/* Placa de origen (opcional) */}
+          {formData.ejemplar_origen_id && (
+            <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 1150 }}>
+              <label className="form-label">
+                Placa de origen (opcional)
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                  — Si venís de una placa específica
+                </span>
+              </label>
+              <SearchableSelect
+                options={batches
+                  .filter(b => b.ejemplarId === formData.ejemplar_origen_id)
+                  .map(b => ({
+                    id: b.id,
+                    nombre: `${b.id} · ${b.genero || ''} ${b.especie || ''} · ${b.status}`
+                  }))}
+                value={formData.batch_origen_id || ''}
+                onChange={val => handleChange('batch_origen_id', val)}
+                placeholder="— Seleccionar placa de origen —"
+              />
+              <div style={{ marginTop: '0.5rem' }}>
+                <ScanInput
+                  onScan={async (scannedId) => {
+                    const id = scannedId.trim();
+                    if (!id.startsWith('BAT-')) {
+                      toast.error('Escaneá un QR de placa (BAT-...)');
+                      return;
+                    }
+                    const batch = batches.find(b => b.id === id);
+                    if (!batch) {
+                      toast.error(`No se encontró batch: ${id}`);
+                      return;
+                    }
+                    if (batch.ejemplarId !== formData.ejemplar_origen_id) {
+                      toast.error(`Este batch pertenece a otro ejemplar: ${batch.ejemplarId}`);
+                      return;
+                    }
+                    handleChange('batch_origen_id', batch.id);
+                    toast.success(`Placa de origen: ${batch.id}`);
+                  }}
+                  label="📷 Escanear QR de la Placa"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Técnica */}
           <div className="form-group" style={{ marginBottom: 0 }}>
