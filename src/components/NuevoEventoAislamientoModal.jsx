@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import {
   collection, doc, onSnapshot, query, getDoc, setDoc,
-  serverTimestamp, runTransaction, writeBatch, increment, where
+  serverTimestamp, runTransaction, writeBatch, increment, where, collectionGroup
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
 import { labelDe } from '../utils/vocabulario';
 import PrintLabelsModal from './PrintLabelsModal';
+import { AddBagModal } from './SubfraccionamientoAccordion';
 import { generarIdBatch } from '../utils/idGenerator';
 import { useMediosDisponibles } from '../hooks/useMediosDisponibles';
 import toast from 'react-hot-toast';
@@ -73,6 +74,9 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
   const [globalEnvaseTypes, setGlobalEnvaseTypes] = useState([]);
   const [showPrint, setShowPrint] = useState(false);
   const [createdBatches, setCreatedBatches] = useState([]);
+  const [showSubfraccionModal, setShowSubfraccionModal] = useState(false);
+  const [subfraccionesAll, setSubfraccionesAll] = useState([]);
+  const [insumos, setInsumos] = useState([]);
 
   // Precargar usuario
   useEffect(() => {
@@ -126,6 +130,24 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
       },
       err => console.error('Error cargando batches:', err)
     );
+    return unsub;
+  }, []);
+
+  // Escuchar subfracciones (para reusar AddBagModal y conocer las bolsas existentes del medio)
+  useEffect(() => {
+    const unsub = onSnapshot(collectionGroup(db, 'subfracciones'), snap => {
+      setSubfraccionesAll(
+        snap.docs.map(d => ({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() }))
+      );
+    }, err => console.error('Error cargando subfracciones:', err));
+    return unsub;
+  }, []);
+
+  // Escuchar insumos_base (para opciones dinámicas de unidad en AddBagModal)
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'insumos_base'), snap => {
+      setInsumos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, err => console.error('Error cargando insumos_base:', err));
     return unsub;
   }, []);
 
@@ -561,6 +583,18 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
                 label="📷 Escanear QR del Medio"
               />
             </div>
+            <div style={{ marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ width: '100%', fontSize: '0.85rem', padding: '0.45rem 0.8rem' }}
+                disabled={!formData.medio_prep}
+                onClick={() => setShowSubfraccionModal(true)}
+                title={formData.medio_prep ? 'Crear una nueva subfracción (bolsa/placa) de este medio e insertarla en este evento' : 'Seleccioná primero un medio'}
+              >
+                ➕ Nueva subfracción de este medio
+              </button>
+            </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: 0, position: 'relative', zIndex: 1100 }}>
@@ -677,6 +711,24 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
           usuarioActivo={formData.operario}
           initialProfile={createdBatches[0]?.tipo_etiqueta || 'PORTAOBJETOS'}
         />}
+        {showSubfraccionModal && formData.medio_prep && (
+          <AddBagModal
+            medio={formData.medio_prep}
+            existingBags={subfraccionesAll.filter(s => s.medioId === formData.medio_prep.id)}
+            salasList={salas}
+            insumosList={insumos}
+            onClose={() => setShowSubfraccionModal(false)}
+            onAdded={() => {}}
+            onCreated={(creadas) => {
+              const sub = creadas[0];
+              if (!sub) return;
+              handleChange('medio_prep_id', sub.id);
+              handleChange('medio_prep', formData.medio_prep);
+              handleChange('fraccion_destino', sub);
+              toast.success(`Subfracción ${sub.id_bolsa || sub.id} creada y seleccionada como destino`);
+            }}
+          />
+        )}
       </div>
     </div>
   );

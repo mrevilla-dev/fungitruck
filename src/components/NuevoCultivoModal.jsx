@@ -8,6 +8,7 @@ import { PROFILES } from '../utils/zplProfiles';
 import PrintLabelsModal from './PrintLabelsModal';
 import HibridacionEjemplarModal from './HibridacionEjemplarModal';
 import NuevoEventoAislamientoModal from './NuevoEventoAislamientoModal';
+import { AddBagModal } from './SubfraccionamientoAccordion';
 import toast from 'react-hot-toast';
 import { generarIdBatch, incrementarSecuenciaHibridacion } from '../utils/idGenerator';
 import AltaRapidaEjemplarExterno from './AltaRapidaEjemplarExterno';
@@ -93,9 +94,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const [showSubfraccionModal, setShowSubfraccionModal] = useState(false);
   const [busquedaPorEnvase, setBusquedaPorEnvase] = useState(false);
   const [envaseSeleccionado, setEnvaseSeleccionado] = useState('');
-  const [subfracTipo, setSubfracTipo] = useState('Bolsa');
-  const [subfracCantidad, setSubfracCantidad] = useState('');
-  const [subfracSaving, setSubfracSaving] = useState(false);
+  const [insumos, setInsumos] = useState([]);
 
   useEffect(() => {
     const fetchNextSeq = async () => {
@@ -183,7 +182,11 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       setContenedores(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    return () => { unsubEje(); unsubMedios(); unsubSubfrac(); unsubSalas(); unsubCont(); };
+    const unsubInsumos = onSnapshot(collection(db, 'insumos_base'), snap => {
+      setInsumos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => { unsubEje(); unsubMedios(); unsubSubfrac(); unsubSalas(); unsubCont(); unsubInsumos(); };
   }, []);
 
   useEffect(() => {
@@ -573,61 +576,6 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       toast.error(`No se encontró medio o subfracción: ${id}`);
     } catch (err) {
       toast.error('Error al buscar medio escaneado');
-    }
-  };
-
-  const handleSubfraccionar = async () => {
-    const qty = Number(subfracCantidad) || 0;
-    if (qty <= 0) return toast.error('Ingresá una cantidad válida');
-    if (!formData.medio_prep) return toast.error('Seleccioná un medio primero');
-
-    const bulk = formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0;
-    if (qty > bulk) return toast.error(`Solo quedan ${bulk} disponibles en el bulk`);
-
-    setSubfracSaving(true);
-    try {
-      const { writeBatch: wb, doc: d, increment: inc, serverTimestamp: st, collection: col } = await import('firebase/firestore');
-      const batch = wb(db);
-      const medioRef = d(db, 'medios_preparados', formData.medio_prep.id);
-      const bagRef = d(col(db, `medios_preparados/${formData.medio_prep.id}/subfracciones`));
-
-      const codigo = (formData.medio_prep.alias || 'MED').split(' ').find(p => !['lote', 'batch', 'nro', 'n°'].includes(p.toLowerCase()) && isNaN(p)) || 'MED';
-      const dateStr = new Date().toISOString().replace(/-/g, '').substring(0, 8);
-      const existingCount = allSubfracciones.filter(s => s.medioId === formData.medio_prep.id).length;
-      let letter = '';
-      let temp = existingCount;
-      do { letter = String.fromCharCode(65 + (temp % 26)) + letter; temp = Math.floor(temp / 26) - 1; } while (temp >= 0);
-      const bagId = `FRAC-${codigo.toUpperCase().replace(/[^A-Z0-9-]/g, '')}-${dateStr}-${letter}`;
-
-      batch.set(bagRef, {
-        id_bolsa: bagId,
-        tipo_envase: subfracTipo,
-        tipo_unidad: subfracTipo,
-        cantidad: qty,
-        disponible: qty,
-        volumen_por_unidad_ml: null,
-        ubicacion: 'Heladera Lab',
-        fecha: new Date().toISOString().split('T')[0],
-        operario: formData.operario || 'Sistema',
-        estado: 'Disponible',
-        novedades: [],
-        createdAt: st()
-      });
-
-      batch.update(medioRef, {
-        'stock_bulk.cantidad_actual': bulk - qty,
-        total_subfracciones: inc(1),
-        subfracciones_disponibles: inc(1)
-      });
-
-      await batch.commit();
-      toast.success(`Subfracción ${bagId} creada (${qty} unidades)`);
-      setShowSubfraccionModal(false);
-      setSubfracCantidad('');
-    } catch (err) {
-      toast.error('Error al crear subfracción: ' + err.message);
-    } finally {
-      setSubfracSaving(false);
     }
   };
 
@@ -1641,48 +1589,21 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
       </div>
 
-      {showSubfraccionModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#2a3142', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.5rem', width: '90%', maxWidth: '420px' }}>
-            <h4 style={{ margin: 0, color: 'var(--primary-color)', marginBottom: '1rem' }}>Nueva subfracción</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0' }}>
-              Crear nuevas unidades de <strong>{formData.medio_prep?.alias || formData.medio_prep?.nombre_receta}</strong> desde el stock bulk.
-            </p>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Stock bulk actual</label>
-              <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', color: 'var(--accent-color)' }}>
-                {formData.medio_prep?.stock_bulk?.cantidad_actual ?? formData.medio_prep?.cantidad_actual ?? 0} unidades
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Tipo de envase</label>
-              <select value={subfracTipo} onChange={e => setSubfracTipo(e.target.value)}
-                style={{ width: '100%', padding: '0.6rem', background: '#1a2233', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-                <option value="Bolsa">Bolsa</option>
-                <option value="Placa">Placa</option>
-                <option value="Tubo">Tubo</option>
-                <option value="Frasco">Frasco</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Cantidad de unidades</label>
-              <input type="number" min="1" value={subfracCantidad} onChange={e => setSubfracCantidad(e.target.value)}
-                style={{ width: '100%', padding: '0.6rem', background: '#1a2233', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontFamily: 'monospace' }}
-                placeholder="Ej: 5" />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowSubfraccionModal(false)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={handleSubfraccionar} disabled={subfracSaving}>
-                {subfracSaving ? '⏳ Creando...' : '✓ Crear'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {showSubfraccionModal && formData.medio_prep && (
+        <AddBagModal
+          medio={formData.medio_prep}
+          existingBags={allSubfracciones.filter(s => s.medioId === formData.medio_prep.id)}
+          salasList={salas}
+          insumosList={insumos}
+          onClose={() => setShowSubfraccionModal(false)}
+          onAdded={() => {}}
+          onCreated={(creadas) => {
+            const sub = creadas[0];
+            if (!sub) return;
+            handleChange('fraccion_destino', sub);
+            toast.success(`Subfracción ${sub.id_bolsa || sub.id} creada y seleccionada como destino`);
+          }}
+        />
       )}
     </div>
   );

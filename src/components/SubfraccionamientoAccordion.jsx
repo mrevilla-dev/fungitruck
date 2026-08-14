@@ -55,7 +55,7 @@ function buildBagId(codigoMedio, existingCount) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Modal: Nueva Bolsa
 // ═══════════════════════════════════════════════════════════════════════════════
-function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onAdded }) {
+export function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onAdded, onCreated }) {
   const [tipoEnvase,         setTipoEnvase]         = useState('Bolsa');
   const [otroEnvaseNombre,   setOtroEnvaseNombre]   = useState('');
   const [tipoUnidad,         setTipoUnidad]          = useState('Placa Petri');
@@ -162,6 +162,7 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
     setSaving(true);
     try {
       const batch    = writeBatch(db);
+      const creadas  = [];
 
       // Si tipoUnidad es 'Otro', creamos registro en insumos_base con es_envase: true
       if (tipoUnidad === 'Otro') {
@@ -230,6 +231,7 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
             createdAt:           serverTimestamp(),
           };
           batch.set(currentBagRef, singleBagData);
+          creadas.push({ id: currentBagRef.id, medioId: medio.id, ...singleBagData });
         }
         
         batch.update(medioRef, {
@@ -259,6 +261,7 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
         };
 
         batch.set(bagRef, bagData);
+        creadas.push({ id: bagRef.id, medioId: medio.id, ...bagData });
         batch.update(medioRef, {
           'stock_bulk.cantidad_actual': cantidadActual - descuento,
           total_subfracciones: increment(1),
@@ -274,6 +277,7 @@ function AddBagModal({ medio, existingBags, salasList, insumosList, onClose, onA
       }
 
       toast.success('Bolsa creada correctamente');
+      if (typeof onCreated === 'function') onCreated(creadas);
       onAdded();
       onClose();
     } catch (err) {

@@ -8,6 +8,7 @@ import { getTipoMaterialCodigo } from '../utils/tipoMaterialCodes';
 import SearchableSelect from '../components/SearchableSelect';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import ScanInput from '../components/ScanInput';
+import { AddBagModal } from '../components/SubfraccionamientoAccordion';
 import { compressImage } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 
@@ -60,6 +61,9 @@ export default function IngresoMaterialPage() {
   const [batchesActivos, setBatchesActivos] = useState([]);
   const [mediosDisponibles, setMediosDisponibles] = useState([]);
   const [salas, setSalas] = useState([]);
+  const [subfraccionesAll, setSubfraccionesAll] = useState([]);
+  const [insumos, setInsumos] = useState([]);
+  const [subfracModalFor, setSubfracModalFor] = useState(null); // derivación id
 
   // Estado del formulario (Ruta A)
   const [formA, setFormA] = useState({
@@ -118,6 +122,7 @@ export default function IngresoMaterialPage() {
     const unsubSub = onSnapshot(collectionGroup(db, 'subfracciones'), snap => {
       subfracciones.length = 0;
       snap.docs.forEach(d => subfracciones.push({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() }));
+      setSubfraccionesAll(subfracciones.slice());
       actualizarListaMedios(medios, subfracciones);
     });
 
@@ -125,7 +130,11 @@ export default function IngresoMaterialPage() {
       setSalas(snap.docs.map(d => ({ id: d.id, nombre: `${d.nombre} (${d.tipo || ''})`, ...d.data() })));
     });
 
-    return () => { unsubBatches(); unsubMedios(); unsubSub(); unsubSalas(); };
+    const unsubInsumos = onSnapshot(collection(db, 'insumos_base'), snap => {
+      setInsumos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => { unsubBatches(); unsubMedios(); unsubSub(); unsubSalas(); unsubInsumos(); };
   }, []);
 
   const actualizarListaMedios = (meds, subs) => {
@@ -964,6 +973,28 @@ export default function IngresoMaterialPage() {
       )}
 
       {batchesToPrint && <PrintLabelsModal batches={batchesToPrint} onClose={() => setBatchesToPrint(null)} />}
+
+      {subfracModalFor && (() => {
+        const deriv = derivaciones.find(d => d.id === subfracModalFor);
+        const medioOpt = mediosDisponibles.find(o => o.id === deriv?.medio_prep_id);
+        if (!deriv || !medioOpt?.medio) return null;
+        return (
+          <AddBagModal
+            medio={medioOpt.medio}
+            existingBags={subfraccionesAll.filter(s => s.medioId === medioOpt.medio.id)}
+            salasList={salas}
+            insumosList={insumos}
+            onClose={() => setSubfracModalFor(null)}
+            onAdded={() => {}}
+            onCreated={(creadas) => {
+              const sub = creadas[0];
+              if (!sub) return;
+              updateDerivacion(deriv.id, 'medio_prep_id', sub.id);
+              toast.success(`Subfracción ${sub.id_bolsa || sub.id} creada y asignada a la derivación`);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 
@@ -1070,6 +1101,18 @@ export default function IngresoMaterialPage() {
                         }} 
                         label="Escanear QR del Medio" 
                       />
+                    </div>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '0.45rem 0.8rem' }}
+                        disabled={!d.medio_prep_id}
+                        onClick={() => setSubfracModalFor(d.id)}
+                        title={d.medio_prep_id ? 'Crear una nueva subfracción (bolsa/placa) de este medio y asignarla a esta derivación' : 'Seleccioná primero un medio'}
+                      >
+                        ➕ Nueva subfracción de este medio
+                      </button>
                     </div>
                   </div>
                   <div className="form-group" style={{ position: 'relative', zIndex: 80 - idx }}>
