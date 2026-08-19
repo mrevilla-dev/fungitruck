@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, orderBy, limit, onSnapshot, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, where, doc, updateDoc, setDoc, collectionGroup } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import SearchableSelect from '../components/SearchableSelect';
 import RegistroMasivoAislamientosModal from '../components/RegistroMasivoAislamientosModal';
+import InspeccionBatchModal from '../components/InspeccionBatchModal';
+import { dueMillis, formatVencimiento } from '../utils/fechas';
 import { idCanonico } from '../utils/vocabulario';
 import toast from 'react-hot-toast';
 
@@ -71,6 +73,22 @@ export default function Dashboard() {
   const [salas, setSalas] = useState([]);
   const [ejemplares, setEjemplares] = useState([]);
 
+  // Cola de revisiones de placas (Bloque 1)
+  const [intervaloInspeccion, setIntervaloInspeccion] = useState(48);
+  const [subfraccionesSinStock, setSubfraccionesSinStock] = useState([]);
+  const [mediosList, setMediosList] = useState([]);
+  const [batchAInspeccionar, setBatchAInspeccionar] = useState(null);
+  const [inspeccionadosIds, setInspeccionadosIds] = useState([]);
+
+  const colaRevision = useMemo(() => {
+    const now = Date.now();
+    return batchesList
+      .filter(b => ['Inoculado', 'Incubación'].includes(b.status))
+      .map(b => ({ ...b, dueMs: dueMillis(b, intervaloInspeccion) }))
+      .filter(x => x.dueMs <= now && !inspeccionadosIds.includes(x.id))
+      .sort((a, b) => a.dueMs - b.dueMs);
+  }, [batchesList, intervaloInspeccion, inspeccionadosIds]);
+
   useEffect(() => {
     const h = new Date().getHours();
     if (h >= 12 && h < 19) setGreeting('Buenas tardes');
@@ -80,6 +98,26 @@ export default function Dashboard() {
   useEffect(() => {
     // Cargar listas para filtros
     onSnapshot(collection(db, "salas"), (snap) => setSalas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    // Intervalo global de inspección (config/inspecciones)
+    onSnapshot(doc(db, "config", "inspecciones"), (snap) => {
+      const data = snap.data();
+      if (data?.intervalo_horas) setIntervaloInspeccion(Number(data.intervalo_horas));
+    });
+
+    // Subfracciones sin stock (R3: hueco del consumo directo de eventos)
+    onSnapshot(collectionGroup(db, "subfracciones"), (snap) => {
+      setSubfraccionesSinStock(
+        snap.docs
+          .map(d => ({ id: d.id, medioId: d.ref.parent.parent?.id, ...d.data() }))
+          .filter(s => (s.disponible ?? 0) <= 0 && s.estado !== 'Agotada')
+      );
+    });
+
+    // Medios (para resolver alias en la mini-sección R3)
+    onSnapshot(collection(db, "medios_preparados"), (snap) => {
+      setMediosList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
     
     // Cargar ejemplares para SearchableSelect
     const unsubEjemplares = onSnapshot(collection(db, "ejemplares"), (snap) => {
@@ -301,6 +339,85 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        </details>
+      )}
+
+      {/* ─── Placas por revisar (Bloque 1) ─── */}
+      <details open style={{ marginBottom: '2rem' }}>
+        <summary style={{ ...summaryStyle, color: 'var(--primary-color)' }}>
+          🔔 Placas por revisar
+          {colaRevision.length > 0 && <span style={{ fontSize: '0.7rem', background: 'var(--danger-color)', color: 'white', padding: '2px 8px', borderRadius: '12px' }}>{colaRevision.length}</span>}
+        </summary>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Placas en incubación con revisión vencida, ordenadas por urgencia.
+          </span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Revisar cada
+            <select
+              value={intervaloInspeccion}
+              onChange={e => {
+                const horas = Number(e.target.value);
+                setIntervaloInspeccion(horas);
+                setDoc(doc(db, 'config', 'inspecciones'), { intervalo_horas: horas }, { merge: true })
+                  .then(() => toast.success(`Intervalo de revisión: ${horas}h`))
+                  .catch(err => toast.error('Error guardando intervalo: ' + err.message));
+              }}
+              style={{ background: 'var(--surface-color)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
+            >
+              <option value={24}>24 h</option>
+              <option value={48}>48 h</option>
+              <option value={72}>72 h</option>
+            </select>
+          </label>
+        </div>
+        {colaRevision.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
+            Sin placas pendientes de revisión. 🎉
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {colaRevision.map(placa => (
+              <div key={placa.id} className="card" style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderLeft: `4px solid ${placa.dueMs < Date.now() - 24 * 3600 * 1000 ? 'var(--danger-color)' : '#f59e0b'}` }}>
+                <div style={{ minWidth: '0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <strong style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{placa.id}</strong>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{placa.genero || ''} {placa.especie || ''}</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                    📍 {placa.destinoNombre || 'Sin sala'} · <span style={{ color: 'var(--danger-color)', fontWeight: 600 }}>{formatVencimiento(placa.dueMs)}</span>
+                  </div>
+                </div>
+                <button type="button" className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => setBatchAInspeccionar(placa)}>
+                  🔍 Inspeccionar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </details>
+
+      {/* ─── Fracciones sin stock (R3) ─── */}
+      {subfraccionesSinStock.length > 0 && (
+        <details style={{ marginBottom: '2rem' }}>
+          <summary style={{ ...summaryStyle, color: '#f59e0b' }}>
+            ⚠️ Fracciones sin stock (pendientes de marcar agotadas)
+            <span style={{ fontSize: '0.7rem', background: '#f59e0b', color: 'black', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{subfraccionesSinStock.length}</span>
+          </summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+            {subfraccionesSinStock.map(s => {
+              const medio = mediosList.find(m => m.id === s.medioId);
+              return (
+                <div key={s.id} className="card" style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', borderLeft: '4px solid #f59e0b' }}>
+                  <strong style={{ fontFamily: 'monospace' }}>{s.id_bolsa || s.id}</strong>
+                  <span style={{ color: 'var(--text-secondary)' }}> · {medio?.alias || medio?.nombre_receta || 'Sin medio'}</span>
+                  <div style={{ color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                    Disponible: <strong style={{ color: 'var(--danger-color)' }}>{s.disponible ?? 0}</strong> / {s.cantidad ?? 0} · Estado: {s.estado || 'Disponible'}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </details>
       )}
@@ -586,6 +703,28 @@ export default function Dashboard() {
         <RegistroMasivoAislamientosModal
           batchMadre={batchToRegister}
           onClose={() => setBatchToRegister(null)}
+        />
+      )}
+
+      {batchAInspeccionar && (
+        <InspeccionBatchModal
+          key={batchAInspeccionar.id}
+          batch={batchAInspeccionar}
+          onClose={() => setBatchAInspeccionar(null)}
+          onGuardada={(batchId, ySiguiente) => {
+            setInspeccionadosIds(prev => [...prev, batchId]);
+            if (!ySiguiente) {
+              setBatchAInspeccionar(null);
+              return;
+            }
+            const siguientes = colaRevision.filter(c => c.id !== batchId && !inspeccionadosIds.includes(c.id));
+            if (siguientes.length > 0) {
+              setBatchAInspeccionar(siguientes[0]);
+            } else {
+              setBatchAInspeccionar(null);
+              toast.success('No quedan más placas por revisar');
+            }
+          }}
         />
       )}
     </div>
