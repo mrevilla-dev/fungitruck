@@ -39,7 +39,7 @@ export function useMediosDisponibles() {
       sfs.forEach(s => {
         options.push({
           id: s.id,
-          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || s.id} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} disponibles ${s.volumen_por_unidad_ml ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
+          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || s.id} — ${s.tipo_unidad || 'Unidad'} — ${s.disponible}/${s.cantidad} ${s.por_volumen ? 'ml' : 'disponibles'}${s.volumen_por_unidad_ml && s.volumen_por_unidad_ml !== 1 ? `— ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
           medio: m,
           sub: s,

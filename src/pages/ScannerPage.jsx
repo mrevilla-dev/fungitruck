@@ -311,10 +311,12 @@ function ScannerPage() {
               <label className="form-label">Fecha de Preparación</label>
               <p style={{ margin: 0 }}>📅 {recordData.trazabilidad?.fecha_preparacion || '—'}</p>
             </div>
-            {recordData.subfraccion?.volumen_por_unidad_ml && (
+            {(recordData.subfraccion?.por_volumen
+              ? (recordData.subfraccion.disponible != null)
+              : (recordData.subfraccion?.volumen_por_unidad_ml && recordData.subfraccion.volumen_por_unidad_ml !== 1)) && (
               <div>
-                <label className="form-label">Volumen por Unidad</label>
-                <p style={{ margin: 0 }}>💧 {recordData.subfraccion.volumen_por_unidad_ml} ml</p>
+                <label className="form-label">{recordData.subfraccion.por_volumen ? 'Volumen disponible' : 'Volumen por Unidad'}</label>
+                <p style={{ margin: 0 }}>💧 {recordData.subfraccion.por_volumen ? recordData.subfraccion.disponible : recordData.subfraccion.volumen_por_unidad_ml} ml</p>
               </div>
             )}
           </div>

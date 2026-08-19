@@ -62,6 +62,7 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
   const [otroUnidadNombre,   setOtroUnidadNombre]   = useState('');
   const [cantidad,           setCantidad]            = useState('');
   const [volumenPorUnidad,   setVolumenPorUnidad]    = useState('');
+  const [porVolumen,         setPorVolumen]          = useState(false);
   const [ubicacion,          setUbicacion]           = useState('Heladera Lab');
   const [ubicacionDetalle,   setUbicacionDetalle]    = useState('');
   const [fecha,              setFecha]               = useState(new Date().toISOString().split('T')[0]);
@@ -131,8 +132,8 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
 
   const handleSave = async () => {
     const qty = Number(cantidad?.toString().replace(',', '.')) || 0;
-    const vol = Number(volumenPorUnidad?.toString().replace(',', '.')) || 0;
-    const descuento = vol > 0 ? (qty * vol) : qty;
+    const vol = porVolumen ? 1 : (Number(volumenPorUnidad?.toString().replace(',', '.')) || 0);
+    const descuento = porVolumen ? qty : (vol > 0 ? (qty * vol) : qty);
 
     if (!qty || qty <= 0) return toast.error('Ingresá una cantidad válida');
     if (descuento > disponibleBulk) return toast.error(`Solo quedan ${disponibleBulk} disponibles en el bulk, y querés fraccionar ${descuento}`);
@@ -217,9 +218,10 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
             id_bolsa:            newBagId,
             tipo_envase:         finalTipoEnvase,
             tipo_unidad:         finalTipoUnidad,
-            cantidad:            1,
-            disponible:          1,
-            volumen_por_unidad_ml: volumenPorUnidad ? Number(volumenPorUnidad?.toString().replace(',', '.')) : null,
+            cantidad:            porVolumen ? qty : 1,
+            disponible:          porVolumen ? qty : 1,
+            volumen_por_unidad_ml: porVolumen ? 1 : (volumenPorUnidad ? Number(volumenPorUnidad?.toString().replace(',', '.')) : null),
+            por_volumen:         porVolumen || null,
             ubicacion:           locConfig.ubicacion || ubicacion,
             ubicacion_id:        sEncontrada?.id || null,
             ubicacion_detalle:   locConfig.ubicacion_detalle || ubicacionDetalle || null,
@@ -246,9 +248,10 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
           id_bolsa:            bagIdPreview,
           tipo_envase:         finalTipoEnvase,
           tipo_unidad:         finalTipoUnidad,
-          cantidad:            qty,
-          disponible:          qty,           // se calcula = cantidad al crear
-          volumen_por_unidad_ml: volumenPorUnidad ? Number(volumenPorUnidad?.toString().replace(',', '.')) : null,
+          cantidad:            porVolumen ? qty : qty,           // por_volumen: ml totales
+          disponible:          qty,           // por_volumen: ml totales
+          volumen_por_unidad_ml: porVolumen ? 1 : (volumenPorUnidad ? Number(volumenPorUnidad?.toString().replace(',', '.')) : null),
+          por_volumen:         porVolumen || null,
           ubicacion,
           ubicacion_id:        salaEncontrada?.id || null,
           ubicacion_detalle:   ubicacionDetalle || null,
@@ -358,7 +361,7 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
 
         {/* Cantidad + indicador bulk */}
         <div className="form-group">
-          <label>Cantidad de unidades *</label>
+          <label>{porVolumen ? 'Volumen total (ml) *' : 'Cantidad de unidades *'}</label>
           <input
             type="number"
             className="form-control"
@@ -376,12 +379,21 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
             fontWeight: 500,
           }}>
             {disponibleBulk > 0
-              ? `⚗️ Quedan ${disponibleBulk} ${medio?.stock_bulk?.unidad || 'uds.'} sin fraccionar en el bulk`
+              ? `⚗️ Quedan ${disponibleBulk} ${medio?.stock_bulk?.unidad || 'ml'} sin fraccionar en el bulk`
               : '⚠️ El bulk está completamente fraccionado'}
           </small>
         </div>
 
+        {/* Toggle por volumen */}
+        <div className="form-group">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+            <input type="checkbox" checked={porVolumen} onChange={e => setPorVolumen(e.target.checked)} />
+            💧 Este envase se mide por volumen (ml) — se rastrea como X ml, no como "1 unidad de X ml"
+          </label>
+        </div>
+
         {/* Volumen por unidad */}
+        {!porVolumen && (
         <div className="form-group">
           <label>Volumen por unidad (ml) <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>– opcional</span></label>
           <input
@@ -393,6 +405,7 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
             onChange={e => setVolumenPorUnidad(e.target.value)}
           />
         </div>
+        )}
 
         {/* Disponible (calculado) */}
         <div className="form-group">
@@ -400,7 +413,7 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
           <input
             type="text"
             className="form-control"
-            value={cantidad ? `${cantidad} unidades` : '—'}
+            value={cantidad ? (porVolumen ? `${cantidad} ml` : `${cantidad} unidades`) : '—'}
             readOnly
             style={{ background: 'rgba(255,255,255,0.05)', cursor: 'default' }}
           />
@@ -533,6 +546,7 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
   const [otroUnidadNombre,  setOtroUnidadNombre]  = useState('');
   const [cantidadHijas,     setCantidadHijas]     = useState('');
   const [volumenPorUnidad,  setVolumenPorUnidad]  = useState('');
+  const [porVolumenHijo,    setPorVolumenHijo]    = useState(false);
   const [cantidadPadre,     setCantidadPadre]     = useState('1');
   const [ubicacion,         setUbicacion]         = useState('Heladera Lab');
   const [ubicacionDetalle,  setUbicacionDetalle]  = useState('');
@@ -557,7 +571,7 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
 
   // ── Valores derivados reactivos ────────────────────────────────────────────
   const qty  = Number(cantidadHijas?.toString().replace(',', '.'))  || 0;
-  const vol  = Number(volumenPorUnidad?.toString().replace(',', '.')) || 0;
+  const vol  = porVolumenHijo ? 1 : (Number(volumenPorUnidad?.toString().replace(',', '.')) || 0);
   const descuentoPadreAuto   = parentHasVolume ? qty * vol : null;
   const descuentoPadreManual = Number(cantidadPadre?.toString().replace(',', '.')) || 0;
   const descuentoPadre       = parentHasVolume ? (descuentoPadreAuto ?? 0) : descuentoPadreManual;
@@ -675,9 +689,10 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
             parent_id:             parentId,
             tipo_envase:           finalTipoEnvase,
             tipo_unidad:           finalTipoUnidad,
-            cantidad:              1,
-            disponible:            1,
-            volumen_por_unidad_ml: vol > 0 ? vol : null,
+            cantidad:              porVolumenHijo ? qty : 1,
+            disponible:            porVolumenHijo ? qty : 1,
+            volumen_por_unidad_ml: porVolumenHijo ? 1 : (vol > 0 ? vol : null),
+            por_volumen:           porVolumenHijo || null,
             ubicacion:             locConfig.ubicacion || ubicacion,
             ubicacion_id:          sEncontrada?.id || null,
             ubicacion_detalle:     locConfig.ubicacion_detalle || ubicacionDetalle || null,
@@ -701,9 +716,10 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
           parent_id:             parentId,
           tipo_envase:           finalTipoEnvase,
           tipo_unidad:           finalTipoUnidad,
-          cantidad:              qty,
-          disponible:            qty,
-          volumen_por_unidad_ml: vol > 0 ? vol : null,
+          cantidad:              porVolumenHijo ? qty : qty,
+          disponible:            porVolumenHijo ? qty : qty,
+          volumen_por_unidad_ml: porVolumenHijo ? 1 : (vol > 0 ? vol : null),
+          por_volumen:           porVolumenHijo || null,
           ubicacion,
           ubicacion_id:          salaEncontrada?.id || null,
           ubicacion_detalle:     ubicacionDetalle || null,
@@ -808,7 +824,11 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
         {/* Tipo de unidad */}
         <div className="form-group">
           <label>Tipo de unidad *</label>
-          <select className="form-control" value={tipoUnidad} onChange={e => setTipoUnidad(e.target.value)}>
+          <select className="form-control" value={tipoUnidad} onChange={e => {
+            const val = e.target.value;
+            setTipoUnidad(val);
+            if (parentHasVolume && /frasco|botella|erlenmeyer|beaker/i.test(val)) setPorVolumenHijo(true);
+          }}>
             {unidadOptions.map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
@@ -823,7 +843,7 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
 
         {/* Cantidad de unidades hijas */}
         <div className="form-group">
-          <label>Cantidad de unidades a crear *</label>
+          <label>{porVolumenHijo ? 'Volumen total a crear (ml) *' : 'Cantidad de unidades a crear *'}</label>
           <input type="number" className="form-control" min={1} value={cantidadHijas}
             onChange={e => { setCantidadHijas(e.target.value); setStep2Locs(null); }} />
           {tipoEnvase === 'Unidad independiente' && qty > 0 && (
@@ -833,12 +853,23 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
           )}
         </div>
 
+        {parentHasVolume && (
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+              <input type="checkbox" checked={porVolumenHijo} onChange={e => setPorVolumenHijo(e.target.checked)} />
+              💧 El envase se mide por volumen (ml)
+            </label>
+          </div>
+        )}
+
         {/* Volumen por unidad */}
+        {!porVolumenHijo && (
         <div className="form-group">
           <label>Volumen por unidad (ml) <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>– opcional</span></label>
           <input type="number" className="form-control" min={0} placeholder="Ej: 20"
             value={volumenPorUnidad} onChange={e => setVolumenPorUnidad(e.target.value)} />
         </div>
+        )}
 
         {/* Descuento del padre */}
         {parentHasVolume ? (
@@ -1317,7 +1348,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
           padding: '0.65rem 0.75rem',
           marginBottom: '0.5rem',
           background: isChild ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
-          borderLeft: `4px solid ${isAgotada ? '#f44' : (isChild ? '#818cf8' : 'var(--accent-color)')}`,
+          borderLeft: `4px solid \$\{isAgotada \? '#f44' : \(isChild \? '#818cf8' : 'var\(--accent-color\)'\)\}`,
           borderRadius: '6px',
         }}
       >
@@ -1343,7 +1374,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
           <span><strong>Fecha:</strong> {b.fecha}</span>
           <span><strong>Envase:</strong> {b.tipo_envase ?? '—'}</span>
           <span><strong>Unidad:</strong> {b.tipo_unidad ?? '—'}</span>
-          {b.volumen_por_unidad_ml && <span><strong>Vol/u:</strong> {b.volumen_por_unidad_ml} ml</span>}
+          {b.volumen_por_unidad_ml && b.volumen_por_unidad_ml !== 1 && <span><strong>Vol/u:</strong> {b.volumen_por_unidad_ml} ml</span>}
           <span><strong>Stock:</strong> {b.disponible ?? b.cantidad}/{b.cantidad}</span>
           <span>📍 {b.ubicacion ?? '—'}{b.ubicacion_detalle ? ` — ${b.ubicacion_detalle}` : ''}</span>
           {b.operario && <span><strong>Operario:</strong> {b.operario}</span>}
