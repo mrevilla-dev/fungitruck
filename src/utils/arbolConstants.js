@@ -54,6 +54,9 @@ export function getDriveEmbedUrl(url) {
   // Ya está en formato embebible
   if (url.includes('lh3.googleusercontent.com/d/')) return url;
 
+  // fileId crudo (sin URL) — p.ej. "1AbC...xyz"
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(url)) return `https://lh3.googleusercontent.com/d/${url}`;
+
   let fileId = null;
 
   // https://drive.google.com/file/d/FILE_ID/view (o /preview, /edit, etc.)

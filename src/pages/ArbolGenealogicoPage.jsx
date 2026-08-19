@@ -17,6 +17,7 @@ import NodoCrioResumen from '../components/arbol/nodos/NodoCrioResumen';
 import NodoColapso from '../components/arbol/nodos/NodoColapso';
 
 import PanelDetalleArbol from '../components/arbol/PanelDetalleArbol';
+import InspeccionBatchModal from '../components/InspeccionBatchModal';
 
 import { construirArbolDesdeBatch, construirArbolDesdeEjemplar } from '../utils/construirArbolGenealogico';
 import { calcularLayout } from '../utils/layoutArbol';
@@ -46,6 +47,18 @@ export default function ArbolGenealogicoPage({ tipo }) {
   const [error, setError] = useState(null);
   const [panelDetalle, setPanelDetalle] = useState(null);
   const [mostrarScanner, setMostrarScanner] = useState(false);
+  const [inspeccionBatch, setInspeccionBatch] = useState(null); // P.13
+
+  const abrirInspeccion = async (batchId) => {
+    try {
+      const snap = await getDoc(doc(db, 'batches', batchId));
+      if (!snap.exists()) return toast.error('Batch no encontrado');
+      setInspeccionBatch({ id: snap.id, ...snap.data() });
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al cargar el batch: ' + err.message);
+    }
+  };
 
   const esMobile = window.innerWidth < 768;
   const direction = esMobile ? 'TB' : 'LR';
@@ -405,15 +418,20 @@ export default function ArbolGenealogicoPage({ tipo }) {
       {/* Panel lateral de detalle (Desktop) */}
       {!esMobile && panelDetalle && (
         <div style={{ width: '350px', background: '#1e293b', borderLeft: '1px solid #334155', padding: '1rem', color: '#f8fafc', overflowY: 'auto' }}>
-          <PanelDetalleArbol datos={panelDetalle} onCerrar={() => setPanelDetalle(null)} />
+          <PanelDetalleArbol datos={panelDetalle} onCerrar={() => setPanelDetalle(null)} onInspeccionar={abrirInspeccion} />
         </div>
       )}
 
       {/* Panel de detalle (Mobile) - Modal full screen */}
       {esMobile && panelDetalle && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: '#1e293b', padding: '1rem', color: '#f8fafc', overflowY: 'auto' }}>
-          <PanelDetalleArbol datos={panelDetalle} onCerrar={() => setPanelDetalle(null)} />
+          <PanelDetalleArbol datos={panelDetalle} onCerrar={() => setPanelDetalle(null)} onInspeccionar={abrirInspeccion} />
         </div>
+      )}
+
+      {/* P.13: ficha de inspección / seguimiento fuera de la cola */}
+      {inspeccionBatch && (
+        <InspeccionBatchModal batch={inspeccionBatch} onClose={() => setInspeccionBatch(null)} onGuardada={() => setInspeccionBatch(null)} />
       )}
     </div>
   );

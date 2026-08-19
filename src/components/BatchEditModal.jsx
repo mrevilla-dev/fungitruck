@@ -4,6 +4,8 @@ import { db } from '../firebase';
 import { doc, updateDoc, serverTimestamp, collection, onSnapshot, query, where, getDocs, arrayUnion } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
+import { getDriveEmbedUrl } from '../utils/arbolConstants';
+import PhotoLightbox from './PhotoLightbox';
 import NuevaCosechaModal from './NuevaCosechaModal';
 import RegistroMasivoAislamientosModal from './RegistroMasivoAislamientosModal';
 import NoConformidadBatchModal from './NoConformidadBatchModal';
@@ -48,6 +50,7 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
 
   const [fotoAuditoria, setFotoAuditoria] = useState([]);
   const [auditoriaObs, setAuditoriaObs] = useState('');
+  const [lightbox, setLightbox] = useState(null); // P.14
 
   useEffect(() => {
     return onSnapshot(collection(db, 'salas'), (snap) => {
@@ -145,7 +148,7 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
       const result = await uploadFileToDrive(file);
       const photos = batch.photos || [];
       await updateDoc(doc(db, 'batches', batch.id), {
-        photos: [...photos, { url: result?.url ?? result?.imageUrl, date: new Date().toISOString() }],
+        photos: [...photos, { url: result?.imageUrl ?? result?.url, date: new Date().toISOString() }],
         updatedAt: serverTimestamp(),
       });
       toast.success('Foto subida a Drive y vinculada.');
@@ -173,7 +176,7 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
         try {
           for (const file of fotoAuditoria) {
             const result = await uploadFileToDrive(file);
-            const url = result?.url ?? result?.imageUrl;
+            const url = result?.imageUrl ?? result?.url;
             if (url) fotosUrls.push(url);
           }
         } catch (err) {
@@ -187,7 +190,7 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
       const auditoriaEntry = (statusCambio || fotosUrls.length > 0) ? {
         status_previo: batch.status,
         status_nuevo: editData.status,
-        fecha: serverTimestamp(),
+        fecha: new Date(),
         operator: getAuth().currentUser?.displayName || getAuth().currentUser?.email || 'Sistema',
         observaciones: auditoriaObs || '',
         fotos_urls: fotosUrls,
@@ -317,8 +320,12 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                       Foto de evidencia actual:
                     </p>
-                    <img src={batch.foto_evidencia} alt="Evidencia actual"
-                      style={{ maxWidth: '200px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+                    <img
+                      src={getDriveEmbedUrl(batch.foto_evidencia)}
+                      alt="Evidencia actual"
+                      onClick={() => setLightbox(getDriveEmbedUrl(batch.foto_evidencia))}
+                      style={{ maxWidth: '200px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'zoom-in' }}
+                    />
                   </div>
                 )}
                 {editData.status !== batch.status && (
@@ -593,7 +600,9 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           {entry.fotos_urls && entry.fotos_urls.length > 0 && (
                             <>
-                              <img src={entry.fotos_urls[0]} alt="" style={{ width: '60px', height: '60px', borderRadius: '6px', objectFit: 'cover' }} />
+                              <img src={getDriveEmbedUrl(entry.fotos_urls[0])} alt=""
+                                onClick={() => setLightbox(getDriveEmbedUrl(entry.fotos_urls[0]))}
+                                style={{ width: '60px', height: '60px', borderRadius: '6px', objectFit: 'cover', cursor: 'zoom-in' }} />
                               {entry.fotos_urls.length > 1 && (
                                 <span style={{ position: 'absolute', bottom: 0, right: 0, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.65rem', padding: '1px 4px', borderRadius: '4px' }}>
                                   +{entry.fotos_urls.length - 1}
@@ -607,6 +616,42 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
                             <strong>{entry.status_previo || '—'}</strong> → <strong>{entry.status_nuevo}</strong> · {entry.operator}
                           </div>
                           {entry.observaciones && <div style={{ color: 'var(--text-secondary)' }}>{entry.observaciones}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Seguimiento (fotos_seguimiento) — P.14.4 ─── */}
+              {batch.fotos_seguimiento && batch.fotos_seguimiento.length > 0 && (
+                <div className="card" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '1rem' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#10b981' }}>📈 Seguimiento ({batch.fotos_seguimiento.length})</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {[...batch.fotos_seguimiento].reverse().map((h, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px' }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          {h.fotos_urls && h.fotos_urls.length > 0 && (
+                            <>
+                              <img src={getDriveEmbedUrl(h.fotos_urls[0])} alt=""
+                                onClick={() => setLightbox(getDriveEmbedUrl(h.fotos_urls[0]))}
+                                style={{ width: '60px', height: '60px', borderRadius: '6px', objectFit: 'cover', cursor: 'zoom-in' }} />
+                              {h.fotos_urls.length > 1 && (
+                                <span style={{ position: 'absolute', bottom: 0, right: 0, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.65rem', padding: '1px 4px', borderRadius: '4px' }}>
+                                  +{h.fotos_urls.length - 1}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <div>
+                            <strong>{h.resultado}</strong>
+                            {h.diametro_mm != null && <span> · {h.diametro_mm} mm</span>}
+                            {h.ufc != null && <span> · {h.ufc} UFC</span>}
+                            {h.fecha && <span style={{ color: 'var(--text-secondary)' }}> · {h.fecha?.toDate ? h.fecha.toDate().toLocaleString() : new Date(h.fecha).toLocaleString()}</span>}
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)' }}>{h.operator}{h.observaciones ? ` · ${h.observaciones}` : ''}</div>
                         </div>
                       </div>
                     ))}
@@ -654,6 +699,8 @@ export default function BatchEditModal({ batch, onClose, onFilterBatch }) {
           }}
         />
       )}
+
+      {lightbox && <PhotoLightbox imageUrl={lightbox} onClose={() => setLightbox(null)} />}
     </>
   );
 }

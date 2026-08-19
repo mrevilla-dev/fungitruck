@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { doc, deleteDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
-const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint, onCriopreservar }) => {
+const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint, onCriopreservar, onInspect }) => {
   const filteredCultivos = cultivos.filter(c => {
     const matchesSearch = (c.id?.toLowerCase() || '').includes((filters.search ?? '').toLowerCase()) || 
                           (c.especie?.toLowerCase() || '').includes((filters.search ?? '').toLowerCase()) ||
@@ -136,6 +136,7 @@ const CultivosTable = ({ cultivos, medios, filters, setFilters, onEdit, onPrint,
             </div>
             <div style={{ textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
               {onPrint && <button className="btn-icon" title="Imprimir" onClick={() => onPrint(cultivo)}>🖨️</button>}
+              {onInspect && <button className="btn-icon" title="Inspeccionar / Ver seguimiento" style={{ color: '#f59e0b' }} onClick={() => onInspect(cultivo)}>🔍</button>}
               {onCriopreservar && cultivo.destino_criopreservacion === true && (
                 <button
                   className="btn-icon"

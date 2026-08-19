@@ -554,6 +554,7 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
   const [saving,            setSaving]            = useState(false);
   const [globalEnvaseTypes, setGlobalEnvaseTypes] = useState([]);
   const [step2Locs,         setStep2Locs]         = useState(null);
+  const [enviarCola,        setEnviarCola]        = useState(true); // P.10
 
   const defaultOperario = useMemo(() => {
     const auth = getAuth();
@@ -767,6 +768,40 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
 
       await batch.commit();
 
+      // P.10: envío de etiqueta(s) a la cola de impresión al crear la subfracción
+      if (enviarCola && creadas.length > 0) {
+        try {
+          const auth = getAuth();
+          const usuarioActivo = auth.currentUser?.email || 'Usuario Desconocido';
+          for (const c of creadas) {
+            await addDoc(collection(db, 'cola_impresion'), {
+              modulo: 'medios',
+              batch_ids: [],
+              tipo_etiqueta: 'MEDIO_ESTANDAR',
+              datos_etiquetas: [{
+                id: c.id_bolsa || c.id,
+                alias: c.id_bolsa,
+                nombre_insumo: `${c.tipo_envase} de ${medio.nombre_receta || 'Medio'}`,
+                fecha: c.fecha,
+                lote: medio.lote || medio.id,
+                especie: c.tipo_unidad,
+                ubicacion: c.ubicacion,
+                operador: c.operario,
+              }],
+              estado: 'Pendiente',
+              fecha_generacion: serverTimestamp(),
+              operario: usuarioActivo,
+              impreso_por: null,
+              fecha_impresion: null,
+            });
+          }
+          toast.success('Etiqueta(s) enviada(s) a la cola de impresión');
+        } catch (err) {
+          console.error(err);
+          toast.error('Error al enviar etiqueta a la cola');
+        }
+      }
+
       toast.success('Subfracción creada correctamente');
       if (typeof onCreated === 'function') onCreated(creadas);
       onAdded();
@@ -961,6 +996,14 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
             value={operario} onChange={e => setOperario(e.target.value)} />
         </div>
 
+        {/* P.10: enviar etiqueta a cola */}
+        <div className="form-group">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+            <input type="checkbox" checked={enviarCola} onChange={e => setEnviarCola(e.target.checked)} />
+            🏷️ Enviar etiqueta a cola de impresión (perfil MEDIO_ESTANDAR)
+          </label>
+        </div>
+
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
           <button className="btn btn-outline" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{btnLabel}</button>
@@ -982,7 +1025,7 @@ const TIPOS_MERMA = [
 // ═══════════════════════════════════════════════════════════════════════════════
 // Modal: Agregar novedad / merma a una bolsa
 // ═══════════════════════════════════════════════════════════════════════════════
-function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose, onAdded }) {
+function AddNovedadModal({ medioId, bagId, bagDisponible, bagPorVolumen = false, operariosList, onClose, onAdded }) {
   const fileInputCamRef = useRef(null);
   const fileInputGalRef = useRef(null);
   const [tipoMerma,        setTipoMerma]        = useState('Contaminación');
@@ -1003,7 +1046,7 @@ function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose
     // Si el tipo descuenta, validar cantidad
     if (mermaInfo.descuenta) {
       if (qty <= 0) return toast.error('Ingresá la cantidad afectada');
-      if (qty > disponible) return toast.error(`Solo hay ${disponible} unidades disponibles en esta bolsa`);
+      if (qty > disponible) return toast.error(`Solo hay ${disponible} ${bagPorVolumen ? 'ml' : 'unidades'} disponibles en esta bolsa`);
     }
 
     setSaving(true);
@@ -1062,7 +1105,7 @@ function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose
 
       await batch.commit();
 
-      const unidadLabel = 'uds.';
+      const unidadLabel = bagPorVolumen ? 'ml' : 'uds.';
       const msgExtra = mermaInfo.descuenta
         ? ` — Se descontaron ${qty} ${unidadLabel}. Disponible: ${nuevoDisponible}`
         : ' — Registrado sin descuento';
@@ -1233,13 +1276,18 @@ function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose
 // ═══════════════════════════════════════════════════════════════════════════════
 // Acordeón principal de Subfraccionamiento
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function SubfraccionamientoAccordion({ medio, operariosList, salasList, insumosList, readOnly }) {
+export default function SubfraccionamientoAccordion({ medio, operariosList, salasList, insumosList, readOnly, forceOpen = false, highlightTerm = '' }) {
   const [open,           setOpen]           = useState(false);
   const [bags,           setBags]           = useState([]);
   const [showAddBag,     setShowAddBag]     = useState(false);
   const [showNovedad,    setShowNovedad]    = useState({ open: false, bagId: null });
   const [printBag,       setPrintBag]       = useState(null);
   const [showSubBag,     setShowSubBag]     = useState(null);
+
+  // P.8: si el buscador maestro matcheó una subfracción de este medio, abrir el acordeón
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
 
   // Carga las bolsas cuando se abre el acordeón
   useEffect(() => {
@@ -1340,6 +1388,11 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
 
   const renderBagCard = (b, isChild = false) => {
     const isAgotada = (b.disponible ?? b.cantidad ?? 0) === 0;
+    const term = highlightTerm.toLowerCase();
+    const esMatch = !!highlightTerm && (
+      (b.id_bolsa || b.id || '').toLowerCase().includes(term) ||
+      (b.id || '').toLowerCase().includes(term)
+    );
     return (
       <div
         key={b.id}
@@ -1347,15 +1400,17 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
         style={{
           padding: '0.65rem 0.75rem',
           marginBottom: '0.5rem',
-          background: isChild ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
-          borderLeft: `4px solid \$\{isAgotada \? '#f44' : \(isChild \? '#818cf8' : 'var\(--accent-color\)'\)\}`,
+          background: esMatch ? 'rgba(255,193,7,0.12)' : (isChild ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)'),
+          borderLeft: `4px solid ${esMatch ? '#ffc107' : (isAgotada ? '#f44' : (isChild ? '#818cf8' : 'var(--accent-color)'))}`,
           borderRadius: '6px',
+          ...(esMatch ? { boxShadow: '0 0 10px rgba(255,193,7,0.35)', border: '1px solid #ffc107' } : {}),
         }}
       >
         {/* Encabezado fila */}
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center', paddingRight: '2rem' }}>
           <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', opacity: 0.8 }}>
             {isChild ? '↳ ' : '🏷️ '}{b.id_bolsa ?? b.id}
+            {esMatch && <span style={{ marginLeft: '0.4rem', background: 'rgba(255,193,7,0.25)', color: '#ffc107', borderRadius: '999px', padding: '0.05rem 0.5rem', fontSize: '0.7rem', fontWeight: 700 }}>🔍 MATCH</span>}
           </span>
           <span style={{
             background: isAgotada ? 'rgba(255,68,68,0.2)' : 'rgba(0,200,100,0.2)',
@@ -1375,7 +1430,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
           <span><strong>Envase:</strong> {b.tipo_envase ?? '—'}</span>
           <span><strong>Unidad:</strong> {b.tipo_unidad ?? '—'}</span>
           {b.volumen_por_unidad_ml && b.volumen_por_unidad_ml !== 1 && <span><strong>Vol/u:</strong> {b.volumen_por_unidad_ml} ml</span>}
-          <span><strong>Stock:</strong> {b.disponible ?? b.cantidad}/{b.cantidad}</span>
+          <span><strong>Stock:</strong> {b.disponible ?? b.cantidad}/{b.cantidad}{b.por_volumen ? ' ml' : ''}</span>
           <span>📍 {b.ubicacion ?? '—'}{b.ubicacion_detalle ? ` — ${b.ubicacion_detalle}` : ''}</span>
           {b.operario && <span><strong>Operario:</strong> {b.operario}</span>}
         </div>
@@ -1394,7 +1449,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
             {b.novedades.map((n, idx) => (
               <p key={idx} style={{ margin: '0.15rem 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 {n.fecha} – <span style={{ fontWeight: 600, color: n.descuenta ? '#f88' : '#ffd54f' }}>{n.tipo ?? 'Sin tipo'}</span>
-                {n.cantidad_afectada > 0 && <span style={{ color: '#f88' }}> (−{n.cantidad_afectada} {medio?.stock_bulk?.unidad || 'uds.'})</span>}
+                {n.cantidad_afectada > 0 && <span style={{ color: '#f88' }}> (−{n.cantidad_afectada} {b.por_volumen ? 'ml' : 'uds.'})</span>}
                 {n.responsable ? ` – ${n.responsable}` : ''}: {n.texto}
               </p>
             ))}
@@ -1562,6 +1617,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
           medioId={medio.id}
           bagId={showNovedad.bagId}
           bagDisponible={(bags.find(b => b.id === showNovedad.bagId)?.disponible) ?? (bags.find(b => b.id === showNovedad.bagId)?.cantidad) ?? 0}
+          bagPorVolumen={!!bags.find(b => b.id === showNovedad.bagId)?.por_volumen}
           operariosList={operariosList}
           onClose={() => setShowNovedad({ open: false, bagId: null })}
           onAdded={refresh}

@@ -11,6 +11,7 @@ import NuevoMedioModal from '../components/NuevoMedioModal';
 import EditInsumoModal from '../components/EditInsumoModal';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import CultivosTable from '../components/CultivosTable';
+import InspeccionBatchModal from '../components/InspeccionBatchModal';
 import NuevoCultivoModal from '../components/NuevoCultivoModal';
 import AuditInsumoModal from '../components/AuditInsumoModal';
 import AuditMedioModal from '../components/AuditMedioModal';
@@ -380,6 +381,34 @@ function InventoryPage() {
   const [mediosSearch, setMediosSearch] = useState('');
   const [mediosFilters, setMediosFilters] = useState({ ubicacion: 'todas', categoria: 'todas', operario: 'todos' });
 
+  // P.8: match de subfracciones por id_bolsa o doc id (substring, case-insensitive)
+  const subfraccionMatch = useMemo(() => {
+    const ids = new Set();
+    const subIds = new Set();
+    if (!mediosSearch) return { ids, subIds };
+    const term = mediosSearch.toLowerCase();
+    allSubfracciones.forEach(s => {
+      const hay = (s.id_bolsa || '').toLowerCase().includes(term) || (s.id || '').toLowerCase().includes(term);
+      if (hay) {
+        subIds.add(s.id);
+        if (s.medioId) ids.add(s.medioId);
+      }
+    });
+    return { ids, subIds };
+  }, [mediosSearch, allSubfracciones]);
+
+  // P.8: auto-expandir los medios que matchean por subfracción
+  useEffect(() => {
+    if (!mediosSearch) return;
+    const ids = subfraccionMatch.ids;
+    if (ids.size === 0) return;
+    setExpanded(prev => {
+      const next = { ...prev };
+      ids.forEach(id => { next[id] = true; });
+      return next;
+    });
+  }, [subfraccionMatch, mediosSearch]);
+
   const uniqueOperarios = useMemo(() => {
     const ops = new Set(medios.map(m => m.operario).filter(Boolean));
     return Array.from(ops).sort();
@@ -405,6 +434,7 @@ function InventoryPage() {
   const [agotarMedio, setAgotarMedio] = useState(null);
   const [recipeToClone, setRecipeToClone] = useState(null);
   const [selectedMedioForPrint, setSelectedMedioForPrint] = useState(null);
+  const [inspeccionBatch, setInspeccionBatch] = useState(null); // P.13
   const [confirmAction, setConfirmAction] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [viewMode, setViewMode] = useState('activos'); // 'activos' o 'historial'
@@ -990,12 +1020,14 @@ function InventoryPage() {
 
                 if (!mediosSearch) return true;
                 const term = mediosSearch.toLowerCase();
-                return (
+                if (
                   m.alias?.toLowerCase().includes(term) ||
                   m.nombre_receta?.toLowerCase().includes(term) ||
                   m.stock_bulk?.cantidad_actual?.toString().toLowerCase().includes(term) ||
                   m.estado?.toLowerCase().includes(term)
-                );
+                ) return true;
+                // P.8: también matchea subfracciones por id_bolsa / doc id
+                return subfraccionMatch.ids.has(m.id);
               }).map(m => {
                   let vencido = false;
                   if (m.createdAt && m.vida_util_dias) {
@@ -1074,7 +1106,9 @@ function InventoryPage() {
                             operariosList={uniqueOperarios} 
                             salasList={salas} 
                             insumosList={insumos} 
-                            readOnly={viewMode === 'historial'} 
+                            readOnly={viewMode === 'historial'}
+                            forceOpen={subfraccionMatch.ids.has(m.id)}
+                            highlightTerm={mediosSearch}
                           />
                           <AuditoriaAccordion medio={m} readOnly={viewMode === 'historial'} />
                         </div>
@@ -1087,7 +1121,7 @@ function InventoryPage() {
               })}
           </div>
         )}
-        {activeTab === 'cultivos' && <CultivosTable cultivos={cultivos} medios={medios} filters={filters} setFilters={setFilters} onEdit={setEditingBatch} onPrint={handlePrintBatch} onCriopreservar={(batch) => navigate('/criobanco/nuevo/batch/' + batch.id)} />}
+        {activeTab === 'cultivos' && <CultivosTable cultivos={cultivos} medios={medios} filters={filters} setFilters={setFilters} onEdit={setEditingBatch} onPrint={handlePrintBatch} onCriopreservar={(batch) => navigate('/criobanco/nuevo/batch/' + batch.id)} onInspect={setInspeccionBatch} />}
         {activeTab === 'recetas' && (
           <RecetasTable 
             recetas={recetas} 
@@ -1141,6 +1175,9 @@ function InventoryPage() {
       {auditingMedio && <AuditMedioModal medio={auditingMedio} onClose={() => setAuditingMedio(null)} />}
       {agotarMedio && <AgotarMedioModal medio={agotarMedio} onClose={() => setAgotarMedio(null)} onSaved={() => setAgotarMedio(null)} />}
       {showPrintModal && selectedMedioForPrint && <PrintLabelsModal batches={selectedMedioForPrint} onClose={() => setShowPrintModal(false)} />}
+      {inspeccionBatch && (
+        <InspeccionBatchModal batch={inspeccionBatch} onClose={() => setInspeccionBatch(null)} onGuardada={() => setInspeccionBatch(null)} />
+      )}
       
       {confirmAction && (
         <ConfirmModal 

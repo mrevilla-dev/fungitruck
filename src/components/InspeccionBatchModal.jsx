@@ -3,6 +3,8 @@ import { doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebase';
 import { uploadFileToDrive } from '../services/driveService';
+import { getDriveEmbedUrl } from '../utils/arbolConstants';
+import PhotoLightbox from './PhotoLightbox';
 import { getIntervaloInspeccion } from '../utils/fechas';
 import toast from 'react-hot-toast';
 
@@ -21,6 +23,8 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
   const [observaciones, setObservaciones] = useState('');
   const [revisarEn, setRevisarEn] = useState(48);
   const [saving, setSaving] = useState(false);
+  const [ufc, setUfc] = useState(''); // P.12
+  const [lightbox, setLightbox] = useState(null); // P.14
 
   useEffect(() => {
     getIntervaloInspeccion().then(h => setRevisarEn(h)).catch(() => {});
@@ -46,7 +50,7 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
         try {
           for (const file of fotos) {
             const res = await uploadFileToDrive(file);
-            const url = res?.url ?? res?.imageUrl;
+            const url = res?.imageUrl ?? res?.url;
             if (url) fotosUrls.push(url);
           }
         } catch (err) {
@@ -57,9 +61,10 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
 
       const operator = getAuth().currentUser?.displayName || getAuth().currentUser?.email || 'Sistema';
       const entry = {
-        fecha: serverTimestamp(),
+        fecha: new Date(),
         resultado,
         diametro_mm: resultado === 'viable' ? (Number(diametroMm) || null) : null,
+        ufc: ufc !== '' && ufc != null ? Number(ufc) : null,
         fotos_urls: fotosUrls,
         operator,
         observaciones: observaciones || '',
@@ -81,7 +86,7 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
         updateData.fotos_auditoria = arrayUnion({
           status_previo: batch?.status,
           status_nuevo: 'Contaminado',
-          fecha: serverTimestamp(),
+          fecha: new Date(),
           operator,
           observaciones: observaciones || '',
           fotos_urls: fotosUrls,
@@ -99,7 +104,10 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
     }
   };
 
-  const historial = batch?.fotos_seguimiento ? batch.fotos_seguimiento.slice(-3).reverse() : [];
+  const historial = batch?.fotos_seguimiento ? [...batch.fotos_seguimiento].reverse() : [];
+  const auditorias = batch?.fotos_auditoria ? [...batch.fotos_auditoria].reverse() : [];
+
+  const fechaDe = (f) => f ? (f.toDate ? f.toDate().toLocaleString() : new Date(f).toLocaleString()) : '';
 
   return (
     <div className="modal-overlay">
@@ -133,19 +141,31 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
         </div>
 
         {resultado === 'viable' && (
-          <div className="form-group">
-            <label className="form-label">Diámetro radial (mm) *</label>
-            <input
-              type="number"
-              className="form-control"
-              min="0"
-              step="0.1"
-              value={diametroMm}
-              onChange={e => setDiametroMm(e.target.value)}
-              placeholder="Ej: 25"
-            />
-          </div>
-        )}
+<div className="form-group">
+          <label className="form-label">Diámetro radial (mm) *</label>
+          <input
+            type="number"
+            className="form-control"
+            min="0"
+            step="0.1"
+            value={diametroMm}
+            onChange={e => setDiametroMm(e.target.value)}
+            placeholder="Ej: 25"
+          />
+        </div>
+      )}
+
+      <div className="form-group">
+        <label className="form-label">UFC <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(unidades formadoras de colonias) – opcional</span></label>
+        <input
+          type="number"
+          className="form-control"
+          min="0"
+          value={ufc}
+          onChange={e => setUfc(e.target.value)}
+          placeholder="Ej: 120"
+        />
+      </div>
 
         <div className="form-group">
           <label className="form-label">Fotos de seguimiento</label>
@@ -186,20 +206,45 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
 
         {historial.length > 0 && (
           <div className="form-group">
-            <label className="form-label">Historial (últimas {historial.length})</label>
+            <label className="form-label">Historial de seguimiento ({historial.length})</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {historial.map((h, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '0.45rem 0.7rem', fontSize: '0.8rem' }}>
                   {h.fotos_urls && h.fotos_urls.length > 0 && (
-                    <img src={h.fotos_urls[0]} alt="" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
+                    <img src={getDriveEmbedUrl(h.fotos_urls[0])} alt="" onClick={() => setLightbox(getDriveEmbedUrl(h.fotos_urls[0]))} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover', cursor: 'zoom-in' }} />
                   )}
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: 600 }}>{h.resultado}</span>
                     {h.diametro_mm != null && <span> · {h.diametro_mm} mm</span>}
+                    {h.ufc != null && <span> · {h.ufc} UFC</span>}
+                    {h.fecha && <span style={{ color: 'var(--text-secondary)' }}> · {fechaDe(h.fecha)}</span>}
                     <div style={{ color: 'var(--text-secondary)' }}>{h.operator} · {h.observaciones || ''}</div>
                   </div>
                   {h.fotos_urls && h.fotos_urls.length > 1 && (
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>+{h.fotos_urls.length - 1}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {auditorias.length > 0 && (
+          <div className="form-group">
+            <label className="form-label">Auditoría ({auditorias.length})</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {auditorias.map((a, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'rgba(255,68,68,0.06)', borderRadius: '8px', padding: '0.45rem 0.7rem', fontSize: '0.8rem' }}>
+                  {a.fotos_urls && a.fotos_urls.length > 0 && (
+                    <img src={getDriveEmbedUrl(a.fotos_urls[0])} alt="" onClick={() => setLightbox(getDriveEmbedUrl(a.fotos_urls[0]))} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover', cursor: 'zoom-in' }} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontWeight: 600 }}>{a.status_previo} → {a.status_nuevo}</span>
+                    {a.fecha && <span style={{ color: 'var(--text-secondary)' }}> · {fechaDe(a.fecha)}</span>}
+                    <div style={{ color: 'var(--text-secondary)' }}>{a.operator} · {a.observaciones || ''}</div>
+                  </div>
+                  {a.fotos_urls && a.fotos_urls.length > 1 && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>+{a.fotos_urls.length - 1}</span>
                   )}
                 </div>
               ))}
@@ -217,6 +262,7 @@ export default function InspeccionBatchModal({ batch, onClose, onGuardada }) {
           </button>
         </div>
       </div>
+      {lightbox && <PhotoLightbox imageUrl={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );
 }

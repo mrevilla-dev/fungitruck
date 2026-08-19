@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
-export default function PanelDetalleArbol({ datos, onCerrar }) {
+export default function PanelDetalleArbol({ datos, onCerrar, onInspeccionar }) {
   const navigate = useNavigate();
 
   if (!datos) return null;
@@ -128,6 +128,9 @@ export default function PanelDetalleArbol({ datos, onCerrar }) {
       <CarruselFotos url={datos.fotoUrl} />
 
       <Section title="Acciones">
+        <button className="btn btn-primary" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => onInspeccionar && onInspeccionar(datos.id)}>
+          🔍 Inspeccionar / Ver seguimiento
+        </button>
         <button className="btn btn-outline" style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem', padding: '0.5rem', borderColor: '#475569', color: '#cbd5e1' }} onClick={() => navigate('/inventario', { state: { action: 'editBatch', batchId: datos.id } })}>
           🔍 Observar / Auditar
         </button>
