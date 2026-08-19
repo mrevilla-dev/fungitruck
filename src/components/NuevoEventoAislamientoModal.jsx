@@ -359,6 +359,42 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
 
       // Guardar batches creados para imprimir si corresponde
       if (formData.imprimir_etiqueta) {
+        const batchIds = createdBatchIds.map(b => b.id || '').filter(Boolean);
+        if (batchIds.length > 0) {
+          try {
+            const yaEnCola = await getDocs(query(collection(db, 'cola_impresion'), where('batch_ids', 'array-contains-any', batchIds), where('estado', '==', 'Pendiente')));
+            if (yaEnCola.empty) {
+              const batchPorPerfil = createdBatchIds.reduce((acc, curr) => {
+                if (!acc[curr.tipo_etiqueta]) acc[curr.tipo_etiqueta] = [];
+                acc[curr.tipo_etiqueta].push(curr);
+                return acc;
+              }, {});
+              for (const [perfil, batchesPerf] of Object.entries(batchPorPerfil)) {
+                await addDoc(collection(db, 'cola_impresion'), {
+                  modulo: 'aislamiento',
+                  batch_ids: batchesPerf.map(b => b.id || '').filter(Boolean),
+                  tipo_etiqueta: perfil,
+                  datos_etiquetas: batchesPerf.map(b => ({
+                    id: b.id || '',
+                    alias: b.alias || b.especie || '',
+                    nombre_receta: b.nombre_receta || '',
+                    fecha: b.fecha || '',
+                    operador: b.operario || '',
+                    sala: b.sala || '',
+                    tipo_uso: b.tipo_uso || '',
+                    tipo_etiqueta: b.tipo_etiqueta || perfil,
+                  })),
+                  copias: 1,
+                  estado: 'Pendiente',
+                  fecha_generacion: serverTimestamp(),
+                  operario: formData.operario || 'Sistema',
+                });
+              }
+            }
+          } catch (err) {
+            console.error('Error al enviar etiquetas a la cola:', err);
+          }
+        }
         setCreatedBatches(createdBatchIds);
         setShowPrint(true);
       } else {

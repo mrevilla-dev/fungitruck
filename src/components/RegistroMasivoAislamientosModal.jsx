@@ -408,6 +408,15 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
           return acc;
         }, {});
         
+        const allIds = createdBatchesData.map(b => b.id).filter(Boolean);
+        let yaEnCola = false;
+        if (allIds.length > 0) {
+          const q = await getDocs(query(collection(db, 'cola_impresion'), where('batch_ids', 'array-contains-any', allIds), where('estado', '==', 'Pendiente')));
+          yaEnCola = !q.empty;
+        }
+        if (yaEnCola) {
+          toast('Estas etiquetas ya están en la cola de impresión (Pendiente)', { icon: '🖨️' });
+        } else {
         for (const [perfil, batchesPerf] of Object.entries(batchPorPerfil)) {
            await addDoc(collection(db, 'cola_impresion'), {
              modulo: 'medios',
@@ -428,7 +437,8 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
              operario: batchMadre.operario || 'Sistema',
            });
         }
-
+        }
+        
         toast.success(`Se registraron ${validos.length} Aislamientos.`);
         if (onSaved) onSaved();
         onClose();

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PROFILES, generateZPL, generateMixedZPL, sendToPrinter } from '../utils/zplProfiles';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export default function PrintLabelsModal({ batches, onClose, usuarioActivo, initialProfile }) {
@@ -112,9 +112,19 @@ export default function PrintLabelsModal({ batches, onClose, usuarioActivo, init
         tipo_etiqueta: batch.tipo_etiqueta || activeProfile,
       }));
 
+      const batchIds = batches.map(b => b.id || '').filter(Boolean);
+      if (batchIds.length > 0) {
+        const yaEnCola = await getDocs(query(collection(db, 'cola_impresion'), where('batch_ids', 'array-contains-any', batchIds), where('estado', '==', 'Pendiente')));
+        if (!yaEnCola.empty) {
+          toast('Estas etiquetas ya están en la cola de impresión (Pendiente)', { icon: '🖨️' });
+          onClose();
+          return;
+        }
+      }
+
       await addDoc(collection(db, 'cola_impresion'), {
         modulo: 'medios',
-        batch_ids: batches.map(b => b.id || '').filter(Boolean),
+        batch_ids: batchIds,
         tipo_etiqueta: hasMixedProfiles ? 'MIXED' : activeProfile,
         datos_etiquetas: datosEtiquetas,
         copias: copies,
