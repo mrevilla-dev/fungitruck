@@ -526,7 +526,7 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
 // ═══════════════════════════════════════════════════════════════════════════════
 // Modal: Sacar Placas / Tubos desde un envase (subfraccionamiento hijo)
 // ═══════════════════════════════════════════════════════════════════════════════
-function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList, onClose, onAdded }) {
+export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList, onClose, onAdded, onCreated }) {
   const [tipoEnvase,        setTipoEnvase]        = useState('Bolsa');
   const [otroEnvaseNombre,  setOtroEnvaseNombre]  = useState('');
   const [tipoUnidad,        setTipoUnidad]         = useState('Placa Petri');
@@ -639,6 +639,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
     setSaving(true);
     try {
       const batch     = writeBatch(db);
+      const creadas   = [];
       const medioRef  = doc(db, 'medios_preparados', medio.id);
       const parentRef = doc(db, `medios_preparados/${medio.id}/subfracciones`, parentBag.id);
 
@@ -669,7 +670,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
           const locConfig   = step2Locs[i];
           const newBagRef   = doc(collection(db, `medios_preparados/${medio.id}/subfracciones`));
           const sEncontrada = (salasList || []).find(s => s.nombre === (locConfig.ubicacion || ubicacion));
-          batch.set(newBagRef, {
+          const indepData = {
             id_bolsa:              locConfig.id,
             parent_id:             parentId,
             tipo_envase:           finalTipoEnvase,
@@ -685,7 +686,9 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
             estado:                'Disponible',
             novedades:             [],
             createdAt:             serverTimestamp(),
-          });
+          };
+          batch.set(newBagRef, indepData);
+          creadas.push({ id: newBagRef.id, medioId: medio.id, ...indepData });
         }
       } else {
         // Una sola subfracción agrupada
@@ -693,7 +696,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
         const newBagId       = buildBagId(codigoMedio, existingBags.length);
         const newBagRef      = doc(collection(db, `medios_preparados/${medio.id}/subfracciones`));
         const salaEncontrada = (salasList || []).find(s => s.nombre === ubicacion);
-        batch.set(newBagRef, {
+        const childData = {
           id_bolsa:              newBagId,
           parent_id:             parentId,
           tipo_envase:           finalTipoEnvase,
@@ -709,7 +712,9 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
           estado:                'Disponible',
           novedades:             [],
           createdAt:             serverTimestamp(),
-        });
+        };
+        batch.set(newBagRef, childData);
+        creadas.push({ id: newBagRef.id, medioId: medio.id, ...childData });
       }
 
       // Descontar del padre
@@ -718,15 +723,22 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
       
       const parentUpdateData = {};
       if (parentHasVolume) {
-        parentUpdateData.volumen_por_unidad_ml = remainingAmount;
-        // Si el volumen llega a 0, la unidad se considera agotada (disponible = 0)
-        parentUpdateData.disponible = remainingAmount <= 0 ? 0 : parentBag.disponible;
+        // (b) Fix: el volumen por unidad del padre queda constante; el descuento
+        // se expresa en unidades (floor), coherente con el consumo por unidad
+        const volUnidad = Number(parentBag.volumen_por_unidad_ml) || 1;
+        const unidadesRestantes = remainingAmount > 0 ? Math.floor(remainingAmount / volUnidad) : 0;
+        parentUpdateData.disponible = unidadesRestantes;
+        const sobrante = remainingAmount - (unidadesRestantes * volUnidad);
+        if (remainingAmount > 0 && sobrante > 0) {
+          toast(`Quedan ${sobrante} ml que no completan una unidad: disponible = ${unidadesRestantes} ${parentBag.tipo_unidad || 'unidades'}`, { icon: '⚠️', duration: 6000 });
+        }
       } else {
         parentUpdateData.disponible = remainingAmount;
       }
       
       if (parentBecomesAgotada) {
         parentUpdateData.estado = 'Agotada';
+        parentUpdateData.fecha_agotamiento = serverTimestamp();
       }
       
       batch.update(parentRef, parentUpdateData);
@@ -740,6 +752,7 @@ function AddSubBagModal({ medio, parentBag, existingBags, salasList, insumosList
       await batch.commit();
 
       toast.success('Subfracción creada correctamente');
+      if (typeof onCreated === 'function') onCreated(creadas);
       onAdded();
       onClose();
     } catch (err) {
@@ -1001,6 +1014,7 @@ function AddNovedadModal({ medioId, bagId, bagDisponible, operariosList, onClose
         updateData.disponible = nuevoDisponible;
         if (nuevoDisponible <= 0 && bagData.estado !== 'Agotada') {
           updateData.estado = 'Agotada';
+          updateData.fecha_agotamiento = serverTimestamp();
           becameAgotada = true;
         }
       }

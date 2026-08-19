@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, writeBatch, doc, serverTimestamp, runTransaction, collectionGroup, increment, getDoc, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, writeBatch, doc, serverTimestamp, runTransaction, collectionGroup, increment, getDoc, setDoc, addDoc, getDocs } from 'firebase/firestore';
 import SearchableSelect from './SearchableSelect';
 import PrintLabelsModal from './PrintLabelsModal';
 import { generarIdBatch } from '../utils/idGenerator';
+import { proximaRevisionDesdeFecha } from '../utils/fechas';
+import { useMlPorPlaca } from '../hooks/useMlPorPlaca';
 import toast from 'react-hot-toast';
 
 const TIPO_ENVASE_OPTIONS = ['Bolsa', 'Caja', 'Cajón', 'Bandeja', 'Canasto'];
@@ -41,6 +43,7 @@ const EMPTY_CONFIG = {
 export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, onSaved }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [mlPorPlaca, setMlPorPlaca] = useMlPorPlaca();
   const [config, setConfig] = useState(EMPTY_CONFIG);
   
   // Data for Step 2
@@ -269,6 +272,9 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
 
       let globalLetraIdx = 0;
 
+      const fechaInoculacion = batchMadre.fecha || new Date().toISOString().split('T')[0];
+      const proximaRevision = await proximaRevisionDesdeFecha(fechaInoculacion);
+
       for (let i = 0; i < validos.length; i++) {
         const ais = validos[i];
         currentSeqEje++;
@@ -339,6 +345,8 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
             status: 'Inoculado',
             destino_criopreservacion: false,
             batch_origen_id: batchMadre.id,
+            fechaInoculacion,
+            proxima_revision: proximaRevision,
             contenedorId: config.contenedorId || null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
@@ -363,14 +371,26 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
           
           if (dest.fraccion_destino) {
             const sfRef = doc(db, 'medios_preparados', dest.medio_prep.id, 'subfracciones', dest.fraccion_destino.id);
-            wb.update(sfRef, { disponible: increment(-1) });
-            if ((dest.fraccion_destino.disponible ?? 0) <= 1) {
+            const esVol = !!dest.fraccion_destino.por_volumen;
+            const descuento = esVol ? (mlPorPlaca > 0 ? mlPorPlaca : 20) : 1;
+            const disp = dest.fraccion_destino.disponible ?? 0;
+            if (descuento > disp) {
+              throw new Error(`La fracción solo tiene ${disp} ${esVol ? 'ml' : 'unidades'} disponibles y querés consumir ${descuento}`);
+            }
+            wb.update(sfRef, { disponible: increment(-descuento) });
+            if (disp <= descuento) {
+              wb.update(sfRef, { estado: 'Agotada', fecha_agotamiento: serverTimestamp() });
               const mRef = doc(db, 'medios_preparados', dest.medio_prep.id);
               wb.update(mRef, { subfracciones_disponibles: increment(-1) });
             }
           } else {
+            const bulkDisp = dest.medio_prep.stock_bulk?.cantidad_actual ?? dest.medio_prep.cantidad_actual ?? 0;
+            const descuento = mlPorPlaca > 0 ? mlPorPlaca : 20;
+            if (descuento > bulkDisp) {
+              throw new Error(`El medio solo tiene ${bulkDisp} ml en bulk y querés consumir ${descuento} ml`);
+            }
             const mRef = doc(db, 'medios_preparados', dest.medio_prep.id);
-            wb.update(mRef, { 'stock_bulk.cantidad_actual': increment(-1) });
+            wb.update(mRef, { 'stock_bulk.cantidad_actual': increment(-descuento) });
           }
         }
       }
@@ -408,7 +428,7 @@ export default function RegistroMasivoAislamientosModal({ batchMadre, onClose, o
              operario: batchMadre.operario || 'Sistema',
            });
         }
-        
+
         toast.success(`Se registraron ${validos.length} Aislamientos.`);
         if (onSaved) onSaved();
         onClose();

@@ -2,16 +2,18 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import {
   collection, doc, onSnapshot, query, getDoc, setDoc,
-  serverTimestamp, runTransaction, writeBatch, increment, where, collectionGroup
+  serverTimestamp, runTransaction, writeBatch, increment, where, collectionGroup, addDoc, getDocs
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
 import { labelDe } from '../utils/vocabulario';
 import PrintLabelsModal from './PrintLabelsModal';
-import { AddBagModal } from './SubfraccionamientoAccordion';
+import { AddBagModal, AddSubBagModal } from './SubfraccionamientoAccordion';
+import { proximaRevisionDesdeFecha } from '../utils/fechas';
 import { generarIdBatch } from '../utils/idGenerator';
 import { useMediosDisponibles } from '../hooks/useMediosDisponibles';
+import { useMlPorPlaca } from '../hooks/useMlPorPlaca';
 import toast from 'react-hot-toast';
 
 function extraerCodigoMedio(alias) {
@@ -66,6 +68,7 @@ const EMPTY_EVT = {
 export default function NuevoEventoAislamientoModal({ onClose }) {
   const [formData, setFormData] = useState(EMPTY_EVT);
   const [loading, setLoading] = useState(false);
+  const [mlPorPlaca, setMlPorPlaca] = useMlPorPlaca();
   const [ejemplares, setEjemplares] = useState([]);
   const [batches, setBatches] = useState([]);
   const [salas, setSalas] = useState([]);
@@ -75,6 +78,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
   const [showPrint, setShowPrint] = useState(false);
   const [createdBatches, setCreatedBatches] = useState([]);
   const [showSubfraccionModal, setShowSubfraccionModal] = useState(false);
+  const [showSubSubModal, setShowSubSubModal] = useState(false);
   const [subfraccionesAll, setSubfraccionesAll] = useState([]);
   const [insumos, setInsumos] = useState([]);
 
@@ -243,6 +247,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
 
       // 2. Escribir el evento y los batches en un WriteBatch atómico
       const wb = writeBatch(db);
+      const proximaRevision = await proximaRevisionDesdeFecha(formData.fecha);
 
       const newDocRef = doc(collection(db, 'eventos_aislamiento'));
       wb.set(newDocRef, {
@@ -298,6 +303,7 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
           tecnica_aislamiento: formData.tecnica,
           operator: formData.operario || 'Sistema',
           fechaInoculacion: formData.fecha,
+          proxima_revision: proximaRevision,
           status: 'Incubación',
           observaciones: formData.observaciones || '',
           tipo_inoculacion: 'aislamiento_primario',
@@ -327,16 +333,24 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
         });
       }
 
-      const totalDescuento = Number(formData.cantidad_derivados) || 1;
+      const totalDescuento = (Number(formData.cantidad_derivados) || 1) * (formData.fraccion_destino?.por_volumen || (!formData.fraccion_destino && formData.medio_prep) ? (mlPorPlaca > 0 ? mlPorPlaca : 20) : 1);
       if (formData.fraccion_destino && formData.medio_prep) {
         const medioId = formData.fraccion_destino.medioId || formData.medio_prep.id;
+        if (totalDescuento > (formData.fraccion_destino.disponible ?? 0)) {
+          throw new Error(`La fracción solo tiene ${formData.fraccion_destino.disponible ?? 0} ${formData.fraccion_destino.por_volumen ? 'ml' : 'unidades'} disponibles y querés consumir ${totalDescuento}`);
+        }
         const sfRef = doc(db, 'medios_preparados', medioId, 'subfracciones', formData.fraccion_destino.id);
         wb.update(sfRef, { disponible: increment(-totalDescuento) });
         if ((formData.fraccion_destino.disponible ?? 0) <= totalDescuento) {
+          wb.update(sfRef, { estado: 'Agotada', fecha_agotamiento: serverTimestamp() });
           const mRef = doc(db, 'medios_preparados', medioId);
           wb.update(mRef, { subfracciones_disponibles: increment(-1) });
         }
       } else if (formData.medio_prep && !formData.fraccion_destino) {
+        const bulkDisp = formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0;
+        if (totalDescuento > bulkDisp) {
+          throw new Error(`El medio solo tiene ${bulkDisp} ml en bulk y querés consumir ${totalDescuento} ml`);
+        }
         const medioRef = doc(db, 'medios_preparados', formData.medio_prep.id);
         wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-totalDescuento) });
       }
@@ -537,6 +551,17 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
               value={formData.cantidad_derivados}
               onChange={e => handleChange('cantidad_derivados', e.target.value)}
             />
+            {(() => {
+              const esVol = !!formData.fraccion_destino?.por_volumen || (!formData.fraccion_destino && !!formData.medio_prep);
+              if (!esVol) return null;
+              const ml = mlPorPlaca > 0 ? mlPorPlaca : 20;
+              return (
+                <small style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  💧 Se descontarán {Math.max(1, Number(formData.cantidad_derivados) || 1) * ml} ml del frasco (a {ml} ml/placa) ·{' '}
+                  <input type="number" min="1" style={{ width: '64px', display: 'inline-block' }} className="form-control" value={mlPorPlaca || ''} placeholder="20" onChange={e => setMlPorPlaca(e.target.value)} /> ml/placa
+                </small>
+              );
+            })()}
           </div>
 
           {/* Fecha / Operario */}
@@ -589,10 +614,20 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
                 className="btn btn-outline"
                 style={{ width: '100%', fontSize: '0.85rem', padding: '0.45rem 0.8rem' }}
                 disabled={!formData.medio_prep}
-                onClick={() => setShowSubfraccionModal(true)}
-                title={formData.medio_prep ? 'Crear una nueva subfracción (bolsa/placa) de este medio e insertarla en este evento' : 'Seleccioná primero un medio'}
+                onClick={() => {
+                  if (formData.fraccion_destino) {
+                    setShowSubSubModal(true);
+                  } else {
+                    setShowSubfraccionModal(true);
+                  }
+                }}
+                title={formData.medio_prep
+                  ? (formData.fraccion_destino
+                    ? `Crear una subfracción desde el envase ${formData.fraccion_destino.id_bolsa || formData.fraccion_destino.id} e insertarla en este evento`
+                    : 'Crear una nueva subfracción (bolsa/placa) de este medio e insertarla en este evento')
+                  : 'Seleccioná primero un medio'}
               >
-                ➕ Nueva subfracción de este medio
+                {formData.fraccion_destino ? '➕ Nueva subfracción de este envase' : '➕ Nueva subfracción de este medio'}
               </button>
             </div>
           </div>
@@ -718,6 +753,25 @@ export default function NuevoEventoAislamientoModal({ onClose }) {
             salasList={salas}
             insumosList={insumos}
             onClose={() => setShowSubfraccionModal(false)}
+            onAdded={() => {}}
+            onCreated={(creadas) => {
+              const sub = creadas[0];
+              if (!sub) return;
+              handleChange('medio_prep_id', sub.id);
+              handleChange('medio_prep', formData.medio_prep);
+              handleChange('fraccion_destino', sub);
+              toast.success(`Subfracción ${sub.id_bolsa || sub.id} creada y seleccionada como destino`);
+            }}
+          />
+        )}
+        {showSubSubModal && formData.fraccion_destino && formData.medio_prep && (
+          <AddSubBagModal
+            medio={formData.medio_prep}
+            parentBag={formData.fraccion_destino}
+            existingBags={subfraccionesAll.filter(s => s.medioId === formData.medio_prep.id)}
+            salasList={salas}
+            insumosList={insumos}
+            onClose={() => setShowSubSubModal(false)}
             onAdded={() => {}}
             onCreated={(creadas) => {
               const sub = creadas[0];

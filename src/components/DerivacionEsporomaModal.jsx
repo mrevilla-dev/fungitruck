@@ -8,6 +8,7 @@ import SearchableSelect from './SearchableSelect';
 import ScanInput from './ScanInput';
 import { uploadFileToDrive } from '../services/driveService';
 import { useMediosDisponibles } from '../hooks/useMediosDisponibles';
+import { useMlPorPlaca } from '../hooks/useMlPorPlaca';
 import { opcionesDe } from '../utils/vocabulario';
 import toast from 'react-hot-toast';
 
@@ -23,6 +24,7 @@ function extraerCodigoMedio(alias) {
 export default function DerivacionEsporomaModal({ esporoma, onClose }) {
   const [loading, setLoading] = useState(false);
   const [authName, setAuthName] = useState('Sistema');
+  const [mlPorPlaca, setMlPorPlaca] = useMlPorPlaca();
 
   const [salas, setSalas] = useState([]);
 
@@ -197,14 +199,26 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
         if (medioOpt) {
           if (medioOpt.type === 'sub') {
             const sfRef = doc(db, 'medios_preparados', medioOpt.medio.id, 'subfracciones', medioOpt.sub.id);
-            wb.update(sfRef, { disponible: increment(-1) });
-            if ((medioOpt.sub.disponible ?? 0) <= 1) {
+            const esVol = !!medioOpt.sub.por_volumen;
+            const descuento = esVol ? (mlPorPlaca > 0 ? mlPorPlaca : 20) : 1;
+            const disp = medioOpt.sub.disponible ?? 0;
+            if (descuento > disp) {
+              throw new Error(`La fracción solo tiene ${disp} ${esVol ? 'ml' : 'unidades'} disponibles y querés consumir ${descuento}`);
+            }
+            wb.update(sfRef, { disponible: increment(-descuento) });
+            if (disp <= descuento) {
+              wb.update(sfRef, { estado: 'Agotada', fecha_agotamiento: serverTimestamp() });
               const mRef = doc(db, 'medios_preparados', medioOpt.medio.id);
               wb.update(mRef, { subfracciones_disponibles: increment(-1) });
             }
           } else {
+            const bulkDisp = medioOpt.medio.stock_bulk?.cantidad_actual ?? medioOpt.medio.cantidad_actual ?? 0;
+            const descuento = mlPorPlaca > 0 ? mlPorPlaca : 20;
+            if (descuento > bulkDisp) {
+              throw new Error(`El medio solo tiene ${bulkDisp} ml en bulk y querés consumir ${descuento} ml`);
+            }
             const medioRef = doc(db, 'medios_preparados', medioOpt.medio.id);
-            wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-1) });
+            wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-descuento) });
           }
         }
 
@@ -283,6 +297,17 @@ export default function DerivacionEsporomaModal({ esporoma, onClose }) {
                   onChange={val => setFormData({ ...formData, medio_prep_id: val })} 
                   placeholder="-- Buscar Medio --" 
                 />
+                {(() => {
+                  const medioOpt = mediosDisponibles.find(m => m.id === formData.medio_prep_id);
+                  const esVol = !!medioOpt?.sub?.por_volumen || medioOpt?.type === 'bulk';
+                  if (!esVol) return null;
+                  const ml = mlPorPlaca > 0 ? mlPorPlaca : 20;
+                  return (
+                    <small style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                      💧 Se descontarán {ml} ml del frasco (a {ml} ml/placa)
+                    </small>
+                  );
+                })()}
                 <div style={{ marginTop: '0.5rem' }}>
                   <ScanInput
                     onScan={async (scannedId) => {

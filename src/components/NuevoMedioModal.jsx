@@ -72,7 +72,8 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
   const [addEnvaseForm, setAddEnvaseForm] = useState({
     recipienteId: '',
     volumen: 500,
-    cantidad: 1
+    cantidad: 1,
+    por_volumen: false
   });
   const [activeSubFracFormId, setActiveSubFracFormId] = useState(null);
   const [subFracForm, setSubFracForm] = useState({
@@ -244,6 +245,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
       : recipientes.find(r => r.id === recipienteId);
       
     if (!selectedRecip) return toast.error("Recipiente no encontrado o inválido.");
+    const esPorVolumen = addEnvaseForm.por_volumen || /frasco|botella|erlenmeyer|beaker/i.test(selectedRecip.nombre);
     const newEnvases = [];
     const baseCount = envasesList.length + 1;
     
@@ -255,6 +257,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
         recipienteNombre: selectedRecip.nombre,
         volumen_inicial: Number(volumen),
         volumen_actual: Number(volumen),
+        por_volumen: esPorVolumen,
         sub_fraccionamientos: []
       });
     }
@@ -656,13 +659,16 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
               const envaseRef = doc(collection(db, `medios_preparados/${newMedioRef.id}/subfracciones`));
               const envaseBagId = buildBagId(codigoMedio, subFracGlobalIndex);
               
+              const esPorVolumen = !!env.por_volumen;
+              
               const envaseData = {
                 id_bolsa: envaseBagId,
                 tipo_envase: 'Envase Principal',
                 tipo_unidad: env.recipienteNombre || 'Desconocido',
-                cantidad: 1,
-                disponible: 1,
-                volumen_por_unidad_ml: env.volumen_inicial,
+                cantidad: esPorVolumen ? (env.volumen_inicial || 0) : 1,
+                disponible: esPorVolumen ? (env.volumen_actual ?? env.volumen_inicial ?? 0) : 1,
+                volumen_por_unidad_ml: esPorVolumen ? 1 : env.volumen_inicial,
+                por_volumen: esPorVolumen || null,
                 ubicacion: env.ubicacion || formData.ubicacion || '',
                 ubicacion_detalle: env.ubicacion_detalle || formData.ubicacion_detalle || '',
                 fecha: formData.fecha_preparacion,
@@ -1347,7 +1353,7 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Cantidad (Unidades)</label>
+                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Cantidad (Envases)</label>
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
                         <button type="button" className="btn btn-outline" style={{ width: '48px', minWidth: '48px', height: '48px', padding: 0 }} onClick={() => setAddEnvaseForm(prev => ({...prev, cantidad: Math.max(1, prev.cantidad - 1)}))}>-</button>
                         <input type="number" className="form-control" style={{ height: '48px', textAlign: 'center', fontSize: '1.1rem' }} value={addEnvaseForm.cantidad} onChange={e => setAddEnvaseForm({...addEnvaseForm, cantidad: Number(e.target.value)})} />
@@ -1355,6 +1361,11 @@ export default function NuevoMedioModal({ onClose, onSaved }) {
                       </div>
                     </div>
                   </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                    <input type="checkbox" checked={addEnvaseForm.por_volumen} onChange={e => setAddEnvaseForm({...addEnvaseForm, por_volumen: e.target.checked})} />
+                    💧 Este envase se mide por volumen (ml) — se rastrea como X ml, no como "1 unidad de X ml"
+                  </label>
                 </div>
 
                 <button 

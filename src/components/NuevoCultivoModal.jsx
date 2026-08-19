@@ -8,12 +8,14 @@ import { PROFILES } from '../utils/zplProfiles';
 import PrintLabelsModal from './PrintLabelsModal';
 import HibridacionEjemplarModal from './HibridacionEjemplarModal';
 import NuevoEventoAislamientoModal from './NuevoEventoAislamientoModal';
-import { AddBagModal } from './SubfraccionamientoAccordion';
+import { AddBagModal, AddSubBagModal } from './SubfraccionamientoAccordion';
+import { useMlPorPlaca } from '../hooks/useMlPorPlaca';
 import toast from 'react-hot-toast';
 import { generarIdBatch, incrementarSecuenciaHibridacion } from '../utils/idGenerator';
 import AltaRapidaEjemplarExterno from './AltaRapidaEjemplarExterno';
 import ScanInput from './ScanInput';
 import { OPERARIOS } from '../constants/operarios';
+import { proximaRevisionDesdeFecha } from '../utils/fechas';
 
 const TIPOS_INOCULACION = [
   { id: 'aislamiento_primario', label: 'Aislamiento Primario (Origen Cero)' },
@@ -39,6 +41,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [mlPorPlaca, setMlPorPlaca] = useMlPorPlaca();
   const [batchesToPrint, setBatchesToPrint] = useState(null);
   const [hibridacionResult, setHibridacionResult] = useState(null);
   const [repiqueResult, setRepiqueResult] = useState(null);
@@ -92,6 +95,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
   const [nextSeqDiaria, setNextSeqDiaria] = useState(1);
   const [nextContadorHib, setNextContadorHib] = useState(1);
   const [showSubfraccionModal, setShowSubfraccionModal] = useState(false);
+  const [showSubSubModal, setShowSubSubModal] = useState(false);
   const [busquedaPorEnvase, setBusquedaPorEnvase] = useState(false);
   const [envaseSeleccionado, setEnvaseSeleccionado] = useState('');
   const [insumos, setInsumos] = useState([]);
@@ -346,7 +350,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
         const envaseInfo = s.tipo_unidad ? ` — ${s.tipo_unidad}` : '';
         options.push({
           id: s.id,
-          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'}${esHija}${envaseInfo} — ${s.disponible}/${s.cantidad} disp. ${s.volumen_por_unidad_ml ? `· ${s.volumen_por_unidad_ml} ml/u` : ''}`,
+          nombre: `${m.alias || m.nombre_receta} → ${s.id_bolsa || 'Soporte'}${esHija}${envaseInfo} — ${s.disponible}/${s.cantidad} ${s.por_volumen ? 'ml' : 'disp.'}${s.volumen_por_unidad_ml && s.volumen_por_unidad_ml !== 1 ? ` · ${s.volumen_por_unidad_ml} ml/u` : ''}`,
           type: 'sub',
           data: { medio: m, sub: s }
         });
@@ -645,6 +649,8 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
       const esAislamientoPrimario = formData.tipo_inoculacion === 'aislamiento_primario';
       const cantidadTotal = Number(formData.cantidad_total) || 1;
       const cantidadUnidades = Number(formData.cantidad_unidades) || 1;
+      const esConsumoPorVolumen = !!formData.fraccion_destino?.por_volumen || (!formData.fraccion_destino && !!formData.medio_prep);
+      const totalConsumo = esConsumoPorVolumen ? cantidadUnidades * (mlPorPlaca > 0 ? mlPorPlaca : 20) : cantidadUnidades;
       const ejemplarData = formData.ejemplar_fuente?.data || {};
 
       const f = formData.fecha_inoculacion.replace(/-/g, '');
@@ -746,6 +752,8 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
 
       const soporteFinal = formData.fraccion_destino?.tipo_unidad || formData.medio_prep?.tipo_soporte || formData.medio_prep?.soporte || 'No definido';
 
+      const proximaRevision = await proximaRevisionDesdeFecha(formData.fecha_inoculacion);
+
       for (let i = 0; i < batchIds.length; i++) {
         wb.set(doc(db, 'batches', batchIds[i]), {
           experimento_id: null,
@@ -758,6 +766,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           destinoNombre: formData.sala_destino?.data?.nombre || formData.sala_destino?.nombre || '',
           operator: formData.operario || 'Sistema',
           fechaInoculacion: formData.fecha_inoculacion,
+          proxima_revision: proximaRevision,
           status: 'Inoculado',
           observaciones: formData.observaciones || '',
           ejemplarId: formData.ejemplar_fuente?.id || null,
@@ -789,17 +798,31 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
         });
       }
 
+      // B.6 P.4: validar sobre-consumo antes de commitear (aborta todo el batch)
+      if (formData.fraccion_destino) {
+        const disp = formData.fraccion_destino.disponible ?? 0;
+        if (totalConsumo > disp) {
+          throw new Error(`La fracción solo tiene ${disp} ${esConsumoPorVolumen ? 'ml' : 'unidades'} disponibles y querés consumir ${totalConsumo}`);
+        }
+      } else if (formData.medio_prep) {
+        const bulkDisp = formData.medio_prep.stock_bulk?.cantidad_actual ?? formData.medio_prep.cantidad_actual ?? 0;
+        if (totalConsumo > bulkDisp) {
+          throw new Error(`El medio solo tiene ${bulkDisp} ml en bulk y querés consumir ${totalConsumo} ml`);
+        }
+      }
+
       if (formData.fraccion_destino && formData.medio_prep) {
         const medioId = formData.fraccion_destino.medioId || formData.medio_prep.id;
         const sfRef = doc(db, 'medios_preparados', medioId, 'subfracciones', formData.fraccion_destino.id);
-        wb.update(sfRef, { disponible: increment(-cantidadUnidades) });
-        if ((formData.fraccion_destino.disponible ?? 0) <= cantidadUnidades) {
+        wb.update(sfRef, { disponible: increment(-totalConsumo) });
+        if ((formData.fraccion_destino.disponible ?? 0) <= totalConsumo) {
+          wb.update(sfRef, { estado: 'Agotada', fecha_agotamiento: serverTimestamp() });
           const mRef = doc(db, 'medios_preparados', medioId);
           wb.update(mRef, { subfracciones_disponibles: increment(-1) });
         }
       } else if (formData.medio_prep && !formData.fraccion_destino) {
         const medioRef = doc(db, 'medios_preparados', formData.medio_prep.id);
-        wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-cantidadUnidades) });
+        wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-totalConsumo) });
       }
 
       // Marcar placa 1 como agotada
@@ -1293,7 +1316,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                       </div>
                       <div style={{ fontSize: '0.85rem', color: opt.data.sub?.disponible > 0 ? 'var(--accent-color)' : 'var(--text-secondary)' }}>
                         {opt.type === 'sub' 
-                          ? `${opt.data.sub.disponible}/${opt.data.sub.cantidad} disp. ${opt.data.sub.volumen_por_unidad_ml ? `· ${opt.data.sub.volumen_por_unidad_ml} ml/u` : ''}`
+                          ? `${opt.data.sub.disponible}/${opt.data.sub.cantidad} ${opt.data.sub.por_volumen ? 'ml' : 'disp.'} ${opt.data.sub.volumen_por_unidad_ml && opt.data.sub.volumen_por_unidad_ml !== 1 ? `· ${opt.data.sub.volumen_por_unidad_ml} ml/u` : ''}`
                           : `${opt.data.medio.stock_bulk?.cantidad_actual || 0} ${opt.data.medio.stock_bulk?.unidad || 'ml'} disponibles`
                         }
                       </div>
@@ -1326,8 +1349,9 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                           (formData.fraccion_destino.disponible ?? 0) > 0
                         );
                         const canSubfraccionar = canSubfraccionarFromBulk || canSubfraccionarFromSub;
+                        const fraccionVol = Number(formData.fraccion_destino?.volumen_por_unidad_ml || 0);
                         const availableVolume = canSubfraccionarFromSub 
-                          ? (formData.fraccion_destino.volumen_por_unidad_ml || formData.fraccion_destino.disponible || 0)
+                          ? ((formData.fraccion_destino.disponible ?? 0) * (fraccionVol > 0 ? fraccionVol : 1))
                           : bulkStock;
                         return (
                           <>
@@ -1335,8 +1359,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                               type="button"
                               onClick={() => {
                                 if (canSubfraccionarFromSub) {
-                                  window.open(`/medios-preparados/${formData.medio_prep.id}?subfraccion=${formData.fraccion_destino.id}`, '_blank');
-                                  toast.success('Abriendo maestro de medios para subfraccionar...');
+                                  setShowSubSubModal(true);
                                 } else {
                                   setShowSubfraccionModal(true);
                                 }
@@ -1354,7 +1377,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                                 opacity: canSubfraccionar ? 1 : 0.5
                               }}
                               title={canSubfraccionarFromSub 
-                                ? `Crear sub-subfracciones desde ${formData.fraccion_destino.id_bolsa} (${availableVolume} disponibles)`
+                                ? `Crear sub-subfracciones desde ${formData.fraccion_destino.id_bolsa} (${availableVolume} ${fraccionVol > 0 ? 'ml' : 'unidades'} disponibles)`
                                 : (canSubfraccionarFromBulk ? 'Crear subfracciones desde bulk' : 'Sin stock disponible')
                               }
                             >
@@ -1403,7 +1426,7 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                                 <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
                                   {s.tipo_unidad || s.tipo_envase || ''} · {s.disponible}/{s.cantidad} disp.
                                 </span>
-                                {s.volumen_por_unidad_ml && <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>· {s.volumen_por_unidad_ml} ml/u</span>}
+                                {s.volumen_por_unidad_ml && s.volumen_por_unidad_ml !== 1 && <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>· {s.volumen_por_unidad_ml} ml/u</span>}
                               </div>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{s.ubicacion || ''}</span>
                             </div>
@@ -1424,6 +1447,16 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                 <div className="form-group">
                   <label className="form-label">Cantidad de Unidades (Recipientes) *</label>
                   <input type="number" min="1" className="form-control" value={formData.cantidad_unidades} onChange={e => handleChange('cantidad_unidades', Number(e.target.value))} />
+                  {(() => {
+                    const esVol = !!formData.fraccion_destino?.por_volumen || (!formData.fraccion_destino && !!formData.medio_prep);
+                    if (!esVol) return null;
+                    const ml = mlPorPlaca > 0 ? mlPorPlaca : 20;
+                    return (
+                      <small style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        💧 Se descontarán {Math.max(1, Number(formData.cantidad_unidades) || 1) * ml} ml del frasco (a {ml} ml/placa)
+                      </small>
+                    );
+                  })()}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Modo de Identificación *</label>
@@ -1433,6 +1466,17 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
                   </select>
                 </div>
               </div>
+              {(() => {
+                const esVol = !!formData.fraccion_destino?.por_volumen || (!formData.fraccion_destino && !!formData.medio_prep);
+                if (!esVol) return null;
+                return (
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label className="form-label">ml por placa / unidad (se descuenta del frasco)</label>
+                    <input type="number" min="1" className="form-control" value={mlPorPlaca || ''} placeholder="20" onChange={e => setMlPorPlaca(e.target.value)} />
+                    <small style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-secondary)' }}>Valor guardado en config/volumenes_placa (default 20 ml).</small>
+                  </div>
+                );
+              })()}
               <div className="form-group" style={{ marginTop: '1rem' }}>
                 <label className="form-label">Contenedor / Agrupación (Opcional)</label>
                 <SearchableSelect 
@@ -1596,6 +1640,24 @@ export default function NuevoCultivoModal({ onClose, onSaved }) {
           salasList={salas}
           insumosList={insumos}
           onClose={() => setShowSubfraccionModal(false)}
+          onAdded={() => {}}
+          onCreated={(creadas) => {
+            const sub = creadas[0];
+            if (!sub) return;
+            handleChange('fraccion_destino', sub);
+            toast.success(`Subfracción ${sub.id_bolsa || sub.id} creada y seleccionada como destino`);
+          }}
+        />
+      )}
+
+      {showSubSubModal && formData.fraccion_destino && formData.medio_prep && (
+        <AddSubBagModal
+          medio={formData.medio_prep}
+          parentBag={formData.fraccion_destino}
+          existingBags={allSubfracciones.filter(s => s.medioId === formData.medio_prep.id)}
+          salasList={salas}
+          insumosList={insumos}
+          onClose={() => setShowSubSubModal(false)}
           onAdded={() => {}}
           onCreated={(creadas) => {
             const sub = creadas[0];

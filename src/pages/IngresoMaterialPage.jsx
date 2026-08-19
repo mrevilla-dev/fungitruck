@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup, updateDoc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, writeBatch, serverTimestamp, increment, runTransaction, where, collectionGroup, updateDoc, getDoc, getDocs, addDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { uploadFileToDrive } from '../services/driveService';
 import { generarIdEsporoma, generarIdEjemplar, generarIdEvento, generarIdBatch } from '../utils/idGenerator';
@@ -8,8 +8,10 @@ import { getTipoMaterialCodigo } from '../utils/tipoMaterialCodes';
 import SearchableSelect from '../components/SearchableSelect';
 import PrintLabelsModal from '../components/PrintLabelsModal';
 import ScanInput from '../components/ScanInput';
-import { AddBagModal } from '../components/SubfraccionamientoAccordion';
+import { AddBagModal, AddSubBagModal } from '../components/SubfraccionamientoAccordion';
 import { compressImage } from '../utils/imageUtils';
+import { proximaRevisionDesdeFecha } from '../utils/fechas';
+import { useMlPorPlaca } from '../hooks/useMlPorPlaca';
 import toast from 'react-hot-toast';
 
 const TIPOS_MATERIAL = [
@@ -94,6 +96,7 @@ export default function IngresoMaterialPage() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [imprimirEtiqueta, setImprimirEtiqueta] = useState(false);
   const [batchesToPrint, setBatchesToPrint] = useState(null);
+  const [mlPorPlaca, setMlPorPlaca] = useMlPorPlaca();
   const [derivaciones, setDerivaciones] = useState([]); // Solo para Ruta A
   const [errors, setErrors] = useState({});
 
@@ -416,6 +419,20 @@ export default function IngresoMaterialPage() {
             const codMedio = extraerCodigoMedio(medioOpt?.medio?.alias || medioOpt?.medio?.codigo);
             const soporteFinal = medioOpt?.type === 'sub' ? medioOpt.sub.tipo_unidad : medioOpt?.medio?.tipo_soporte || medioOpt?.medio?.soporte || 'No definido';
             const cantidadPlacas = Math.max(1, parseInt(deriv.cantidad_placas, 10) || 1);
+            const proximaRevision = await proximaRevisionDesdeFecha(formValues.fecha);
+
+            const descuentoPorPlaca = (medioOpt?.type === 'sub' && medioOpt.sub.por_volumen) || medioOpt?.type === 'bulk'
+              ? (mlPorPlaca > 0 ? mlPorPlaca : 20)
+              : 1;
+            const totalConsumo = cantidadPlacas * descuentoPorPlaca;
+            if (medioOpt) {
+              if (medioOpt.type === 'sub' && totalConsumo > (medioOpt.sub.disponible ?? 0)) {
+                throw new Error(`La fracción solo tiene ${medioOpt.sub.disponible ?? 0} ${medioOpt.sub.por_volumen ? 'ml' : 'unidades'} disponibles y querés consumir ${totalConsumo}`);
+              }
+              if (medioOpt.type === 'bulk' && totalConsumo > (medioOpt.medio.stock_bulk?.cantidad_actual ?? medioOpt.medio.cantidad_actual ?? 0)) {
+                throw new Error(`El medio solo tiene ${medioOpt.medio.stock_bulk?.cantidad_actual ?? 0} ml en bulk y querés consumir ${totalConsumo} ml`);
+              }
+            }
 
             for (let b = 0; b < cantidadPlacas; b++) {
               const batchId = generarIdBatch({
@@ -436,6 +453,7 @@ export default function IngresoMaterialPage() {
                 destinoNombre: salaOpt?.nombre || '',
                 operator: authName,
                 fechaInoculacion: formValues.fecha,
+                proxima_revision: proximaRevision,
                 status: 'Inoculado',
                 tipo_inoculacion: 'aislamiento_primario',
                 es_aislamiento_primario: true,
@@ -448,14 +466,15 @@ export default function IngresoMaterialPage() {
               if (medioOpt) {
                 if (medioOpt.type === 'sub') {
                   const sfRef = doc(db, 'medios_preparados', medioOpt.medio.id, 'subfracciones', medioOpt.sub.id);
-                  wb.update(sfRef, { disponible: increment(-1) });
-                  if ((medioOpt.sub.disponible ?? 0) <= 1) {
+                  wb.update(sfRef, { disponible: increment(-descuentoPorPlaca) });
+                  if ((medioOpt.sub.disponible ?? 0) <= totalConsumo) {
+                    wb.update(sfRef, { estado: 'Agotada', fecha_agotamiento: serverTimestamp() });
                     const mRef = doc(db, 'medios_preparados', medioOpt.medio.id);
                     wb.update(mRef, { subfracciones_disponibles: increment(-1) });
                   }
                 } else {
                   const medioRef = doc(db, 'medios_preparados', medioOpt.medio.id);
-                  wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-1) });
+                  wb.update(medioRef, { 'stock_bulk.cantidad_actual': increment(-descuentoPorPlaca) });
                 }
               }
 
@@ -643,7 +662,28 @@ export default function IngresoMaterialPage() {
           tipo_etiqueta: rutaActiva === 'A' ? 'PORTAOBJETOS' : 'MEDIO_ESTANDAR',
           codigo_cepa: formValues.codigo_cepa || null
         };
-        setBatchesToPrint([batchData, ...etiquetas]);
+        const todasEtiquetas = [batchData, ...etiquetas];
+        const ids = todasEtiquetas.map(e => e.id).filter(Boolean);
+        if (ids.length > 0) {
+          try {
+            const yaEnCola = await getDocs(query(collection(db, 'cola_impresion'), where('batch_ids', 'array-contains-any', ids), where('estado', '==', 'Pendiente')));
+            if (yaEnCola.empty) {
+              await addDoc(collection(db, 'cola_impresion'), {
+                modulo: 'ingreso_material',
+                batch_ids: ids,
+                tipo_etiqueta: 'MIXED',
+                datos_etiquetas: todasEtiquetas,
+                copias: 1,
+                estado: 'Pendiente',
+                fecha_generacion: serverTimestamp(),
+                operario: authName,
+              });
+            }
+          } catch (queueErr) {
+            console.error('Error al encolar etiquetas (el registro ya se guardó):', queueErr);
+          }
+        }
+        setBatchesToPrint(todasEtiquetas);
         setImprimirEtiqueta(false);
         } catch (printErr) {
           console.error('Error generando etiquetas (el registro ya se guardó):', printErr);
@@ -663,7 +703,9 @@ export default function IngresoMaterialPage() {
 
   if (!ruta) {
     return (
-      <div className="animate-fade-in" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      <>
+        {batchesToPrint && <PrintLabelsModal batches={batchesToPrint} onClose={() => setBatchesToPrint(null)} />}
+        <div className="animate-fade-in" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
         <h2 style={{ marginBottom: '2rem', textAlign: 'center' }}>Ventanilla Única de Ingreso de Material</h2>
         <p style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--text-secondary)' }}>
           Seleccioná el tipo de material biológico que estás ingresando al sistema.
@@ -703,6 +745,7 @@ export default function IngresoMaterialPage() {
           </button>
         </div>
       </div>
+      </>
     );
   }
 
@@ -978,6 +1021,25 @@ export default function IngresoMaterialPage() {
         const deriv = derivaciones.find(d => d.id === subfracModalFor);
         const medioOpt = mediosDisponibles.find(o => o.id === deriv?.medio_prep_id);
         if (!deriv || !medioOpt?.medio) return null;
+        if (medioOpt.type === 'sub') {
+          return (
+            <AddSubBagModal
+              medio={medioOpt.medio}
+              parentBag={medioOpt.sub}
+              existingBags={subfraccionesAll.filter(s => s.medioId === medioOpt.medio.id)}
+              salasList={salas}
+              insumosList={insumos}
+              onClose={() => setSubfracModalFor(null)}
+              onAdded={() => {}}
+              onCreated={(creadas) => {
+                const sub = creadas[0];
+                if (!sub) return;
+                updateDerivacion(deriv.id, 'medio_prep_id', sub.id);
+                toast.success(`Subfracción ${sub.id_bolsa || sub.id} creada y asignada a la derivación`);
+              }}
+            />
+          );
+        }
         return (
           <AddBagModal
             medio={medioOpt.medio}
@@ -1111,7 +1173,7 @@ export default function IngresoMaterialPage() {
                         onClick={() => setSubfracModalFor(d.id)}
                         title={d.medio_prep_id ? 'Crear una nueva subfracción (bolsa/placa) de este medio y asignarla a esta derivación' : 'Seleccioná primero un medio'}
                       >
-                        ➕ Nueva subfracción de este medio
+                        {mediosDisponibles.find(o => o.id === d.medio_prep_id)?.type === 'sub' ? '➕ Nueva subfracción de este envase' : '➕ Nueva subfracción de este medio'}
                       </button>
                     </div>
                   </div>
@@ -1143,6 +1205,17 @@ export default function IngresoMaterialPage() {
                       onChange={e => updateDerivacion(d.id, 'cantidad_placas', Math.max(1, parseInt(e.target.value, 10) || 1))}
                     />
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Se crea 1 batch por placa, todas vinculadas al mismo ejemplar</p>
+                    {(() => {
+                      const medioOpt = mediosDisponibles.find(o => o.id === d.medio_prep_id);
+                      const esVol = (medioOpt?.type === 'sub' && medioOpt.sub.por_volumen) || medioOpt?.type === 'bulk';
+                      if (!esVol) return null;
+                      const ml = mlPorPlaca > 0 ? mlPorPlaca : 20;
+                      return (
+                        <p style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.2rem', fontWeight: 600 }}>
+                          💧 Se descontarán {Math.max(1, parseInt(d.cantidad_placas, 10) || 1) * ml} ml del frasco (a {ml} ml/placa)
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
