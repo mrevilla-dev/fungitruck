@@ -117,4 +117,10 @@ if (!$res) { exit 1 }
 
 export default defineConfig({
   plugins: [react(), zebraPrinterPlugin()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: [],
+    include: ['src/**/*.test.{js,jsx}'],
+  },
 });
