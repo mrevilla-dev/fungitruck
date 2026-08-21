@@ -19,6 +19,13 @@ import {
 import { uploadFileToDrive } from '../services/driveService';
 import toast from 'react-hot-toast';
 import PrintLabelsModal from './PrintLabelsModal';
+import {
+  calcularFraccionBulk,
+  calcularDescuentoVolumen,
+  calcularConsumoSubfraccion,
+  calcularRestauracionBulk,
+  evaluarAgotamiento,
+} from '../domain/medios.js';
 
 // ── Opciones fijas ─────────────────────────────────────────────────────────────
 const TIPO_ENVASE_OPTIONS  = ['Unidad independiente', 'Bolsa', 'Caja', 'Bandeja'];
@@ -117,14 +124,10 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
   const cantidadActual = Math.max(0, rawCantidadActual);
 
   // ── suma de lo ya fraccionado en bolsas existentes ─────────────────────
-  const yaFraccionado = existingBags.reduce((sum, b) => {
-    const q = b.cantidad ?? 0;
-    const v = b.volumen_por_unidad_ml > 0 ? Number(b.volumen_por_unidad_ml) : 1;
-    return sum + (q * v);
-  }, 0);
-
-  // ── quedan sin fraccionar ─────────────────────────────────────────────
-  const disponibleBulk = cantidadActual;
+  const { yaFraccionado, disponibleBulk } = calcularFraccionBulk({
+    cantidadActual,
+    existentes: existingBags,
+  });
 
   // ── ID que se asignará a esta bolsa ────────────────────────────────────
   const codigoMedio = extraerCodigoMedio(medio?.alias || medio?.codigo || medio?.id);
@@ -132,11 +135,18 @@ export function AddBagModal({ medio, existingBags, salasList, insumosList, onClo
 
   const handleSave = async () => {
     const qty = Number(cantidad?.toString().replace(',', '.')) || 0;
-    const vol = porVolumen ? 1 : (Number(volumenPorUnidad?.toString().replace(',', '.')) || 0);
-    const descuento = porVolumen ? qty : (vol > 0 ? (qty * vol) : qty);
+    const { descuento, errorMsg: descError } = calcularDescuentoVolumen({
+      disponibleMl: disponibleBulk,
+      descuentoMl: porVolumen ? qty : (vol > 0 ? (qty * vol) : qty),
+      volU: 1,
+    });
+    const descuentoFinal = descuento;
 
     if (!qty || qty <= 0) return toast.error('Ingresá una cantidad válida');
-    if (descuento > disponibleBulk) return toast.error(`Solo quedan ${disponibleBulk} disponibles en el bulk, y querés fraccionar ${descuento}`);
+    if (!descError && descuentoFinal > disponibleBulk) {
+      return toast.error(`Solo quedan ${disponibleBulk} disponibles en el bulk, y querés fraccionar ${descuentoFinal}`);
+    }
+    if (descError) return toast.error(descError);
     if (!operario.trim())    return toast.error('Ingresá el nombre del operario');
 
     // Advertencia de operario distinto
@@ -609,16 +619,16 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
   const handleSave = async () => {
     if (!qty || qty <= 0) return toast.error('Ingresá una cantidad válida de unidades a crear');
 
-    if (parentHasVolume) {
-      if (!vol || vol <= 0) return toast.error('Ingresá el volumen por unidad para calcular el descuento del padre');
-      if (descuentoPadreAuto > parentDisponible)
-        return toast.error(`El padre solo tiene ${parentDisponible} ml disponibles y querés usar ${descuentoPadreAuto} ml`);
-    } else {
-      if (!descuentoPadreManual || descuentoPadreManual <= 0)
-        return toast.error('Ingresá cuántas unidades del padre se consumen');
-      if (descuentoPadreManual > parentDisponible)
-        return toast.error(`El padre solo tiene ${parentDisponible} ${parentUnidadLabel} disponibles`);
-    }
+    const consumo = calcularConsumoSubfraccion({
+      parentHasVolume,
+      parentVolU: Number(parentBag.volumen_por_unidad_ml) || 1,
+      parentDisponible,
+      qty,
+      volHijo: vol,
+      childPorVolumen: porVolumenHijo,
+    });
+
+    if (!consumo.valido) return toast.error(consumo.errorMsg);
 
     if (!operario.trim()) return toast.error('Ingresá el nombre del operario');
     if (defaultOperario && operario.trim() !== defaultOperario) {
@@ -734,23 +744,19 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
         creadas.push({ id: newBagRef.id, medioId: medio.id, ...childData });
       }
 
-      // Descontar del padre
-      const remainingAmount = Math.max(0, parentDisponible - descuentoPadre);
-      const parentBecomesAgotada = remainingAmount <= 0 && parentBag.estado !== 'Agotada';
+      // Descontar del padre (usando dominio puro)
+      const agotamiento = evaluarAgotamiento({
+        nuevoDisponible: consumo.nuevoDisponiblePadre,
+        estadoActual: parentBag.estado,
+      });
+      const parentBecomesAgotada = agotamiento.debeAgotar;
+
+      const parentUpdateData = {
+        disponible: consumo.unidadesRestantes !== undefined ? consumo.unidadesRestantes : consumo.nuevoDisponiblePadre,
+      };
       
-      const parentUpdateData = {};
-      if (parentHasVolume) {
-        // (b) Fix: el volumen por unidad del padre queda constante; el descuento
-        // se expresa en unidades (floor), coherente con el consumo por unidad
-        const volUnidad = Number(parentBag.volumen_por_unidad_ml) || 1;
-        const unidadesRestantes = remainingAmount > 0 ? Math.floor(remainingAmount / volUnidad) : 0;
-        parentUpdateData.disponible = unidadesRestantes;
-        const sobrante = remainingAmount - (unidadesRestantes * volUnidad);
-        if (remainingAmount > 0 && sobrante > 0) {
-          toast(`Quedan ${sobrante} ml que no completan una unidad: disponible = ${unidadesRestantes} ${parentBag.tipo_unidad || 'unidades'}`, { icon: '⚠️', duration: 6000 });
-        }
-      } else {
-        parentUpdateData.disponible = remainingAmount;
+      if (parentHasVolume && consumo.sobranteMl > 0 && consumo.nuevoDisponiblePadre > 0) {
+        toast(`Quedan ${consumo.sobranteMl} ml que no completan una unidad: disponible = ${consumo.unidadesRestantes} ${parentBag.tipo_unidad || 'unidades'}`, { icon: '⚠️', duration: 6000 });
       }
       
       if (parentBecomesAgotada) {
@@ -1363,7 +1369,11 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
       const bagData = bagSnap.data() || {};
       const wasAgotada = bagData.estado === 'Agotada';
 
-      const descuento = vol > 0 ? (qty * vol) : qty;
+      const { descuentoRestaurado, nuevoBulk } = calcularRestauracionBulk({
+        cantidadActual: cantidadActualUI,
+        bagQty: qty,
+        bagVolU: vol,
+      });
       const batch = writeBatch(db);
       
       const bagRef = doc(db, `medios_preparados/${medio.id}/subfracciones`, bagId);
@@ -1372,7 +1382,7 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
       batch.delete(bagRef);
       // Restaurar bulk
       batch.update(medioRef, {
-        'stock_bulk.cantidad_actual': cantidadActualUI + descuento,
+        'stock_bulk.cantidad_actual': nuevoBulk,
         total_subfracciones: increment(-1),
         subfracciones_disponibles: wasAgotada ? increment(0) : increment(-1),
         ...(medio.estado === 'Agotado' ? { estado: 'Activo' } : {})
