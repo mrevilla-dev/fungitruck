@@ -13,6 +13,7 @@ import { compressImage } from '../utils/imageUtils';
 import { proximaRevisionDesdeFecha } from '../utils/fechas';
 import { useMlPorPlaca } from '../hooks/useMlPorPlaca';
 import toast from 'react-hot-toast';
+import { calcularDescuentoEvento } from '../domain/medios.js';
 
 const TIPOS_MATERIAL = [
   { id: 'sello_esporas', label: 'Sello de Esporas' },
@@ -421,18 +422,19 @@ export default function IngresoMaterialPage() {
             const cantidadPlacas = Math.max(1, parseInt(deriv.cantidad_placas, 10) || 1);
             const proximaRevision = await proximaRevisionDesdeFecha(formValues.fecha);
 
-            const descuentoPorPlaca = (medioOpt?.type === 'sub' && medioOpt.sub.por_volumen) || medioOpt?.type === 'bulk'
-              ? (mlPorPlaca > 0 ? mlPorPlaca : 20)
-              : 1;
-            const totalConsumo = cantidadPlacas * descuentoPorPlaca;
-            if (medioOpt) {
-              if (medioOpt.type === 'sub' && totalConsumo > (medioOpt.sub.disponible ?? 0)) {
-                throw new Error(`La fracción solo tiene ${medioOpt.sub.disponible ?? 0} ${medioOpt.sub.por_volumen ? 'ml' : 'unidades'} disponibles y querés consumir ${totalConsumo}`);
-              }
-              if (medioOpt.type === 'bulk' && totalConsumo > (medioOpt.medio.stock_bulk?.cantidad_actual ?? medioOpt.medio.cantidad_actual ?? 0)) {
-                throw new Error(`El medio solo tiene ${medioOpt.medio.stock_bulk?.cantidad_actual ?? 0} ml en bulk y querés consumir ${totalConsumo} ml`);
-              }
-            }
+            const consumo = calcularDescuentoEvento({
+              cantidadPlacas,
+              mlPorPlaca: mlPorPlaca > 0 ? mlPorPlaca : 20,
+              padre: {
+                por_volumen: (medioOpt?.type === 'sub' && medioOpt.sub.por_volumen) || medioOpt?.type === 'bulk',
+                type: medioOpt?.type,
+                volumen_por_unidad_ml: medioOpt?.type === 'sub' ? medioOpt.sub.volumen_por_unidad_ml : 1,
+                disponible: medioOpt?.type === 'sub' ? (medioOpt.sub.disponible ?? 0) : (medioOpt?.medio.stock_bulk?.cantidad_actual ?? medioOpt?.medio.cantidad_actual ?? 0),
+                stock_bulk: medioOpt?.medio?.stock_bulk,
+                tipo_unidad: medioOpt?.type === 'sub' ? (medioOpt.sub.por_volumen ? 'ml' : medioOpt.sub.tipo_unidad) : 'ml',
+              },
+            });
+            if (!consumo.valido) throw new Error(consumo.errorMsg);
 
             for (let b = 0; b < cantidadPlacas; b++) {
               const batchId = generarIdBatch({
@@ -1209,10 +1211,21 @@ export default function IngresoMaterialPage() {
                       const medioOpt = mediosDisponibles.find(o => o.id === d.medio_prep_id);
                       const esVol = (medioOpt?.type === 'sub' && medioOpt.sub.por_volumen) || medioOpt?.type === 'bulk';
                       if (!esVol) return null;
-                      const ml = mlPorPlaca > 0 ? mlPorPlaca : 20;
+                      const preview = calcularDescuentoEvento({
+                        cantidadPlacas: Math.max(1, parseInt(d.cantidad_placas, 10) || 1),
+                        mlPorPlaca: mlPorPlaca > 0 ? mlPorPlaca : 20,
+                        padre: {
+                          por_volumen: true,
+                          type: medioOpt?.type,
+                          volumen_por_unidad_ml: 1,
+                          disponible: medioOpt?.type === 'sub' ? (medioOpt.sub.disponible ?? 0) : (medioOpt?.medio.stock_bulk?.cantidad_actual ?? 0),
+                          tipo_unidad: 'ml',
+                        },
+                      });
+                      if (!preview.valido) return null;
                       return (
                         <p style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.2rem', fontWeight: 600 }}>
-                          💧 Se descontarán {Math.max(1, parseInt(d.cantidad_placas, 10) || 1) * ml} ml del frasco (a {ml} ml/placa)
+                          💧 Se descontarán {preview.descuentoTotal} ml del frasco (a {mlPorPlaca > 0 ? mlPorPlaca : 20} ml/placa)
                         </p>
                       );
                     })()}
