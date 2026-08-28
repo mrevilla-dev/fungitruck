@@ -153,6 +153,7 @@ export function calcularConsumoSubfraccion({ parentHasVolume, parentVolU, parent
         sobranteMl: 0,
         unidadesRestantes: 0,
         padreAgotado: false,
+        valido: false,
         errorMsg: 'volHijo requerido cuando hijo no es por_volumen',
       };
     }
@@ -168,6 +169,7 @@ export function calcularConsumoSubfraccion({ parentHasVolume, parentVolU, parent
       sobranteMl: r.sobranteMl,
       unidadesRestantes: r.unidadesRestantes,
       padreAgotado: r.agotada,
+      valido: r.valido,
       errorMsg: r.errorMsg,
     };
   }
@@ -180,6 +182,7 @@ export function calcularConsumoSubfraccion({ parentHasVolume, parentVolU, parent
       sobranteMl: 0,
       unidadesRestantes: 0,
       padreAgotado: false,
+      valido: false,
       errorMsg: `Descuento ${descuentoPadre} supera disponible ${parentDisponible}`,
     };
   }
@@ -189,6 +192,7 @@ export function calcularConsumoSubfraccion({ parentHasVolume, parentVolU, parent
     sobranteMl: 0,
     unidadesRestantes: parentDisponible - descuentoPadre,
     padreAgotado: parentDisponible - descuentoPadre <= 0,
+    valido: true,
     errorMsg: null,
   };
 }

@@ -186,6 +186,35 @@ describe('calcularConsumoSubfraccion', () => {
     expect(r.nuevoDisponiblePadre).toBe(15);
     expect(r.padreAgotado).toBe(false);
   });
+
+  it('REG-AddSubBagModal: padre 380ml vol/u=1, hijo NO por_volumen 10 uds x4ml -> valido, descuento 40ml', () => {
+    const r = calcularConsumoSubfraccion({
+      parentHasVolume: true,
+      parentVolU: 1,
+      parentDisponible: 380,
+      qty: 10,
+      volHijo: 4,
+      childPorVolumen: false,
+    });
+    expect(r.valido).toBe(true);
+    expect(r.descuentoPadre).toBe(40);
+    expect(r.nuevoDisponiblePadre).toBe(340);
+    expect(r.errorMsg).toBeNull();
+  });
+
+  it('REG-AddSubBagModal: mismo padre 400 uds x4ml=1600ml supera 380 -> valido:false errorMsg no vacío', () => {
+    const r = calcularConsumoSubfraccion({
+      parentHasVolume: true,
+      parentVolU: 1,
+      parentDisponible: 380,
+      qty: 400,
+      volHijo: 4,
+      childPorVolumen: false,
+    });
+    expect(r.valido).toBe(false);
+    expect(r.errorMsg).toBeTruthy();
+    expect(r.errorMsg).toContain('supera disponible');
+  });
 });
 
 describe('calcularFraccionBulk', () => {

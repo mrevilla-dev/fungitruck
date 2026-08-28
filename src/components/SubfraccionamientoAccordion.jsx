@@ -921,9 +921,11 @@ export function AddSubBagModal({ medio, parentBag, existingBags, salasList, insu
               readOnly style={{ background: 'rgba(255,255,255,0.05)', cursor: 'default' }} />
             <small style={{
               display: 'block', marginTop: '0.3rem', fontWeight: 500,
-              color: (parentDisponible - (descuentoPadreAuto ?? 0)) >= 0 ? 'var(--text-secondary)' : '#f44',
+              color: (descuentoPadreAuto ?? 0) > parentDisponible ? '#f44' : 'var(--text-secondary)',
             }}>
-              Padre quedará con: {Math.max(0, parentDisponible - (descuentoPadreAuto ?? 0))} ml
+              {(descuentoPadreAuto ?? 0) > parentDisponible
+                ? `Faltan ${descuentoPadreAuto - parentDisponible} ml`
+                : `Padre quedará con: ${Math.max(0, parentDisponible - (descuentoPadreAuto ?? 0))} ml`}
             </small>
           </div>
         ) : (
