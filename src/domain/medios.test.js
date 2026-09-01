@@ -229,6 +229,22 @@ describe('calcularFraccionBulk', () => {
     expect(r.yaFraccionado).toBe(250);
     expect(r.disponibleBulk).toBe(750);
   });
+
+  it('REG-doble-contabilidad: hijas con parent_id no se cuentan dos veces', () => {
+    const r = calcularFraccionBulk({
+      cantidadActual: 450,
+      existentes: [
+        { cantidad: 500, volumen_por_unidad_ml: 1 },              // frasco A (top-level)
+        { cantidad: 50,  volumen_por_unidad_ml: 1 },              // bolsa B (top-level)
+        { cantidad: 60,  volumen_por_unidad_ml: 1, parent_id: 'FRAC-A' }, // D (child of A)
+        { cantidad: 60,  volumen_por_unidad_ml: 1, parent_id: 'FRAC-A' }, // C (child of A)
+        { cantidad: 3,   volumen_por_unidad_ml: 1, parent_id: 'FRAC-A' }, // E (child of A)
+        { cantidad: 2,   volumen_por_unidad_ml: 1, parent_id: 'FRAC-A' }, // F (child of A)
+      ],
+    });
+    expect(r.yaFraccionado).toBe(550);
+    expect(r.disponibleBulk).toBe(0);
+  });
 });
 
 describe('calcularRestauracionBulk', () => {

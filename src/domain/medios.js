@@ -198,7 +198,8 @@ export function calcularConsumoSubfraccion({ parentHasVolume, parentVolU, parent
 }
 
 export function calcularFraccionBulk({ cantidadActual, existentes }) {
-  const yaFraccionado = (existentes || []).reduce((sum, b) => {
+  const toplevel = (existentes || []).filter(b => !b.parent_id);
+  const yaFraccionado = toplevel.reduce((sum, b) => {
     const q = Number(b.cantidad) || 0;
     const v = Number(b.volumen_por_unidad_ml) || 1;
     return sum + (q * v);

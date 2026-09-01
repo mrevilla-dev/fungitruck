@@ -1355,7 +1355,8 @@ export default function SubfraccionamientoAccordion({ medio, operariosList, sala
   // ── Indicador global del bulk ──────────────────────────────────────────────
   const rawCantidadActualUI = medio?.stock_bulk?.cantidad_actual ?? medio?.cantidad_actual ?? medio?.stock_total_base ?? 0;
   const cantidadActualUI = Math.max(0, rawCantidadActualUI);
-  const yaFraccionado  = bags.reduce((sum, b) => {
+  const toplevelBags = bags.filter(b => !b.parent_id);
+  const yaFraccionado  = toplevelBags.reduce((sum, b) => {
     const q = b.cantidad ?? 0;
     const v = b.volumen_por_unidad_ml > 0 ? Number(b.volumen_por_unidad_ml) : 1;
     return sum + (q * v);
